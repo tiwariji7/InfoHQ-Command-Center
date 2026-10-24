@@ -9,7 +9,14 @@ import type {
   DuplicateCheckResult,
 } from '@infohq/shared';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+function buildUrl(endpoint: string): string {
+  const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+  if (!base) return endpoint;
+  if (base.endsWith('/api') && endpoint.startsWith('/api')) {
+    return `${base}${endpoint.slice(4)}`;
+  }
+  return `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+}
 
 export class ApiRequestError extends Error {
   status: number;
@@ -36,7 +43,8 @@ export async function fetchWithAuth<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const url = buildUrl(endpoint);
+  const response = await fetch(url, {
     ...options,
     headers,
   });
@@ -58,7 +66,7 @@ export async function fetchWithAuth<T>(
 }
 
 export async function checkHealth(): Promise<HealthResponse> {
-  const response = await fetch(`${API_BASE}/api/health`);
+  const response = await fetch(buildUrl('/api/health'));
   if (!response.ok) {
     throw new Error('Health check failed');
   }
