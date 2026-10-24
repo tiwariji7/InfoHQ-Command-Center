@@ -1,12 +1,21 @@
-import type { HealthResponse, MeResponse, ApiError } from '@infohq/shared';
+import type {
+  HealthResponse,
+  MeResponse,
+  ApiError,
+  Lead,
+  CreateLeadInput,
+  LeadListQuery,
+  PaginatedResponse,
+  DuplicateCheckResult,
+} from '@infohq/shared';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export class ApiRequestError extends Error {
   status: number;
-  data: ApiError;
+  data: ApiError & { matches?: DuplicateCheckResult['matches'] };
 
-  constructor(status: number, data: ApiError) {
+  constructor(status: number, data: ApiError & { matches?: DuplicateCheckResult['matches'] }) {
     super(data.message || `API Request failed with status ${status}`);
     this.name = 'ApiRequestError';
     this.status = status;
@@ -33,9 +42,9 @@ export async function fetchWithAuth<T>(
   });
 
   if (!response.ok) {
-    let errorData: ApiError;
+    let errorData: ApiError & { matches?: DuplicateCheckResult['matches'] };
     try {
-      errorData = (await response.json()) as ApiError;
+      errorData = (await response.json()) as ApiError & { matches?: DuplicateCheckResult['matches'] };
     } catch {
       errorData = {
         error: 'unknown_error',
@@ -58,4 +67,40 @@ export async function checkHealth(): Promise<HealthResponse> {
 
 export async function fetchMe(getToken: () => Promise<string | null>): Promise<MeResponse> {
   return fetchWithAuth<MeResponse>('/api/me', getToken);
+}
+
+// Leads API
+export async function fetchLeads(
+  getToken: () => Promise<string | null>,
+  query: LeadListQuery = { page: 1, pageSize: 20 }
+): Promise<PaginatedResponse<Lead>> {
+  const params = new URLSearchParams();
+  params.set('page', String(query.page));
+  params.set('pageSize', String(query.pageSize));
+  if (query.stage) params.set('stage', query.stage);
+  if (query.source) params.set('source', query.source);
+  if (query.search) params.set('search', query.search);
+
+  return fetchWithAuth<PaginatedResponse<Lead>>(`/api/leads?${params.toString()}`, getToken);
+}
+
+export async function createLeadApi(
+  getToken: () => Promise<string | null>,
+  input: CreateLeadInput
+): Promise<{ success: boolean; data: Lead }> {
+  return fetchWithAuth<{ success: boolean; data: Lead }>('/api/leads', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function checkDuplicateLead(
+  getToken: () => Promise<string | null>,
+  params: { email?: string; phone?: string }
+): Promise<DuplicateCheckResult> {
+  const query = new URLSearchParams();
+  if (params.email) query.set('email', params.email);
+  if (params.phone) query.set('phone', params.phone);
+
+  return fetchWithAuth<DuplicateCheckResult>(`/api/leads/check-duplicate?${query.toString()}`, getToken);
 }
