@@ -1,0 +1,57 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          primary: '#7C5CE8',
+          hover: '#6A48DC',
+          active: '#5835CF',
+          light: '#E5DEFF',
+          subtle: '#F3F0FF',
+          heading: '#1A085C',
+          body: '#4B5563',
+          muted: '#6B7280',
+          lightGray: '#9CA3AF',
+          page: '#F8F8FF',
+          section: '#F4F3F9',
+          wash: '#E6DFFE',
+          card: '#FFFFFF',
+          border: '#EAE6F7',
+          subtleBorder: 'rgba(124, 92, 232, 0.12)',
+          focus: '#5B4BF0',
+          destructive: '#E11D48',
+          errorBg: '#FFF1F2',
+        },
+        chips: {
+          blueBg: '#EFF6FF',
+          blueText: '#1D4ED8',
+          purpleBg: '#FAF5FF',
+          purpleText: '#6B21A8',
+          greenBg: '#F0FDF4',
+          greenText: '#15803D',
+          orangeBg: '#FFF7ED',
+          orangeText: '#C2410C',
+          neutralBg: '#F4F3F9',
+          neutralText: '#6B7280',
+        },
+      },
+      borderRadius: {
+        chip: '8px',
+        control: '12px',
+        popover: '16px',
+        card: '20px',
+        drawerTop: '24px',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      backgroundImage: {
+        'brand-gradient': 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
+        'cta-gradient': 'linear-gradient(90deg, #5B4CF5, #E85AA0)',
+      },
+    },
+  },
+  plugins: [],
+};
