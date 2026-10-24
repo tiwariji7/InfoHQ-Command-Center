@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { AppContext } from './types/env.js';
 import { requireSuperadmin } from './middleware/auth.js';
+import { leadsRouter } from './routes/leads.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
@@ -65,5 +66,8 @@ app.get('/api/me', requireSuperadmin, (c) => {
   };
   return c.json(response);
 });
+
+// Protected: Leads core router
+app.route('/api/leads', leadsRouter);
 
 export default app;
