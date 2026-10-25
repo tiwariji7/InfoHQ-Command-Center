@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useClerk } from '@clerk/clerk-react';
 import type { AuthUser, HealthResponse } from '@infohq/shared';
 import { LeadsInbox } from '../leads/LeadsInbox.js';
+import { PipelineView } from '../pipeline/PipelineView.js';
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -22,7 +23,7 @@ interface ShellProps {
 
 export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
   const { signOut } = useClerk();
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads'>('leads');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'pipeline'>('leads');
 
   return (
     <div className="min-h-screen bg-brand-page flex flex-col md:flex-row">
@@ -75,14 +76,17 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
           </button>
 
           <button
-            disabled
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-control text-brand-lightGray font-medium text-sm cursor-not-allowed opacity-60"
-            title="Available in Step 4"
+            onClick={() => setActiveTab('pipeline')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-control font-medium text-sm transition-colors ${
+              activeTab === 'pipeline'
+                ? 'bg-brand-subtle text-brand-primary'
+                : 'text-brand-body hover:bg-brand-section'
+            }`}
           >
             <Kanban size={20} />
             <span className="hidden lg:inline">Pipeline</span>
-            <span className="hidden lg:inline ml-auto text-[10px] bg-brand-section text-brand-muted px-1.5 py-0.5 rounded">
-              Step 4
+            <span className="hidden lg:inline ml-auto text-[10px] bg-chips-purpleBg text-chips-purpleText font-semibold px-1.5 py-0.5 rounded border border-purple-100">
+              Active
             </span>
           </button>
 
@@ -160,7 +164,9 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
 
         {/* Page Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto space-y-6 pb-20 md:pb-8">
-          {activeTab === 'leads' ? (
+          {activeTab === 'pipeline' ? (
+            <PipelineView />
+          ) : activeTab === 'leads' ? (
             <LeadsInbox />
           ) : (
             <>
@@ -172,16 +178,25 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
                       System Overview
                     </h1>
                     <p className="text-sm text-brand-body mt-1">
-                      Step 2 operational: Leads Core and centralized Inbox active with D1 persistence.
+                      Step 4 operational: Leads Inbox & 5-stage opportunity pipeline active with D1 persistence.
                     </p>
                   </div>
-                  <button
-                    onClick={() => setActiveTab('leads')}
-                    className="hq-btn-primary text-xs self-start sm:self-auto"
-                  >
-                    <Inbox size={14} />
-                    Open Leads Inbox
-                  </button>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      onClick={() => setActiveTab('pipeline')}
+                      className="hq-btn-primary text-xs"
+                    >
+                      <Kanban size={14} />
+                      Sales Pipeline
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('leads')}
+                      className="hq-btn-secondary text-xs"
+                    >
+                      <Inbox size={14} />
+                      Leads Inbox
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -314,11 +329,13 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
           <span className="text-[11px] font-medium">Leads</span>
         </button>
         <button
-          disabled
-          className="flex flex-col items-center justify-center gap-1 text-brand-lightGray py-1 opacity-50"
+          onClick={() => setActiveTab('pipeline')}
+          className={`flex flex-col items-center justify-center gap-1 py-1 ${
+            activeTab === 'pipeline' ? 'text-brand-primary' : 'text-brand-muted'
+          }`}
         >
           <Kanban size={20} />
-          <span className="text-[11px]">Pipeline</span>
+          <span className="text-[11px] font-medium">Pipeline</span>
         </button>
         <button
           disabled

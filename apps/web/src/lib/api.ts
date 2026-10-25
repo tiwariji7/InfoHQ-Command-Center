@@ -4,6 +4,7 @@ import type {
   ApiError,
   Lead,
   CreateLeadInput,
+  UpdateLeadStageInput,
   LeadListQuery,
   PaginatedResponse,
   DuplicateCheckResult,
@@ -111,4 +112,15 @@ export async function checkDuplicateLead(
   if (params.phone) query.set('phone', params.phone);
 
   return fetchWithAuth<DuplicateCheckResult>(`/api/leads/check-duplicate?${query.toString()}`, getToken);
+}
+
+export async function updateLeadStageApi(
+  getToken: () => Promise<string | null>,
+  leadId: string,
+  input: UpdateLeadStageInput
+): Promise<{ success: boolean; data: Lead }> {
+  return fetchWithAuth<{ success: boolean; data: Lead }>(`/api/leads/${leadId}/stage`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 }

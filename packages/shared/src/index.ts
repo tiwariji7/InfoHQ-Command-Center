@@ -65,8 +65,11 @@ export const LeadSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().nullable().optional(),
   phone: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
   serviceNeeded: z.string().nullable().optional(),
   budget: z.string().nullable().optional(),
+  timeline: z.string().nullable().optional(),
+  preferredContact: z.string().nullable().optional(),
   message: z.string().nullable().optional(),
   source: LeadSourceSchema,
   stage: LeadStageSchema,
@@ -83,8 +86,11 @@ export const CreateLeadSchema = z
     name: z.string().trim().min(1, 'Name is required'),
     email: z.string().trim().email('Invalid email address').optional().or(z.literal('')),
     phone: z.string().trim().optional().or(z.literal('')),
+    company: z.string().trim().optional(),
     serviceNeeded: z.string().trim().optional(),
     budget: z.string().trim().optional(),
+    timeline: z.string().trim().optional(),
+    preferredContact: z.string().trim().optional(),
     message: z.string().trim().optional(),
     source: LeadSourceSchema.default('other'),
     stage: LeadStageSchema.default('new'),
@@ -100,6 +106,13 @@ export const CreateLeadSchema = z
   );
 
 export type CreateLeadInput = z.infer<typeof CreateLeadSchema>;
+
+export const UpdateLeadStageSchema = z.object({
+  stage: LeadStageSchema,
+  lostReason: z.string().trim().optional(),
+});
+
+export type UpdateLeadStageInput = z.infer<typeof UpdateLeadStageSchema>;
 
 export const LeadActivitySchema = z.object({
   id: z.string(),

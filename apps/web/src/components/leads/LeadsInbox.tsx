@@ -244,9 +244,14 @@ export const LeadsInbox: React.FC = () => {
                       key={lead.id}
                       className="hover:bg-brand-section/40 transition-colors"
                     >
-                      {/* Name */}
+                      {/* Name & Company */}
                       <td className="py-3.5 px-4 font-semibold text-brand-heading">
-                        {lead.name}
+                        <div>{lead.name}</div>
+                        {lead.company && (
+                          <div className="text-[11px] font-normal text-brand-muted">
+                            {lead.company}
+                          </div>
+                        )}
                       </td>
 
                       {/* Phone & Email */}
@@ -352,6 +357,11 @@ export const LeadsInbox: React.FC = () => {
                       <h4 className="text-base font-bold text-brand-heading">
                         {lead.name}
                       </h4>
+                      {lead.company && (
+                        <div className="text-xs text-brand-muted font-medium">
+                          {lead.company}
+                        </div>
+                      )}
                       <span className="text-[11px] text-brand-muted">
                         {getSourceLabel(lead.source)} • {formatDate(lead.createdAt)}
                       </span>

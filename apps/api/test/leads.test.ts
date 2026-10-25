@@ -222,4 +222,106 @@ describe('InfoHQ API - Leads Core (Step 2)', () => {
       expect(json.data[0].source).toBe('referral');
     });
   });
+
+  describe('PATCH /api/leads/:id/stage', () => {
+    it('returns 400 when invalid stage provided', async () => {
+      mockEnv.DB = { prepare: vi.fn() };
+      const res = await app.request(
+        '/api/leads/lead_123/stage',
+        {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify({ stage: 'invalid_stage' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(400);
+      const json = (await res.json()) as Record<string, unknown>;
+      expect(json.error).toBe('validation_error');
+    });
+
+    it('returns 404 when lead does not exist', async () => {
+      const mockPrepare = vi.fn().mockImplementation((sql: string) => {
+        return {
+          bind: vi.fn().mockReturnValue({
+            first: vi.fn().mockResolvedValue(null),
+          }),
+        };
+      });
+
+      mockEnv.DB = { prepare: mockPrepare };
+
+      const res = await app.request(
+        '/api/leads/lead_nonexistent/stage',
+        {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify({ stage: 'contacted' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(404);
+      const json = (await res.json()) as Record<string, unknown>;
+      expect(json.error).toBe('not_found');
+    });
+
+    it('updates stage atomically and writes activity log', async () => {
+      const mockBatch = vi.fn().mockResolvedValue([{ success: true }, { success: true }]);
+      const mockPrepare = vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT * FROM leads WHERE id = ?')) {
+          return {
+            bind: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue({
+                id: 'lead_123',
+                name: 'Rahul Sharma',
+                email: 'rahul@example.com',
+                phone: '+919876543210',
+                company: 'Acme Corp',
+                service_needed: 'Web App',
+                budget: '50000',
+                timeline: '2 weeks',
+                preferred_contact: 'WhatsApp',
+                message: null,
+                source: 'website_contact',
+                stage: 'new',
+                lost_reason: null,
+                next_follow_up_at: null,
+                created_at: 1000,
+                updated_at: 1000,
+              }),
+            }),
+          };
+        }
+        return {
+          bind: vi.fn().mockReturnValue({
+            run: vi.fn().mockResolvedValue({ success: true }),
+          }),
+        };
+      });
+
+      mockEnv.DB = {
+        prepare: mockPrepare,
+        batch: mockBatch,
+      };
+
+      const res = await app.request(
+        '/api/leads/lead_123/stage',
+        {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify({ stage: 'contacted' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const json = (await res.json()) as any;
+      expect(json.success).toBe(true);
+      expect(json.data.id).toBe('lead_123');
+      expect(json.data.stage).toBe('contacted');
+      expect(mockBatch).toHaveBeenCalledTimes(1);
+    });
+  });
 });

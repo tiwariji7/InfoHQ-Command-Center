@@ -35,9 +35,17 @@ Append-only project history. Do not rewrite earlier entries.
 ## 2026-10-24 | Cloudflare deploy fix — Root wrangler configuration
 - Added: Root `wrangler.jsonc` specifying Worker name `infohq-command-center`, entry `apps/api/src/index.ts`, assets directory `apps/web/dist`, and D1 binding `DB` (`infohq-command-center`).
 - Added: `assets.run_worker_first: ["/api/*"]` routing pattern ensuring API calls route to the Worker and static assets serve the SPA with single-page fallback.
-- Upgraded: `wrangler` devDependency to `4.152.0` in root `package.json` for deployment CLI compatibility.
-- Retained: `apps/api/wrangler.jsonc` untouched for isolated backend development.
-- Verified: `npm run build` and `npx wrangler deploy --dry-run` successfully executed locally with 0 errors.
+## 2026-10-25 | Step 4 — Five-Stage Sales Pipeline & Opportunity Tracking
+- Added: Schema enrichment with `company`, `timeline`, and `preferred_contact` across `migrations/0002_leads_core.sql`, `@infohq/shared`, and `apps/api/src/services/leadService.ts`.
+- Added: Stage transition endpoint `PATCH /api/leads/:id/stage` validated with `UpdateLeadStageSchema`.
+- Added: Atomic D1 batch execution in `updateLeadStage` updating lead stage and inserting audit record in `lead_activities` with `before_json` and `after_json`.
+- Added: `updateLeadStageApi` in `apps/web/src/lib/api.ts`.
+- Added: `apps/web/src/components/pipeline/PipelineView.tsx` implementing 5-stage visual funnel (`New`, `Contacted`, `Proposal Sent`, `Won`, `Lost`) with stage revenue metrics, card indicators, and optimistic UI updates with automatic rollback on error.
+- Added: `LostReasonModal.tsx` for capturing structured reason and notes when transitioning leads to `Lost`.
+- Added: Company name display in desktop table and mobile cards in `LeadsInbox.tsx`.
+- Added: New input fields (`company`, `timeline`, `preferredContact`) in `AddLeadModal.tsx`.
+- Added: Automated unit and integration tests in `apps/api/test/leads.test.ts` (14/14 tests passing).
+- Verified: `npm run typecheck`, `npm run test`, `npm run build`, and `npx wrangler deploy --dry-run` all pass cleanly with zero errors.
 
 
 

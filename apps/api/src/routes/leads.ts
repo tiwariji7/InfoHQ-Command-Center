@@ -4,12 +4,14 @@ import { requireSuperadmin } from '../middleware/auth.js';
 import {
   CreateLeadSchema,
   LeadListQuerySchema,
+  UpdateLeadStageSchema,
 } from '@infohq/shared';
 import {
   getLeads,
   createLead,
   checkDuplicate,
   getLeadById,
+  updateLeadStage,
   DuplicateLeadError,
 } from '../services/leadService.js';
 
@@ -129,5 +131,45 @@ leadsRouter.get('/:id', async (c) => {
   } catch (err: unknown) {
     console.error('Error getting lead details:', err instanceof Error ? err.message : err);
     return c.json({ error: 'internal_error', message: 'Failed to retrieve lead details.' }, 500);
+  }
+});
+
+// PATCH /api/leads/:id/stage - Update lead stage and log activity
+leadsRouter.patch('/:id/stage', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const leadId = c.req.param('id');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'bad_request', message: 'Malformed JSON payload.' }, 400);
+  }
+
+  const parseResult = UpdateLeadStageSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json(
+      {
+        error: 'validation_error',
+        message: 'Validation failed for stage update.',
+        details: parseResult.error.format(),
+      },
+      400
+    );
+  }
+
+  const user = c.get('user');
+
+  try {
+    const updatedLead = await updateLeadStage(c.env.DB, leadId, parseResult.data, user.clerkUserId);
+    if (!updatedLead) {
+      return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
+    }
+    return c.json({ success: true, data: updatedLead });
+  } catch (err: unknown) {
+    console.error('Error updating lead stage:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to update lead stage.' }, 500);
   }
 });
