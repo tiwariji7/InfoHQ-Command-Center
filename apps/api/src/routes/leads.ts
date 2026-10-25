@@ -5,6 +5,8 @@ import {
   CreateLeadSchema,
   LeadListQuerySchema,
   UpdateLeadStageSchema,
+  CreateLeadNoteSchema,
+  SetFollowUpSchema,
 } from '@infohq/shared';
 import {
   getLeads,
@@ -12,6 +14,8 @@ import {
   checkDuplicate,
   getLeadById,
   updateLeadStage,
+  addLeadNote,
+  setLeadFollowUp,
   DuplicateLeadError,
 } from '../services/leadService.js';
 
@@ -171,5 +175,85 @@ leadsRouter.patch('/:id/stage', async (c) => {
   } catch (err: unknown) {
     console.error('Error updating lead stage:', err instanceof Error ? err.message : err);
     return c.json({ error: 'internal_error', message: 'Failed to update lead stage.' }, 500);
+  }
+});
+
+// POST /api/leads/:id/notes - Add authored internal note
+leadsRouter.post('/:id/notes', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const leadId = c.req.param('id');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'bad_request', message: 'Malformed JSON payload.' }, 400);
+  }
+
+  const parseResult = CreateLeadNoteSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json(
+      {
+        error: 'validation_error',
+        message: 'Invalid note content.',
+        details: parseResult.error.format(),
+      },
+      400
+    );
+  }
+
+  const user = c.get('user');
+
+  try {
+    const note = await addLeadNote(c.env.DB, leadId, parseResult.data.body, user.clerkUserId);
+    if (!note) {
+      return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
+    }
+    return c.json({ success: true, data: note }, 201);
+  } catch (err: unknown) {
+    console.error('Error adding lead note:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to add note.' }, 500);
+  }
+});
+
+// PATCH /api/leads/:id/follow-up - Schedule or clear follow-up
+leadsRouter.patch('/:id/follow-up', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const leadId = c.req.param('id');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'bad_request', message: 'Malformed JSON payload.' }, 400);
+  }
+
+  const parseResult = SetFollowUpSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json(
+      {
+        error: 'validation_error',
+        message: 'Invalid follow-up timestamp.',
+        details: parseResult.error.format(),
+      },
+      400
+    );
+  }
+
+  const user = c.get('user');
+
+  try {
+    const updatedLead = await setLeadFollowUp(c.env.DB, leadId, parseResult.data.nextFollowUpAt, user.clerkUserId);
+    if (!updatedLead) {
+      return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
+    }
+    return c.json({ success: true, data: updatedLead });
+  } catch (err: unknown) {
+    console.error('Error scheduling follow-up:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to schedule follow-up.' }, 500);
   }
 });

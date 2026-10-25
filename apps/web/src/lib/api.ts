@@ -3,6 +3,8 @@ import type {
   MeResponse,
   ApiError,
   Lead,
+  LeadNote,
+  LeadDetailResponse,
   CreateLeadInput,
   UpdateLeadStageInput,
   LeadListQuery,
@@ -122,5 +124,34 @@ export async function updateLeadStageApi(
   return fetchWithAuth<{ success: boolean; data: Lead }>(`/api/leads/${leadId}/stage`, getToken, {
     method: 'PATCH',
     body: JSON.stringify(input),
+  });
+}
+
+export async function fetchLeadDetail(
+  getToken: () => Promise<string | null>,
+  leadId: string
+): Promise<LeadDetailResponse> {
+  return fetchWithAuth<LeadDetailResponse>(`/api/leads/${leadId}`, getToken);
+}
+
+export async function addLeadNoteApi(
+  getToken: () => Promise<string | null>,
+  leadId: string,
+  body: string
+): Promise<{ success: boolean; data: LeadNote }> {
+  return fetchWithAuth<{ success: boolean; data: LeadNote }>(`/api/leads/${leadId}/notes`, getToken, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function setLeadFollowUpApi(
+  getToken: () => Promise<string | null>,
+  leadId: string,
+  nextFollowUpAt: number | null
+): Promise<{ success: boolean; data: Lead }> {
+  return fetchWithAuth<{ success: boolean; data: Lead }>(`/api/leads/${leadId}/follow-up`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify({ nextFollowUpAt }),
   });
 }

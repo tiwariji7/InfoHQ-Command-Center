@@ -282,9 +282,9 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
                     </div>
                     <div>
                       <h2 className="text-sm font-semibold text-brand-heading">
-                        D1 & R2 Bindings
+                        Cloudflare D1
                       </h2>
-                      <div className="text-xs text-brand-muted">Worker Config</div>
+                      <div className="text-xs text-brand-muted">Relational Storage</div>
                     </div>
                   </div>
                   <div className="space-y-1.5 text-xs">
@@ -293,8 +293,8 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
                       <span className="font-mono text-brand-heading">DB (active)</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">R2 Storage</span>
-                      <span className="font-mono text-brand-heading">FILES (private)</span>
+                      <span className="text-brand-muted">Schema Version</span>
+                      <span className="font-mono text-brand-heading">0002_leads_core</span>
                     </div>
                     <div className="flex justify-between py-1">
                       <span className="text-brand-muted">Atomic Writes</span>

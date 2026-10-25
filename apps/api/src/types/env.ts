@@ -3,6 +3,7 @@ import type { AuthUser } from '@infohq/shared';
 
 export interface Bindings {
   DB: D1Database;
+  COMMAND_DB?: D1Database;
   FILES?: R2Bucket;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;

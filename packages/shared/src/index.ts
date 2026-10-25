@@ -114,6 +114,24 @@ export const UpdateLeadStageSchema = z.object({
 
 export type UpdateLeadStageInput = z.infer<typeof UpdateLeadStageSchema>;
 
+export const CreateLeadNoteSchema = z.object({
+  body: z.string().trim().min(1, 'Note content cannot be empty'),
+});
+
+export type CreateLeadNoteInput = z.infer<typeof CreateLeadNoteSchema>;
+
+export const SetFollowUpSchema = z.object({
+  nextFollowUpAt: z.number().nullable(),
+});
+
+export type SetFollowUpInput = z.infer<typeof SetFollowUpSchema>;
+
+export interface LeadDetailResponse {
+  lead: Lead;
+  activities: LeadActivity[];
+  notes: LeadNote[];
+}
+
 export const LeadActivitySchema = z.object({
   id: z.string(),
   leadId: z.string(),
