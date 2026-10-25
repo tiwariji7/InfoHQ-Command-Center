@@ -65,6 +65,16 @@ app.get('/api/health', (c) => {
   return c.json(response);
 });
 
+// Public auth configuration (exposes ONLY client-safe Clerk Publishable Key from Cloudflare environment)
+app.get('/api/auth/config', (c) => {
+  const publishableKey = (
+    c.env?.VITE_CLERK_PUBLISHABLE_KEY ||
+    c.env?.CLERK_PUBLISHABLE_KEY ||
+    ''
+  ).trim();
+  return c.json({ publishableKey });
+});
+
 // Protected: Superadmin identity check
 app.get('/api/me', requireSuperadmin, (c) => {
   const user = c.get('user');
