@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2024-10-22",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "VITE_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaW5mb2hxLmluJA"
+  },
   "d1_databases": [
     {
       "binding": "DB",
