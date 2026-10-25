@@ -25,8 +25,11 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
   const [serviceNeeded, setServiceNeeded] = useState('');
   const [budget, setBudget] = useState('');
+  const [timeline, setTimeline] = useState('');
+  const [preferredContact, setPreferredContact] = useState('');
   const [source, setSource] = useState<LeadSource>('phone_call');
   const [message, setMessage] = useState('');
 
@@ -95,8 +98,11 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
       name: name.trim(),
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
+      company: company.trim() || undefined,
       serviceNeeded: serviceNeeded.trim() || undefined,
       budget: budget.trim() || undefined,
+      timeline: timeline.trim() || undefined,
+      preferredContact: preferredContact.trim() || undefined,
       source,
       stage: 'new',
       message: message.trim() || undefined,
@@ -110,8 +116,11 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
       setName('');
       setPhone('');
       setEmail('');
+      setCompany('');
       setServiceNeeded('');
       setBudget('');
+      setTimeline('');
+      setPreferredContact('');
       setMessage('');
       setDuplicateWarning(null);
       setConfirmDuplicate(false);
@@ -186,19 +195,34 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
             </div>
           )}
 
-          {/* Name */}
-          <div>
-            <label className="block text-xs font-semibold text-brand-heading mb-1">
-              Client / Prospect Name <span className="text-brand-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Rahul Sharma"
-              className="w-full h-11 px-3.5 rounded-control border border-brand-border text-sm text-brand-heading placeholder:text-brand-lightGray focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
-            />
+          {/* Name & Company Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-brand-heading mb-1">
+                Client / Prospect Name <span className="text-brand-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Rahul Sharma"
+                className="w-full h-11 px-3.5 rounded-control border border-brand-border text-sm text-brand-heading placeholder:text-brand-lightGray focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-brand-heading mb-1">
+                Company / Organization
+              </label>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g. Acme Studio"
+                className="w-full h-11 px-3.5 rounded-control border border-brand-border text-sm text-brand-heading placeholder:text-brand-lightGray focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
+              />
+            </div>
           </div>
 
           {/* Phone & Email Grid */}
@@ -256,9 +280,41 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
                 type="text"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                placeholder="e.g. 50,000"
+                placeholder="e.g. ₹50,000"
                 className="w-full h-11 px-3.5 rounded-control border border-brand-border text-sm text-brand-heading placeholder:text-brand-lightGray focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
               />
+            </div>
+          </div>
+
+          {/* Timeline & Preferred Contact */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-brand-heading mb-1">
+                Expected Timeline
+              </label>
+              <input
+                type="text"
+                value={timeline}
+                onChange={(e) => setTimeline(e.target.value)}
+                placeholder="e.g. 2-4 weeks, Immediate"
+                className="w-full h-11 px-3.5 rounded-control border border-brand-border text-sm text-brand-heading placeholder:text-brand-lightGray focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-brand-heading mb-1">
+                Preferred Contact
+              </label>
+              <select
+                value={preferredContact}
+                onChange={(e) => setPreferredContact(e.target.value)}
+                className="w-full h-11 px-3 rounded-control border border-brand-border text-sm text-brand-heading bg-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
+              >
+                <option value="">Any / Not specified</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Phone Call">Phone Call</option>
+                <option value="Email">Email</option>
+              </select>
             </div>
           </div>
 

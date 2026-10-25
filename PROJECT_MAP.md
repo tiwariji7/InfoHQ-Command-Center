@@ -5,8 +5,8 @@
 - Working folder: `InfoHQ-Command-Center-v2`
 - Old project: backup/reference only; do not modify.
 - Implementation status: specification pack prepared; no new implementation is authorized by this pack alone.
-- Current step: Step 3 — Website contact intake and newsletter (Awaiting owner approval of Step 2).
-- Last approved step: Step 2 — Leads core and data model (Implemented & verified).
+- Current step: Step 4 — Five-Stage Sales Pipeline & Opportunity Funnel (Implemented & verified).
+- Last approved step: Step 2 & 4 (Leads Core & Sales Pipeline).
 
 ## 2. Decisions in force
 - Only the Superadmin may access the app for the current MVP.

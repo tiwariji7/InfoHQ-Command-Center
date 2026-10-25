@@ -4,6 +4,7 @@ import type {
   LeadActivity,
   LeadNote,
   CreateLeadInput,
+  UpdateLeadStageInput,
   LeadListQuery,
   PaginatedResponse,
   DuplicateCheckResult,
@@ -25,8 +26,11 @@ function mapDbRowToLead(row: Record<string, unknown>): Lead {
     name: String(row.name),
     email: row.email ? String(row.email) : null,
     phone: row.phone ? String(row.phone) : null,
+    company: row.company ? String(row.company) : null,
     serviceNeeded: row.service_needed ? String(row.service_needed) : null,
     budget: row.budget ? String(row.budget) : null,
+    timeline: row.timeline ? String(row.timeline) : null,
+    preferredContact: row.preferred_contact ? String(row.preferred_contact) : null,
     message: row.message ? String(row.message) : null,
     source: row.source as Lead['source'],
     stage: row.stage as Lead['stage'],
@@ -163,8 +167,11 @@ export async function createLead(
     name: input.name.trim(),
     email: normalizedEmail,
     phone: normalizedPhone,
+    company: input.company?.trim() || null,
     service_needed: input.serviceNeeded?.trim() || null,
     budget: input.budget?.trim() || null,
+    timeline: input.timeline?.trim() || null,
+    preferred_contact: input.preferredContact?.trim() || null,
     message: input.message?.trim() || null,
     source: input.source,
     stage: input.stage,
@@ -174,15 +181,19 @@ export async function createLead(
   };
 
   const insertLeadStmt = db.prepare(`
-    INSERT INTO leads (id, name, email, phone, service_needed, budget, message, source, stage, next_follow_up_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO leads (
+      id, name, email, phone, company, service_needed, budget, timeline, preferred_contact, message, source, stage, next_follow_up_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     leadRow.id,
     leadRow.name,
     leadRow.email,
     leadRow.phone,
+    leadRow.company,
     leadRow.service_needed,
     leadRow.budget,
+    leadRow.timeline,
+    leadRow.preferred_contact,
     leadRow.message,
     leadRow.source,
     leadRow.stage,
@@ -195,6 +206,7 @@ export async function createLead(
     name: leadRow.name,
     email: leadRow.email,
     phone: leadRow.phone,
+    company: leadRow.company,
     source: leadRow.source,
     stage: leadRow.stage,
   });
@@ -265,4 +277,69 @@ export async function getLeadById(
     activities,
     notes,
   };
+}
+
+export async function updateLeadStage(
+  db: D1Database,
+  leadId: string,
+  input: UpdateLeadStageInput,
+  actorClerkUserId: string
+): Promise<Lead | null> {
+  const leadRow = await db
+    .prepare('SELECT * FROM leads WHERE id = ?')
+    .bind(leadId)
+    .first<Record<string, unknown>>();
+
+  if (!leadRow) {
+    return null;
+  }
+
+  const previousStage = leadRow.stage as Lead['stage'];
+  const newStage = input.stage;
+  const lostReason = newStage === 'lost' ? (input.lostReason?.trim() || null) : null;
+  const now = Date.now();
+  const activityId = `act_${crypto.randomUUID()}`;
+
+  const updateLeadStmt = db.prepare(`
+    UPDATE leads
+    SET stage = ?, lost_reason = ?, updated_at = ?
+    WHERE id = ?
+  `).bind(newStage, lostReason, now, leadId);
+
+  const beforeJson = JSON.stringify({
+    stage: previousStage,
+    lostReason: leadRow.lost_reason || null,
+  });
+
+  const afterJson = JSON.stringify({
+    stage: newStage,
+    lostReason,
+  });
+
+  const summary = `Stage moved from "${previousStage}" to "${newStage}"${
+    lostReason ? ` (Reason: ${lostReason})` : ''
+  }`;
+
+  const insertActivityStmt = db.prepare(`
+    INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    activityId,
+    leadId,
+    actorClerkUserId,
+    'stage_change',
+    summary,
+    beforeJson,
+    afterJson,
+    now
+  );
+
+  await db.batch([updateLeadStmt, insertActivityStmt]);
+
+  return mapDbRowToLead({
+    ...leadRow,
+    stage: newStage,
+    lost_reason: lostReason,
+    updated_at: now,
+  });
 }
