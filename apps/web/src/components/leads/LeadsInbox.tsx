@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import type { Lead, LeadStage, LeadSource, PaginatedResponse } from '@infohq/shared';
 import { fetchLeads } from '../../lib/api.js';
 import { AddLeadModal } from './AddLeadModal.js';
+import { LeadDetailDrawer } from './LeadDetailDrawer.js';
 import {
   Search,
   Plus,
@@ -86,6 +87,7 @@ export const LeadsInbox: React.FC = () => {
   const pageSize = 15;
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
@@ -242,7 +244,8 @@ export const LeadsInbox: React.FC = () => {
                   {leadsData.data.map((lead) => (
                     <tr
                       key={lead.id}
-                      className="hover:bg-brand-section/40 transition-colors"
+                      onClick={() => setSelectedLeadId(lead.id)}
+                      className="hover:bg-brand-section/50 transition-colors cursor-pointer"
                     >
                       {/* Name & Company */}
                       <td className="py-3.5 px-4 font-semibold text-brand-heading">
@@ -310,7 +313,10 @@ export const LeadsInbox: React.FC = () => {
 
                       {/* Quick Contact Icons */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center gap-1.5 justify-end">
+                        <div
+                          className="inline-flex items-center gap-1.5 justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {lead.phone && (
                             <>
                               <a
@@ -351,7 +357,11 @@ export const LeadsInbox: React.FC = () => {
             {/* Mobile Card View (<= 767px) */}
             <div className="md:hidden divide-y divide-brand-border">
               {leadsData.data.map((lead) => (
-                <div key={lead.id} className="p-4 space-y-2.5">
+                <div
+                  key={lead.id}
+                  onClick={() => setSelectedLeadId(lead.id)}
+                  className="p-4 space-y-2.5 cursor-pointer hover:bg-brand-section/30 transition-colors"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h4 className="text-base font-bold text-brand-heading">
@@ -399,7 +409,10 @@ export const LeadsInbox: React.FC = () => {
                   </div>
 
                   {/* Mobile Quick Action Buttons (min 44px touch targets) */}
-                  <div className="flex items-center gap-2 pt-1">
+                  <div
+                    className="flex items-center gap-2 pt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {lead.phone && (
                       <>
                         <a
@@ -473,6 +486,14 @@ export const LeadsInbox: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={() => {
+          loadLeads();
+        }}
+      />
+
+      <LeadDetailDrawer
+        leadId={selectedLeadId}
+        onClose={() => setSelectedLeadId(null)}
+        onLeadUpdated={() => {
           loadLeads();
         }}
       />

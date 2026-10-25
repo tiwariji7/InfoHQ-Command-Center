@@ -32,7 +32,7 @@ export const AccessRestrictedScreen: React.FC<AccessRestrictedScreenProps> = ({
         <div className="p-3 bg-brand-section rounded-control border border-brand-border text-xs text-brand-muted mb-6">
           <span className="font-medium text-brand-heading">Account:</span> {userEmail}
           <div className="mt-1">
-            Role requirement: <span className="font-medium text-brand-heading">Superadmin</span>
+            Access level: <span className="font-medium text-brand-heading">Authorized Team Member</span>
           </div>
         </div>
 

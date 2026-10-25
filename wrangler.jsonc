@@ -3,15 +3,19 @@
   "name": "infohq-command-center",
   "main": "apps/api/src/index.ts",
   "compatibility_date": "2026-10-24",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "assets": {
     "directory": "apps/web/dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "d1_databases": [
     {
-      "binding": "DB",
+      "binding": "COMMAND_DB",
       "database_name": "infohq-command-center",
       "database_id": "65a48298-6c06-4494-af0b-71e020d68a68",
       "migrations_dir": "migrations"

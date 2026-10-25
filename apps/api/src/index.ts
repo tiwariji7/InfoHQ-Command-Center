@@ -7,6 +7,14 @@ import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
 
+// Auto-alias COMMAND_DB to DB if COMMAND_DB is bound in Cloudflare Worker
+app.use('*', async (c, next) => {
+  if (c.env && !c.env.DB && c.env.COMMAND_DB) {
+    c.env.DB = c.env.COMMAND_DB;
+  }
+  await next();
+});
+
 // CORS configuration for local frontend and production origin
 app.use(
   '/api/*',

@@ -316,9 +316,8 @@ export async function updateLeadStage(
     lostReason,
   });
 
-  const summary = `Stage moved from "${previousStage}" to "${newStage}"${
-    lostReason ? ` (Reason: ${lostReason})` : ''
-  }`;
+  const summary = `Stage moved from "${previousStage}" to "${newStage}"${lostReason ? ` (Reason: ${lostReason})` : ''
+    }`;
 
   const insertActivityStmt = db.prepare(`
     INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
@@ -340,6 +339,97 @@ export async function updateLeadStage(
     ...leadRow,
     stage: newStage,
     lost_reason: lostReason,
+    updated_at: now,
+  });
+}
+
+export async function addLeadNote(
+  db: D1Database,
+  leadId: string,
+  body: string,
+  actorClerkUserId: string
+): Promise<LeadNote | null> {
+  const lead = await db.prepare('SELECT id FROM leads WHERE id = ?').bind(leadId).first();
+  if (!lead) return null;
+
+  const now = Date.now();
+  const noteId = `note_${crypto.randomUUID()}`;
+  const activityId = `act_${crypto.randomUUID()}`;
+
+  const insertNoteStmt = db.prepare(`
+    INSERT INTO lead_notes (id, lead_id, body, created_by_clerk_user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(noteId, leadId, body.trim(), actorClerkUserId, now, now);
+
+  const insertActivityStmt = db.prepare(`
+    INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    activityId,
+    leadId,
+    actorClerkUserId,
+    'note_added',
+    'Added an internal note',
+    null,
+    JSON.stringify({ body: body.trim() }),
+    now
+  );
+
+  await db.batch([insertNoteStmt, insertActivityStmt]);
+
+  return {
+    id: noteId,
+    leadId,
+    body: body.trim(),
+    createdByClerkUserId: actorClerkUserId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export async function setLeadFollowUp(
+  db: D1Database,
+  leadId: string,
+  nextFollowUpAt: number | null,
+  actorClerkUserId: string
+): Promise<Lead | null> {
+  const leadRow = await db
+    .prepare('SELECT * FROM leads WHERE id = ?')
+    .bind(leadId)
+    .first<Record<string, unknown>>();
+
+  if (!leadRow) return null;
+
+  const now = Date.now();
+  const activityId = `act_${crypto.randomUUID()}`;
+
+  const updateLeadStmt = db.prepare(`
+    UPDATE leads SET next_follow_up_at = ?, updated_at = ? WHERE id = ?
+  `).bind(nextFollowUpAt, now, leadId);
+
+  const summary = nextFollowUpAt
+    ? `Follow-up scheduled for ${new Date(nextFollowUpAt).toLocaleDateString()}`
+    : 'Follow-up cleared';
+
+  const insertActivityStmt = db.prepare(`
+    INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    activityId,
+    leadId,
+    actorClerkUserId,
+    'follow_up_changed',
+    summary,
+    JSON.stringify({ nextFollowUpAt: leadRow.next_follow_up_at }),
+    JSON.stringify({ nextFollowUpAt }),
+    now
+  );
+
+  await db.batch([updateLeadStmt, insertActivityStmt]);
+
+  return mapDbRowToLead({
+    ...leadRow,
+    next_follow_up_at: nextFollowUpAt,
     updated_at: now,
   });
 }

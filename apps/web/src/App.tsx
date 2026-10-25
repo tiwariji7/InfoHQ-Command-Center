@@ -135,7 +135,7 @@ export const App: React.FC<AppProps> = ({ hasValidClerkKey }) => {
       <div className="min-h-screen bg-brand-page flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-brand-primary border-t-transparent animate-spin"></div>
-          <span className="text-xs text-brand-muted">Verifying Superadmin authorization...</span>
+          <span className="text-xs text-brand-muted">Verifying authorization...</span>
         </div>
       </div>
     );
