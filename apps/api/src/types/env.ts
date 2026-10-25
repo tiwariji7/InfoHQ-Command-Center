@@ -6,7 +6,8 @@ export interface Bindings {
   COMMAND_DB?: D1Database;
   FILES?: R2Bucket;
   CLERK_SECRET_KEY: string;
-  CLERK_PUBLISHABLE_KEY: string;
+  CLERK_PUBLISHABLE_KEY?: string;
+  VITE_CLERK_PUBLISHABLE_KEY?: string;
   SUPERADMIN_CLERK_USER_ID: string;
   INTAKE_SECRET?: string;
 }

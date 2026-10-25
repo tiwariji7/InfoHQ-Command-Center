@@ -30,6 +30,23 @@ describe('InfoHQ API - Step 1 Verification', () => {
     });
   });
 
+  describe('GET /api/auth/config', () => {
+    it('returns client-safe publishableKey from environment and never leaks secret key', async () => {
+      const mockEnv = {
+        CLERK_PUBLISHABLE_KEY: 'pk_test_mock_key_123',
+        CLERK_SECRET_KEY: 'sk_test_super_secret_never_leak',
+      };
+
+      const res = await app.request('/api/auth/config', undefined, mockEnv);
+      expect(res.status).toBe(200);
+
+      const json = await res.json() as Record<string, unknown>;
+      expect(json.publishableKey).toBe('pk_test_mock_key_123');
+      expect((json as any).CLERK_SECRET_KEY).toBeUndefined();
+      expect((json as any).secretKey).toBeUndefined();
+    });
+  });
+
   describe('404 Not Found Handling', () => {
     it('returns 404 with typed error structure', async () => {
       const res = await app.request('/api/non-existent-endpoint');
