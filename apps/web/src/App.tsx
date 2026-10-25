@@ -7,11 +7,7 @@ import { AccessRestrictedScreen } from './components/auth/AccessRestrictedScreen
 import { Shell } from './components/layout/Shell.js';
 import Lenis from 'lenis';
 
-interface AppProps {
-  hasValidClerkKey: boolean;
-}
-
-export const App: React.FC<AppProps> = ({ hasValidClerkKey }) => {
+export const App: React.FC = () => {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user: clerkUser } = useUser();
 
@@ -110,10 +106,6 @@ export const App: React.FC<AppProps> = ({ hasValidClerkKey }) => {
       isMounted = false;
     };
   }, [isSignedIn, clerkUser, getToken]);
-
-  if (!hasValidClerkKey) {
-    return <SignInCard hasValidKey={false} />;
-  }
 
   if (!isLoaded) {
     return (
