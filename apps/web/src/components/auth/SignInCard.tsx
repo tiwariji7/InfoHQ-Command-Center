@@ -26,16 +26,24 @@ export const SignInCard: React.FC<SignInCardProps> = ({ hasValidKey }) => {
           </div>
 
           <p className="text-sm text-brand-body mb-4">
-            To enable sign-in, add your Clerk Publishable Key to your local environment file:
+            To enable sign-in, configure your Clerk Publishable Key:
           </p>
 
-          <div className="bg-brand-section p-3 rounded-control border border-brand-border text-xs font-mono text-brand-heading mb-4 select-all">
+          <div className="bg-brand-section p-3 rounded-control border border-brand-border text-xs font-mono text-brand-heading mb-3 select-all">
+            <span className="text-brand-muted font-sans font-medium block mb-1">Local Development:</span>
             apps/web/.env.local<br />
             VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
           </div>
 
+          <div className="bg-brand-section p-3 rounded-control border border-brand-border text-xs font-mono text-brand-heading mb-4 select-all">
+            <span className="text-brand-muted font-sans font-medium block mb-1">Cloudflare Deployment:</span>
+            Workers / Pages &gt; Settings &gt; Variables and Secrets<br />
+            Name: VITE_CLERK_PUBLISHABLE_KEY<br />
+            Value: pk_live_... (or pk_test_...)
+          </div>
+
           <p className="text-xs text-brand-muted">
-            After updating <code className="text-brand-heading font-medium">apps/web/.env.local</code>, restart the frontend server.
+            After configuring, redeploy the application or restart your local server.
           </p>
         </div>
       </div>
