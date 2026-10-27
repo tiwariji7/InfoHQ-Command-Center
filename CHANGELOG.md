@@ -47,5 +47,16 @@ Append-only project history. Do not rewrite earlier entries.
 - Added: Automated unit and integration tests in `apps/api/test/leads.test.ts` (14/14 tests passing).
 - Verified: `npm run typecheck`, `npm run test`, `npm run build`, and `npx wrangler deploy --dry-run` all pass cleanly with zero errors.
 
-
-
+## 2026-10-27 | Option 3 — Projects & Tasks Management
+- Added: D1 SQL migration `migrations/0003_projects_tasks.sql` creating `projects` and `project_tasks` tables with foreign keys (`ON DELETE CASCADE`), indexes, and status/priority check constraints.
+- Applied: Migration `0003_projects_tasks.sql` executed with 100% success on local D1 (`COMMAND_DB`).
+- Added: Shared models and Zod schemas in `@infohq/shared` for `Project`, `ProjectTask`, `CreateProjectSchema`, `UpdateProjectSchema`, `CreateTaskSchema`, `UpdateTaskSchema`, and `ProjectDetailResponse`.
+- Added: Backend service `apps/api/src/services/projectService.ts` for parameterized project and task CRUD operations, task completion calculations, and automated lead-conversion activity logging.
+- Added: Backend router `apps/api/src/routes/projects.ts` mounted at `/api/projects` protected by `requireSuperadmin`.
+- Added: Frontend API client methods in `apps/web/src/lib/api.ts` (`fetchProjects`, `fetchProjectDetail`, `createProjectApi`, `updateProjectApi`, `createTaskApi`, `updateTaskApi`, `deleteTaskApi`).
+- Added: `apps/web/src/components/projects/ProjectsList.tsx` with project status metrics banner, search filter, project cards with task progress meters, agreed budget, and quick actions.
+- Added: `apps/web/src/components/projects/ProjectDetailDrawer.tsx` with client profile, direct WhatsApp/Phone/Email actions, project status selector, task checklist with inline task creation, priority tags, and quick completion toggle.
+- Added: `apps/web/src/components/projects/CreateProjectModal.tsx` for creating projects standalone or pre-filled from converted leads.
+- Added: "Convert to Project" workflow in `LeadDetailDrawer.tsx` allowing one-click transition from lead to active project.
+- Added: `Projects` tab in desktop sidebar and mobile bottom navigation in `Shell.tsx`.
+- Verified: `npm run typecheck` and `npm run build` both pass with zero errors across the entire monorepo.
