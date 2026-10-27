@@ -297,8 +297,8 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   let totalProjectInvoiced = 0;
   let totalProjectCollected = 0;
   for (const py of projectPayments) {
-    if (py.status !== 'cancelled') totalProjectInvoiced += py.amount;
-    if (py.status === 'paid') totalProjectCollected += py.amount;
+    if (py.status !== 'failed') totalProjectInvoiced += py.amount;
+    if (py.status === 'received') totalProjectCollected += py.amount;
   }
   const projectPendingBalance = totalProjectInvoiced - totalProjectCollected;
 
@@ -369,10 +369,9 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                   >
                     <option value="planning">Planning</option>
                     <option value="in_progress">In Progress</option>
-                    <option value="in_review">In Review</option>
+                    <option value="review">In Review</option>
                     <option value="completed">Completed</option>
                     <option value="on_hold">On Hold</option>
-                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
 
@@ -707,7 +706,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                   ) : (
                     <div className="space-y-2">
                       {projectPayments.map((py) => {
-                        const isPaid = py.status === 'paid';
+                        const isPaid = py.status === 'received';
                         const isOverdue =
                           py.status === 'pending' && py.dueDate && py.dueDate < Date.now();
 

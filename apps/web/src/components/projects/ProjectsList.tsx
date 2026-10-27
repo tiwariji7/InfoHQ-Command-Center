@@ -64,7 +64,7 @@ export const ProjectsList: React.FC = () => {
   // Metrics summary
   const totalCount = projects.length;
   const inProgressCount = projects.filter((p) => p.status === 'in_progress').length;
-  const inReviewCount = projects.filter((p) => p.status === 'in_review').length;
+  const reviewCount = projects.filter((p) => p.status === 'review').length;
   const completedCount = projects.filter((p) => p.status === 'completed').length;
   const planningCount = projects.filter((p) => p.status === 'planning').length;
 
@@ -72,7 +72,7 @@ export const ProjectsList: React.FC = () => {
     { key: 'all', label: 'All Projects' },
     { key: 'planning', label: 'Planning' },
     { key: 'in_progress', label: 'In Progress' },
-    { key: 'in_review', label: 'In Review' },
+    { key: 'review', label: 'In Review' },
     { key: 'completed', label: 'Completed' },
     { key: 'on_hold', label: 'On Hold' },
   ];
@@ -85,7 +85,7 @@ export const ProjectsList: React.FC = () => {
             In Progress
           </span>
         );
-      case 'in_review':
+      case 'review':
         return (
           <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             In Review
@@ -101,12 +101,6 @@ export const ProjectsList: React.FC = () => {
         return (
           <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
             On Hold
-          </span>
-        );
-      case 'cancelled':
-        return (
-          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
-            Cancelled
           </span>
         );
       default:
@@ -176,7 +170,7 @@ export const ProjectsList: React.FC = () => {
           <div className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">
             In Review
           </div>
-          <div className="text-xl font-bold text-brand-heading mt-1">{inReviewCount}</div>
+          <div className="text-xl font-bold text-brand-heading mt-1">{reviewCount}</div>
         </div>
 
         <div className="hq-card bg-white border-brand-border p-3.5">
