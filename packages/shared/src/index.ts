@@ -186,3 +186,121 @@ export interface DuplicateCheckResult {
     stage: LeadStage;
   }>;
 }
+
+// --- Projects & Tasks Data Models ---
+
+export const ProjectStatusSchema = z.enum([
+  'planning',
+  'in_progress',
+  'in_review',
+  'completed',
+  'on_hold',
+  'cancelled',
+]);
+export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+
+export const TaskStatusSchema = z.enum([
+  'todo',
+  'in_progress',
+  'done',
+  'blocked',
+]);
+export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+
+export const TaskPrioritySchema = z.enum([
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]);
+export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
+
+export const ProjectTaskSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  title: z.string().min(1),
+  description: z.string().nullable().optional(),
+  status: TaskStatusSchema,
+  priority: TaskPrioritySchema,
+  dueDate: z.number().nullable().optional(),
+  completedAt: z.number().nullable().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type ProjectTask = z.infer<typeof ProjectTaskSchema>;
+
+export const ProjectSchema = z.object({
+  id: z.string(),
+  leadId: z.string().nullable().optional(),
+  title: z.string().min(1),
+  clientName: z.string().min(1),
+  clientEmail: z.string().nullable().optional(),
+  clientPhone: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  serviceType: z.string().min(1),
+  budget: z.string().nullable().optional(),
+  status: ProjectStatusSchema,
+  startDate: z.number().nullable().optional(),
+  targetDate: z.number().nullable().optional(),
+  description: z.string().nullable().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  totalTasks: z.number().optional(),
+  completedTasks: z.number().optional(),
+});
+export type Project = z.infer<typeof ProjectSchema>;
+
+export const CreateProjectSchema = z.object({
+  leadId: z.string().trim().optional(),
+  title: z.string().trim().min(1, 'Project title is required'),
+  clientName: z.string().trim().min(1, 'Client name is required'),
+  clientEmail: z.string().trim().email('Invalid email').optional().or(z.literal('')),
+  clientPhone: z.string().trim().optional().or(z.literal('')),
+  company: z.string().trim().optional(),
+  serviceType: z.string().trim().min(1, 'Service type is required'),
+  budget: z.string().trim().optional(),
+  status: ProjectStatusSchema.default('planning'),
+  startDate: z.number().nullable().optional(),
+  targetDate: z.number().nullable().optional(),
+  description: z.string().trim().optional(),
+});
+export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
+
+export const UpdateProjectSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  clientName: z.string().trim().min(1).optional(),
+  clientEmail: z.string().trim().email().optional().or(z.literal('')),
+  clientPhone: z.string().trim().optional().or(z.literal('')),
+  company: z.string().trim().optional(),
+  serviceType: z.string().trim().min(1).optional(),
+  budget: z.string().trim().optional(),
+  status: ProjectStatusSchema.optional(),
+  startDate: z.number().nullable().optional(),
+  targetDate: z.number().nullable().optional(),
+  description: z.string().trim().optional(),
+});
+export type UpdateProjectInput = z.infer<typeof UpdateProjectSchema>;
+
+export const CreateTaskSchema = z.object({
+  title: z.string().trim().min(1, 'Task title is required'),
+  description: z.string().trim().optional(),
+  status: TaskStatusSchema.default('todo'),
+  priority: TaskPrioritySchema.default('medium'),
+  dueDate: z.number().nullable().optional(),
+});
+export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
+
+export const UpdateTaskSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: TaskStatusSchema.optional(),
+  priority: TaskPrioritySchema.optional(),
+  dueDate: z.number().nullable().optional(),
+});
+export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
+
+export interface ProjectDetailResponse {
+  project: Project;
+  tasks: ProjectTask[];
+}
+

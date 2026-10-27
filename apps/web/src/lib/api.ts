@@ -10,6 +10,13 @@ import type {
   LeadListQuery,
   PaginatedResponse,
   DuplicateCheckResult,
+  Project,
+  ProjectTask,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CreateTaskInput,
+  UpdateTaskInput,
+  ProjectDetailResponse,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -155,3 +162,83 @@ export async function setLeadFollowUpApi(
     body: JSON.stringify({ nextFollowUpAt }),
   });
 }
+
+// --- Projects & Tasks API ---
+
+export async function fetchProjects(
+  getToken: () => Promise<string | null>,
+  params?: { status?: string; search?: string }
+): Promise<{ projects: Project[] }> {
+  const searchParams = new URLSearchParams();
+  if (params?.status && params.status !== 'all') {
+    searchParams.set('status', params.status);
+  }
+  if (params?.search && params.search.trim()) {
+    searchParams.set('search', params.search.trim());
+  }
+  const queryString = searchParams.toString();
+  const endpoint = queryString ? `/api/projects?${queryString}` : '/api/projects';
+  return fetchWithAuth<{ projects: Project[] }>(endpoint, getToken);
+}
+
+export async function fetchProjectDetail(
+  getToken: () => Promise<string | null>,
+  projectId: string
+): Promise<ProjectDetailResponse> {
+  return fetchWithAuth<ProjectDetailResponse>(`/api/projects/${projectId}`, getToken);
+}
+
+export async function createProjectApi(
+  getToken: () => Promise<string | null>,
+  input: CreateProjectInput
+): Promise<{ project: Project }> {
+  return fetchWithAuth<{ project: Project }>('/api/projects', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProjectApi(
+  getToken: () => Promise<string | null>,
+  projectId: string,
+  input: UpdateProjectInput
+): Promise<{ project: Project }> {
+  return fetchWithAuth<{ project: Project }>(`/api/projects/${projectId}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createTaskApi(
+  getToken: () => Promise<string | null>,
+  projectId: string,
+  input: CreateTaskInput
+): Promise<{ task: ProjectTask }> {
+  return fetchWithAuth<{ task: ProjectTask }>(`/api/projects/${projectId}/tasks`, getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateTaskApi(
+  getToken: () => Promise<string | null>,
+  projectId: string,
+  taskId: string,
+  input: UpdateTaskInput
+): Promise<{ task: ProjectTask }> {
+  return fetchWithAuth<{ task: ProjectTask }>(`/api/projects/${projectId}/tasks/${taskId}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteTaskApi(
+  getToken: () => Promise<string | null>,
+  projectId: string,
+  taskId: string
+): Promise<{ success: boolean }> {
+  return fetchWithAuth<{ success: boolean }>(`/api/projects/${projectId}/tasks/${taskId}`, getToken, {
+    method: 'DELETE',
+  });
+}
+
