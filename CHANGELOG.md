@@ -82,3 +82,19 @@ Append-only project history. Do not rewrite earlier entries.
 - Aligned: Frontend views in `apps/web` (`ProjectsList.tsx`, `ProjectDetailDrawer.tsx`, `CreateProjectModal.tsx`, `PaymentsView.tsx`) to support `review`, `received`, and `failed` statuses.
 - Documented: `migrations/0003_projects_tasks.sql` and `migrations/0004_payments_billing.sql` updated to accurately record D1 Studio schemas for version control without executing remote migrations.
 - Verified: `npm run build` and `npm test` passing with zero errors across all packages.
+
+## 2026-10-27 | Dashboard Home Overview (Executive CRM Pulse)
+- Added: Shared models in `@infohq/shared` for `DashboardMetrics`, `UrgentFollowUpItem`, `RecentProjectItem`, `RecentPaymentItem`, and `DashboardOverviewResponse`.
+- Added: Backend service `apps/api/src/services/overviewService.ts` running optimized D1 aggregates for total leads, new leads this week, stage distribution, active vs completed deliverables, urgent IST follow-ups, and cashflow financials.
+- Added: Backend router `apps/api/src/routes/overview.ts` with protected endpoint `GET /api/overview` requiring Superadmin authentication.
+- Added: Client API method `fetchDashboardOverview` in `apps/web/src/lib/api.ts`.
+- Added: `apps/web/src/components/dashboard/OverviewDashboard.tsx` adhering to `docs/univerrule.md` with:
+  - 4 Executive KPI cards (Inbound Leads, Active Pipeline, Deliverables, Collected/Pending Receivables).
+  - Priority Follow-up Schedule widget with direct 1-click WhatsApp (`wa.me`) and Call (`tel:`) shortcuts.
+  - Opportunity Distribution visual breakdown with stage percentage shares.
+  - Recent Milestone Invoices billing ledger.
+  - Active Client Deliverables with live task completion meters and deadline countdown.
+  - Live Infrastructure status indicator (COMMAND_DB, Cloudflare Worker, Clerk Superadmin).
+- Enhanced: `apps/web/src/components/layout/Shell.tsx` mounting `OverviewDashboard` as the primary default tab on login.
+- Added: Automated unit test in `apps/api/test/index.test.ts` verifying authentication enforcement (401) and full metric payload (200).
+- Verified: `npm run build` and `npm test` passing with 17 passed tests and zero errors.
