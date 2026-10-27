@@ -383,4 +383,64 @@ export interface PaymentListResponse {
   summary: PaymentSummary;
 }
 
+// --- Dashboard & Analytics Models ---
+
+export interface DashboardMetrics {
+  totalLeads: number;
+  newLeadsThisWeek: number;
+  leadsByStage: {
+    new: number;
+    contacted: number;
+    proposal_sent: number;
+    won: number;
+    lost: number;
+  };
+  followUpsDueTodayCount: number;
+  activeProjectsCount: number;
+  completedProjectsCount: number;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalPending: number;
+}
+
+export interface UrgentFollowUpItem {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  stage: LeadStage;
+  nextFollowUpAt: number;
+}
+
+export interface RecentProjectItem {
+  id: string;
+  title: string;
+  clientName: string;
+  status: ProjectStatus;
+  budget: string | null;
+  deadline: number | null;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface RecentPaymentItem {
+  id: string;
+  projectId: string;
+  title: string;
+  amount: number;
+  status: PaymentStatus;
+  invoiceNumber: string | null;
+  clientName: string | null;
+  createdAt: number;
+}
+
+export interface DashboardOverviewResponse {
+  metrics: DashboardMetrics;
+  urgentFollowUps: UrgentFollowUpItem[];
+  recentProjects: RecentProjectItem[];
+  recentPayments: RecentPaymentItem[];
+}
+
+
 

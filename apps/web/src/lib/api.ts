@@ -22,6 +22,7 @@ import type {
   UpdatePaymentInput,
   RecordPaymentInput,
   PaymentListResponse,
+  DashboardOverviewResponse,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -315,5 +316,14 @@ export async function deletePaymentApi(
     method: 'DELETE',
   });
 }
+
+// --- Dashboard & Analytics Overview API ---
+
+export async function fetchDashboardOverview(
+  getToken: () => Promise<string | null>
+): Promise<DashboardOverviewResponse> {
+  return fetchWithAuth<DashboardOverviewResponse>('/api/overview', getToken);
+}
+
 
 

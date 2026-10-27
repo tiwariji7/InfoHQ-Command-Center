@@ -5,6 +5,7 @@ import { requireSuperadmin } from './middleware/auth.js';
 import { leadsRouter } from './routes/leads.js';
 import { projectsRouter } from './routes/projects.js';
 import { paymentsRouter } from './routes/payments.js';
+import { overviewRouter } from './routes/overview.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
@@ -95,5 +96,8 @@ app.route('/api/projects', projectsRouter);
 
 // Protected: Payments and milestone billing router
 app.route('/api/payments', paymentsRouter);
+
+// Protected: Dashboard overview and analytics router
+app.route('/api/overview', overviewRouter);
 
 export default app;
