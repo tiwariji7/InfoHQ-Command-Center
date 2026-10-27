@@ -5,8 +5,8 @@
 - Working folder: `InfoHQ-Command-Center-v2`
 - Old project: backup/reference only; do not modify.
 - Implementation status: specification pack prepared; no new implementation is authorized by this pack alone.
-- Current step: Step 4 — Five-Stage Sales Pipeline & Opportunity Funnel (Implemented & verified).
-- Last approved step: Step 2 & 4 (Leads Core & Sales Pipeline).
+- Current step: Option 3 — Projects & Tasks Management (Implemented & verified).
+- Last approved steps: Step 2 & 4 (Leads Core & Sales Pipeline), Option 2 (Website Contact Intake Integration), Option 3 (Projects & Tasks Management).
 
 ## 2. Decisions in force
 - Only the Superadmin may access the app for the current MVP.
@@ -32,10 +32,12 @@
 - Hosting target: `app.infohq.in`, only after owner approval.
 
 ## 4. Planned D1 tables (must be finalized before migrations)
-- `users`: minimum identity/allowlist record for the one Superadmin. Do not seed a real identity without owner confirmation.
+- `users`: minimum identity/allowlist record for the one Superadmin.
 - `leads`: current client/contact/service/budget/source/status/follow-up data.
 - `lead_activities`: append-only change history, separate from notes.
 - `lead_notes`: user-entered call/meeting/follow-up notes.
+- `projects`: client delivery projects, agreed budgets, deadlines, and delivery status.
+- `project_tasks`: project deliverables, milestones, priority levels, and completion status.
 - `newsletter_subscribers`: newsletter records, separate from leads (future step).
 - `audit_log`: security/admin/data-change audit records.
 
