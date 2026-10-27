@@ -4,12 +4,14 @@ import type { AuthUser, HealthResponse } from '@infohq/shared';
 import { LeadsInbox } from '../leads/LeadsInbox.js';
 import { PipelineView } from '../pipeline/PipelineView.js';
 import { ProjectsList } from '../projects/ProjectsList.js';
+import { PaymentsView } from '../payments/PaymentsView.js';
 import {
   ShieldCheck,
   LayoutDashboard,
   Inbox,
   Kanban,
   Briefcase,
+  CreditCard,
   Mail,
   LogOut,
   Database,
@@ -25,7 +27,7 @@ interface ShellProps {
 
 export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
   const { signOut } = useClerk();
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'pipeline' | 'projects'>('leads');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'pipeline' | 'projects' | 'payments'>('leads');
 
   return (
     <div className="min-h-screen bg-brand-page flex flex-col md:flex-row">
@@ -108,6 +110,21 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
           </button>
 
           <button
+            onClick={() => setActiveTab('payments')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-control font-medium text-sm transition-colors ${
+              activeTab === 'payments'
+                ? 'bg-brand-subtle text-brand-primary'
+                : 'text-brand-body hover:bg-brand-section'
+            }`}
+          >
+            <CreditCard size={20} />
+            <span className="hidden lg:inline">Billing</span>
+            <span className="hidden lg:inline ml-auto text-[10px] bg-chips-purpleBg text-chips-purpleText font-semibold px-1.5 py-0.5 rounded border border-purple-100">
+              Active
+            </span>
+          </button>
+
+          <button
             disabled
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-control text-brand-lightGray font-medium text-sm cursor-not-allowed opacity-60"
             title="Available in Step 6"
@@ -181,7 +198,9 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
 
         {/* Page Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto space-y-6 pb-20 md:pb-8">
-          {activeTab === 'projects' ? (
+          {activeTab === 'payments' ? (
+            <PaymentsView />
+          ) : activeTab === 'projects' ? (
             <ProjectsList />
           ) : activeTab === 'pipeline' ? (
             <PipelineView />
@@ -197,13 +216,20 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
                       System Overview
                     </h1>
                     <p className="text-sm text-brand-body mt-1">
-                      InfoHQ Command Center: Leads Inbox, 5-stage opportunity pipeline, and Projects & Tasks workspace.
+                      InfoHQ Command Center: Leads Inbox, 5-stage opportunity pipeline, Projects & Tasks, and Milestone Billing.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                     <button
-                      onClick={() => setActiveTab('projects')}
+                      onClick={() => setActiveTab('payments')}
                       className="hq-btn-primary text-xs"
+                    >
+                      <CreditCard size={14} />
+                      Milestone Billing
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('projects')}
+                      className="hq-btn-secondary text-xs"
                     >
                       <Briefcase size={14} />
                       Projects & Tasks
@@ -371,6 +397,15 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
         >
           <Briefcase size={20} />
           <span className="text-[11px] font-medium">Projects</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`flex flex-col items-center justify-center gap-1 py-1 ${
+            activeTab === 'payments' ? 'text-brand-primary' : 'text-brand-muted'
+          }`}
+        >
+          <CreditCard size={20} />
+          <span className="text-[11px] font-medium">Billing</span>
         </button>
         <button
           disabled

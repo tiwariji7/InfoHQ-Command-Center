@@ -17,6 +17,11 @@ import type {
   CreateTaskInput,
   UpdateTaskInput,
   ProjectDetailResponse,
+  Payment,
+  CreatePaymentInput,
+  UpdatePaymentInput,
+  RecordPaymentInput,
+  PaymentListResponse,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -241,4 +246,74 @@ export async function deleteTaskApi(
     method: 'DELETE',
   });
 }
+
+// --- Payments & Milestone Billing API ---
+
+export async function fetchPayments(
+  getToken: () => Promise<string | null>,
+  params?: { projectId?: string; status?: string; search?: string }
+): Promise<PaymentListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.projectId) {
+    searchParams.set('projectId', params.projectId);
+  }
+  if (params?.status && params.status !== 'all') {
+    searchParams.set('status', params.status);
+  }
+  if (params?.search && params.search.trim()) {
+    searchParams.set('search', params.search.trim());
+  }
+  const queryString = searchParams.toString();
+  const endpoint = queryString ? `/api/payments?${queryString}` : '/api/payments';
+  return fetchWithAuth<PaymentListResponse>(endpoint, getToken);
+}
+
+export async function fetchPaymentDetail(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<{ payment: Payment }> {
+  return fetchWithAuth<{ payment: Payment }>(`/api/payments/${paymentId}`, getToken);
+}
+
+export async function createPaymentApi(
+  getToken: () => Promise<string | null>,
+  input: CreatePaymentInput
+): Promise<{ payment: Payment }> {
+  return fetchWithAuth<{ payment: Payment }>('/api/payments', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function recordPaymentApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string,
+  input: RecordPaymentInput
+): Promise<{ payment: Payment }> {
+  return fetchWithAuth<{ payment: Payment }>(`/api/payments/${paymentId}/record-payment`, getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updatePaymentApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string,
+  input: UpdatePaymentInput
+): Promise<{ payment: Payment }> {
+  return fetchWithAuth<{ payment: Payment }>(`/api/payments/${paymentId}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deletePaymentApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<{ success: boolean }> {
+  return fetchWithAuth<{ success: boolean }>(`/api/payments/${paymentId}`, getToken, {
+    method: 'DELETE',
+  });
+}
+
 
