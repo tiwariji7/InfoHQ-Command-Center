@@ -141,4 +141,60 @@ describe('InfoHQ API - Step 1 Verification', () => {
       });
     });
   });
+
+  describe('GET /api/overview', () => {
+    it('rejects unauthenticated requests with 401', async () => {
+      const res = await app.request('/api/overview');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns dashboard overview metrics for authenticated superadmin', async () => {
+      const mockEnv = {
+        CLERK_SECRET_KEY: 'sk_test_super_secret',
+        SUPERADMIN_CLERK_USER_ID: 'user_superadmin_123',
+        DB: {
+          prepare: vi.fn().mockReturnValue({
+            bind: vi.fn().mockReturnThis(),
+            first: vi.fn().mockResolvedValue({
+              total_leads: 5,
+              new_this_week: 2,
+              stage_new: 1,
+              stage_contacted: 2,
+              stage_proposal_sent: 1,
+              stage_won: 1,
+              stage_lost: 0,
+              follow_ups_due: 1,
+              total_projects: 2,
+              active_projects: 2,
+              completed_projects: 0,
+            }),
+            all: vi.fn().mockResolvedValue({ results: [] }),
+            run: vi.fn().mockResolvedValue({ success: true }),
+          }),
+        },
+      };
+
+      vi.mocked(verifyToken).mockResolvedValue({
+        sub: 'user_superadmin_123',
+        email: 'superadmin@infohq.in',
+      } as any);
+
+      const res = await app.request(
+        '/api/overview',
+        {
+          headers: {
+            Authorization: 'Bearer valid_clerk_token_for_superadmin',
+          },
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json() as Record<string, unknown>;
+      expect(json.metrics).toBeDefined();
+      expect(json.urgentFollowUps).toBeDefined();
+      expect(json.recentProjects).toBeDefined();
+      expect(json.recentPayments).toBeDefined();
+    });
+  });
 });
