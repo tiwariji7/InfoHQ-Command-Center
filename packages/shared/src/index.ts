@@ -304,3 +304,86 @@ export interface ProjectDetailResponse {
   tasks: ProjectTask[];
 }
 
+// --- Payments & Milestone Billing Data Models ---
+
+export const PaymentStatusSchema = z.enum([
+  'pending',
+  'paid',
+  'overdue',
+  'cancelled',
+]);
+export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
+
+export const PaymentMethodSchema = z.enum([
+  'bank_transfer',
+  'upi',
+  'stripe',
+  'cash',
+  'other',
+]);
+export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
+
+export const PaymentSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  leadId: z.string().nullable().optional(),
+  title: z.string().min(1),
+  amount: z.number().positive(),
+  currency: z.string().default('INR'),
+  status: PaymentStatusSchema,
+  paymentMethod: PaymentMethodSchema.nullable().optional(),
+  invoiceNumber: z.string().nullable().optional(),
+  dueDate: z.number().nullable().optional(),
+  paidAt: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  // Joined details for list display
+  projectTitle: z.string().optional(),
+  clientName: z.string().optional(),
+  company: z.string().nullable().optional(),
+});
+export type Payment = z.infer<typeof PaymentSchema>;
+
+export const CreatePaymentSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  title: z.string().trim().min(1, 'Milestone title is required'),
+  amount: z.coerce.number().positive('Amount must be greater than zero'),
+  currency: z.string().trim().default('INR'),
+  invoiceNumber: z.string().trim().optional(),
+  dueDate: z.number().nullable().optional(),
+  notes: z.string().trim().optional(),
+});
+export type CreatePaymentInput = z.infer<typeof CreatePaymentSchema>;
+
+export const UpdatePaymentSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  amount: z.coerce.number().positive().optional(),
+  currency: z.string().trim().optional(),
+  status: PaymentStatusSchema.optional(),
+  invoiceNumber: z.string().trim().optional(),
+  dueDate: z.number().nullable().optional(),
+  notes: z.string().trim().optional(),
+});
+export type UpdatePaymentInput = z.infer<typeof UpdatePaymentSchema>;
+
+export const RecordPaymentSchema = z.object({
+  paymentMethod: PaymentMethodSchema.default('bank_transfer'),
+  notes: z.string().trim().optional(),
+  paidAt: z.number().default(() => Date.now()),
+});
+export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>;
+
+export interface PaymentSummary {
+  totalInvoiced: number;
+  totalCollected: number;
+  totalPending: number;
+  overdueCount: number;
+}
+
+export interface PaymentListResponse {
+  payments: Payment[];
+  summary: PaymentSummary;
+}
+
+

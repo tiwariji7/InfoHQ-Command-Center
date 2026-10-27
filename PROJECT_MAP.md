@@ -5,8 +5,8 @@
 - Working folder: `InfoHQ-Command-Center-v2`
 - Old project: backup/reference only; do not modify.
 - Implementation status: specification pack prepared; no new implementation is authorized by this pack alone.
-- Current step: Option 3 — Projects & Tasks Management (Implemented & verified).
-- Last approved steps: Step 2 & 4 (Leads Core & Sales Pipeline), Option 2 (Website Contact Intake Integration), Option 3 (Projects & Tasks Management).
+- Current step: Option B — Payments & Milestone Billing Module (Implemented & verified).
+- Last approved steps: Step 2 & 4 (Leads Core & Sales Pipeline), Option 2 (Website Contact Intake Integration), Option 3 (Projects & Tasks Management), Option B (Payments & Milestone Billing).
 
 ## 2. Decisions in force
 - Only the Superadmin may access the app for the current MVP.
@@ -38,6 +38,7 @@
 - `lead_notes`: user-entered call/meeting/follow-up notes.
 - `projects`: client delivery projects, agreed budgets, deadlines, and delivery status.
 - `project_tasks`: project deliverables, milestones, priority levels, and completion status.
+- `payments`: client milestone invoices, advance payments, currency, UTR references, and collection status.
 - `newsletter_subscribers`: newsletter records, separate from leads (future step).
 - `audit_log`: security/admin/data-change audit records.
 

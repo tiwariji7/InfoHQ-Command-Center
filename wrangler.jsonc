@@ -13,6 +13,12 @@
       "/api/*"
     ]
   },
+  "routes": [
+    {
+      "pattern": "commandcenter.infohq.in",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "VITE_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaW5mb2hxLmluJA"
   },
