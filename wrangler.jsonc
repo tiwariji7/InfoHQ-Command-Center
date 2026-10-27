@@ -18,7 +18,7 @@
   },
   "d1_databases": [
     {
-      "binding": "DB",
+      "binding": "COMMAND_DB",
       "database_name": "infohq-command-center",
       "database_id": "65a48298-6c06-4494-af0b-71e020d68a68",
       "migrations_dir": "migrations"
@@ -27,7 +27,7 @@
   "previews": {
     "d1_databases": [
       {
-        "binding": "DB",
+        "binding": "COMMAND_DB",
         "database_id": "65a48298-6c06-4494-af0b-71e020d68a68"
       }
     ],
