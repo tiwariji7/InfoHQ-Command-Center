@@ -20,7 +20,9 @@ import {
   FileText,
   History,
   CheckCircle2,
+  Briefcase,
 } from 'lucide-react';
+import { CreateProjectModal } from '../projects/CreateProjectModal.js';
 
 interface LeadDetailDrawerProps {
   leadId: string | null;
@@ -97,6 +99,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
 
   // Stage change state
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
   // Close on Escape
   useEffect(() => {
@@ -365,6 +368,19 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                     )
                   )}
                 </div>
+                <div className="w-full flex items-center justify-between pt-2.5 mt-1 border-t border-brand-border">
+                  <span className="text-[11px] text-brand-muted">
+                    Ready to execute client delivery?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsConvertModalOpen(true)}
+                    className="hq-btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Briefcase size={14} />
+                    <span>Convert to Project</span>
+                  </button>
+                </div>
               </div>
 
               {/* Next Follow-Up Reminder Widget */}
@@ -627,6 +643,19 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
           )}
         </div>
       </div>
+
+      {lead && (
+        <CreateProjectModal
+          isOpen={isConvertModalOpen}
+          onClose={() => setIsConvertModalOpen(false)}
+          initialLead={lead}
+          onSuccess={() => {
+            loadData();
+            onLeadUpdated?.(lead);
+            setIsConvertModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };
