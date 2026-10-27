@@ -13,17 +13,21 @@ function mapDbRowToPayment(row: Record<string, unknown>): Payment {
     id: String(row.id),
     projectId: String(row.project_id),
     leadId: row.lead_id ? String(row.lead_id) : null,
-    title: String(row.title),
+    title: row.invoice_number
+      ? String(row.invoice_number)
+      : row.project_title
+      ? `${String(row.project_title)} Milestone`
+      : 'Milestone Payment',
     amount: Number(row.amount),
-    currency: String(row.currency || 'INR'),
-    status: row.status as Payment['status'],
-    paymentMethod: row.payment_method ? (row.payment_method as Payment['paymentMethod']) : null,
+    currency: 'INR',
+    status: (row.status as Payment['status']) || 'pending',
+    paymentMethod: null,
     invoiceNumber: row.invoice_number ? String(row.invoice_number) : null,
     dueDate: row.due_date ? Number(row.due_date) : null,
     paidAt: row.paid_at ? Number(row.paid_at) : null,
-    notes: row.notes ? String(row.notes) : null,
+    notes: null,
     createdAt: Number(row.created_at),
-    updatedAt: Number(row.updated_at),
+    updatedAt: Number(row.created_at),
     projectTitle: row.project_title ? String(row.project_title) : undefined,
     clientName: row.client_name ? String(row.client_name) : undefined,
     company: row.company ? String(row.company) : null,
@@ -50,28 +54,36 @@ export async function getPayments(
   if (params.search && params.search.trim().length > 0) {
     const term = `%${params.search.trim().toLowerCase()}%`;
     conditions.push(
-      '(LOWER(py.title) LIKE ? OR LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(py.invoice_number) LIKE ? OR LOWER(py.notes) LIKE ?)'
+      '(LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(py.invoice_number) LIKE ?)'
     );
-    bindings.push(term, term, term, term, term);
+    bindings.push(term, term, term);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const sql = `
     SELECT 
-      py.*,
+      py.id,
+      py.project_id,
+      py.amount,
+      py.status,
+      py.invoice_number,
+      py.paid_at,
+      py.created_at,
       p.title as project_title,
       p.client_name,
-      p.company
+      p.deadline as due_date,
+      p.lead_id,
+      l.company
     FROM payments py
     LEFT JOIN projects p ON py.project_id = p.id
+    LEFT JOIN leads l ON p.lead_id = l.id
     ${whereClause}
     ORDER BY 
       CASE py.status
         WHEN 'pending' THEN 1
-        WHEN 'overdue' THEN 2
-        WHEN 'paid' THEN 3
-        WHEN 'cancelled' THEN 4
+        WHEN 'received' THEN 2
+        WHEN 'failed' THEN 3
       END ASC,
       py.created_at DESC
   `;
@@ -87,19 +99,16 @@ export async function getPayments(
   let overdueCount = 0;
 
   for (const py of payments) {
-    if (py.status !== 'cancelled') {
+    if (py.status !== 'failed') {
       totalInvoiced += py.amount;
     }
-    if (py.status === 'paid') {
+    if (py.status === 'received') {
       totalCollected += py.amount;
     } else if (py.status === 'pending') {
       totalPending += py.amount;
       if (py.dueDate && py.dueDate < now) {
         overdueCount += 1;
       }
-    } else if (py.status === 'overdue') {
-      totalPending += py.amount;
-      overdueCount += 1;
     }
   }
 
@@ -122,12 +131,21 @@ export async function getPaymentById(
 ): Promise<Payment | null> {
   const sql = `
     SELECT 
-      py.*,
+      py.id,
+      py.project_id,
+      py.amount,
+      py.status,
+      py.invoice_number,
+      py.paid_at,
+      py.created_at,
       p.title as project_title,
       p.client_name,
-      p.company
+      p.deadline as due_date,
+      p.lead_id,
+      l.company
     FROM payments py
     LEFT JOIN projects p ON py.project_id = p.id
+    LEFT JOIN leads l ON p.lead_id = l.id
     WHERE py.id = ?
   `;
   const row = await db.prepare(sql).bind(paymentId).first<Record<string, unknown>>();
@@ -141,29 +159,17 @@ export async function createPayment(
   const id = `pay_${crypto.randomUUID()}`;
   const now = Date.now();
 
-  // Fetch project to link lead_id if exists
-  const projectRow = await db.prepare('SELECT lead_id FROM projects WHERE id = ?')
-    .bind(input.projectId)
-    .first<{ lead_id: string | null }>();
-
-  const leadId = projectRow?.lead_id || null;
+  const invoiceNum = input.invoiceNumber || input.title || null;
 
   await db.prepare(`
     INSERT INTO payments (
-      id, project_id, lead_id, title, amount, currency, status,
-      invoice_number, due_date, paid_at, notes, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, NULL, ?, ?, ?)
+      id, project_id, amount, status, invoice_number, paid_at, created_at
+    ) VALUES (?, ?, ?, 'pending', ?, NULL, ?)
   `).bind(
     id,
     input.projectId,
-    leadId,
-    input.title,
-    input.amount,
-    input.currency || 'INR',
-    input.invoiceNumber || null,
-    input.dueDate || null,
-    input.notes || null,
-    now,
+    String(input.amount),
+    invoiceNum,
     now
   ).run();
 
@@ -183,20 +189,12 @@ export async function recordPaymentReceived(
   const now = Date.now();
   const paidAt = input.paidAt || now;
 
-  let combinedNotes = existing.notes || '';
-  if (input.notes) {
-    combinedNotes = combinedNotes ? `${combinedNotes} | ${input.notes}` : input.notes;
-  }
-
   await db.prepare(`
     UPDATE payments
-    SET status = 'paid', payment_method = ?, paid_at = ?, notes = ?, updated_at = ?
+    SET status = 'received', paid_at = ?
     WHERE id = ?
   `).bind(
-    input.paymentMethod,
     paidAt,
-    combinedNotes || null,
-    now,
     paymentId
   ).run();
 
@@ -215,45 +213,29 @@ export async function updatePayment(
   const bindings: unknown[] = [];
   const now = Date.now();
 
-  if (input.title !== undefined) {
-    updates.push('title = ?');
-    bindings.push(input.title);
-  }
   if (input.amount !== undefined) {
     updates.push('amount = ?');
-    bindings.push(input.amount);
-  }
-  if (input.currency !== undefined) {
-    updates.push('currency = ?');
-    bindings.push(input.currency);
-  }
-  if (input.status !== undefined) {
-    updates.push('status = ?');
-    bindings.push(input.status);
-    if (input.status === 'paid' && !existing.paidAt) {
-      updates.push('paid_at = ?');
-      bindings.push(now);
-    }
+    bindings.push(String(input.amount));
   }
   if (input.invoiceNumber !== undefined) {
     updates.push('invoice_number = ?');
     bindings.push(input.invoiceNumber || null);
   }
-  if (input.dueDate !== undefined) {
-    updates.push('due_date = ?');
-    bindings.push(input.dueDate);
-  }
-  if (input.notes !== undefined) {
-    updates.push('notes = ?');
-    bindings.push(input.notes || null);
+  if (input.status !== undefined) {
+    updates.push('status = ?');
+    bindings.push(input.status);
+    if (input.status === 'received' && !existing.paidAt) {
+      updates.push('paid_at = ?');
+      bindings.push(now);
+    } else if (input.status === 'pending') {
+      updates.push('paid_at = NULL');
+    }
   }
 
   if (updates.length === 0) {
     return existing;
   }
 
-  updates.push('updated_at = ?');
-  bindings.push(now);
   bindings.push(paymentId);
 
   const sql = `UPDATE payments SET ${updates.join(', ')} WHERE id = ?`;

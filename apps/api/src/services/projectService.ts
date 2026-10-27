@@ -18,11 +18,11 @@ function mapDbRowToProject(row: Record<string, unknown>): Project {
     clientEmail: row.client_email ? String(row.client_email) : null,
     clientPhone: row.client_phone ? String(row.client_phone) : null,
     company: row.company ? String(row.company) : null,
-    serviceType: String(row.service_type),
+    serviceType: row.service_type ? String(row.service_type) : undefined,
     budget: row.budget ? String(row.budget) : null,
     status: row.status as Project['status'],
     startDate: row.start_date ? Number(row.start_date) : null,
-    targetDate: row.target_date ? Number(row.target_date) : null,
+    targetDate: row.deadline ? Number(row.deadline) : (row.target_date ? Number(row.target_date) : null),
     description: row.description ? String(row.description) : null,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
@@ -38,7 +38,7 @@ function mapDbRowToTask(row: Record<string, unknown>): ProjectTask {
     title: String(row.title),
     description: row.description ? String(row.description) : null,
     status: row.status as ProjectTask['status'],
-    priority: row.priority as ProjectTask['priority'],
+    priority: (row.priority as ProjectTask['priority']) || 'medium',
     dueDate: row.due_date ? Number(row.due_date) : null,
     completedAt: row.completed_at ? Number(row.completed_at) : null,
     createdAt: Number(row.created_at),
@@ -60,7 +60,7 @@ export async function getProjects(
 
   if (params.search && params.search.trim().length > 0) {
     const term = `%${params.search.trim().toLowerCase()}%`;
-    conditions.push('(LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(p.company) LIKE ?)');
+    conditions.push('(LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(l.company) LIKE ?)');
     bindings.push(term, term, term);
   }
 
@@ -68,11 +68,26 @@ export async function getProjects(
 
   const sql = `
     SELECT 
-      p.*, 
+      p.id,
+      p.lead_id,
+      p.title,
+      p.client_name,
+      p.status,
+      p.budget,
+      p.start_date,
+      p.deadline,
+      p.created_at,
+      p.updated_at,
+      l.email as client_email,
+      l.phone as client_phone,
+      l.company as company,
+      l.service_needed as service_type,
+      l.message as description,
       COUNT(t.id) as total_tasks, 
       SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed_tasks
     FROM projects p
-    LEFT JOIN project_tasks t ON p.id = t.project_id
+    LEFT JOIN leads l ON p.lead_id = l.id
+    LEFT JOIN tasks t ON p.id = t.project_id
     ${whereClause}
     GROUP BY p.id
     ORDER BY p.created_at DESC
@@ -88,11 +103,26 @@ export async function getProjectById(
 ): Promise<ProjectDetailResponse | null> {
   const projectSql = `
     SELECT 
-      p.*, 
+      p.id,
+      p.lead_id,
+      p.title,
+      p.client_name,
+      p.status,
+      p.budget,
+      p.start_date,
+      p.deadline,
+      p.created_at,
+      p.updated_at,
+      l.email as client_email,
+      l.phone as client_phone,
+      l.company as company,
+      l.service_needed as service_type,
+      l.message as description,
       COUNT(t.id) as total_tasks, 
       SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed_tasks
     FROM projects p
-    LEFT JOIN project_tasks t ON p.id = t.project_id
+    LEFT JOIN leads l ON p.lead_id = l.id
+    LEFT JOIN tasks t ON p.id = t.project_id
     WHERE p.id = ?
     GROUP BY p.id
   `;
@@ -101,14 +131,14 @@ export async function getProjectById(
   if (!projectRow) return null;
 
   const tasksSql = `
-    SELECT * FROM project_tasks 
+    SELECT id, project_id, title, status, due_date, created_at, updated_at
+    FROM tasks 
     WHERE project_id = ? 
     ORDER BY 
       CASE status 
         WHEN 'todo' THEN 1 
         WHEN 'in_progress' THEN 2 
-        WHEN 'blocked' THEN 3 
-        WHEN 'done' THEN 4 
+        WHEN 'done' THEN 3 
       END ASC,
       created_at ASC
   `;
@@ -131,24 +161,18 @@ export async function createProject(
 
   const insertStmt = db.prepare(`
     INSERT INTO projects (
-      id, lead_id, title, client_name, client_email, client_phone, company,
-      service_type, budget, status, start_date, target_date, description,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, lead_id, title, client_name, status, budget,
+      start_date, deadline, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id,
     input.leadId || null,
     input.title,
     input.clientName,
-    input.clientEmail || null,
-    input.clientPhone || null,
-    input.company || null,
-    input.serviceType,
+    input.status || 'in_progress',
     input.budget || null,
-    input.status || 'planning',
     input.startDate || null,
     input.targetDate || null,
-    input.description || null,
     now,
     now
   );
@@ -202,22 +226,6 @@ export async function updateProject(
     updates.push('client_name = ?');
     bindings.push(input.clientName);
   }
-  if (input.clientEmail !== undefined) {
-    updates.push('client_email = ?');
-    bindings.push(input.clientEmail || null);
-  }
-  if (input.clientPhone !== undefined) {
-    updates.push('client_phone = ?');
-    bindings.push(input.clientPhone || null);
-  }
-  if (input.company !== undefined) {
-    updates.push('company = ?');
-    bindings.push(input.company || null);
-  }
-  if (input.serviceType !== undefined) {
-    updates.push('service_type = ?');
-    bindings.push(input.serviceType);
-  }
   if (input.budget !== undefined) {
     updates.push('budget = ?');
     bindings.push(input.budget || null);
@@ -231,12 +239,8 @@ export async function updateProject(
     bindings.push(input.startDate);
   }
   if (input.targetDate !== undefined) {
-    updates.push('target_date = ?');
+    updates.push('deadline = ?');
     bindings.push(input.targetDate);
-  }
-  if (input.description !== undefined) {
-    updates.push('description = ?');
-    bindings.push(input.description || null);
   }
 
   if (updates.length === 0) {
@@ -261,26 +265,22 @@ export async function createTask(
 ): Promise<ProjectTask> {
   const id = `task_${crypto.randomUUID()}`;
   const now = Date.now();
-  const completedAt = input.status === 'done' ? now : null;
 
   await db.prepare(`
-    INSERT INTO project_tasks (
-      id, project_id, title, description, status, priority, due_date, completed_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (
+      id, project_id, title, status, due_date, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id,
     projectId,
     input.title,
-    input.description || null,
     input.status || 'todo',
-    input.priority || 'medium',
     input.dueDate || null,
-    completedAt,
     now,
     now
   ).run();
 
-  const row = await db.prepare('SELECT * FROM project_tasks WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  const row = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!row) throw new Error('Task creation verification failed.');
   return mapDbRowToTask(row);
 }
@@ -291,7 +291,7 @@ export async function updateTask(
   taskId: string,
   input: UpdateTaskInput
 ): Promise<ProjectTask | null> {
-  const existingRow = await db.prepare('SELECT * FROM project_tasks WHERE id = ? AND project_id = ?')
+  const existingRow = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
     .bind(taskId, projectId)
     .first<Record<string, unknown>>();
 
@@ -305,14 +305,6 @@ export async function updateTask(
     updates.push('title = ?');
     bindings.push(input.title);
   }
-  if (input.description !== undefined) {
-    updates.push('description = ?');
-    bindings.push(input.description || null);
-  }
-  if (input.priority !== undefined) {
-    updates.push('priority = ?');
-    bindings.push(input.priority);
-  }
   if (input.dueDate !== undefined) {
     updates.push('due_date = ?');
     bindings.push(input.dueDate);
@@ -320,12 +312,6 @@ export async function updateTask(
   if (input.status !== undefined) {
     updates.push('status = ?');
     bindings.push(input.status);
-    if (input.status === 'done') {
-      updates.push('completed_at = ?');
-      bindings.push(now);
-    } else {
-      updates.push('completed_at = NULL');
-    }
   }
 
   if (updates.length === 0) {
@@ -337,10 +323,10 @@ export async function updateTask(
   bindings.push(taskId);
   bindings.push(projectId);
 
-  const sql = `UPDATE project_tasks SET ${updates.join(', ')} WHERE id = ? AND project_id = ?`;
+  const sql = `UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND project_id = ?`;
   await db.prepare(sql).bind(...bindings).run();
 
-  const updatedRow = await db.prepare('SELECT * FROM project_tasks WHERE id = ? AND project_id = ?')
+  const updatedRow = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
     .bind(taskId, projectId)
     .first<Record<string, unknown>>();
 
@@ -352,7 +338,7 @@ export async function deleteTask(
   projectId: string,
   taskId: string
 ): Promise<boolean> {
-  const result = await db.prepare('DELETE FROM project_tasks WHERE id = ? AND project_id = ?')
+  const result = await db.prepare('DELETE FROM tasks WHERE id = ? AND project_id = ?')
     .bind(taskId, projectId)
     .run();
   return result.success;

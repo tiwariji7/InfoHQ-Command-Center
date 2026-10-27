@@ -192,10 +192,9 @@ export interface DuplicateCheckResult {
 export const ProjectStatusSchema = z.enum([
   'planning',
   'in_progress',
-  'in_review',
+  'review',
   'completed',
   'on_hold',
-  'cancelled',
 ]);
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 
@@ -203,7 +202,6 @@ export const TaskStatusSchema = z.enum([
   'todo',
   'in_progress',
   'done',
-  'blocked',
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
@@ -221,7 +219,7 @@ export const ProjectTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: TaskStatusSchema,
-  priority: TaskPrioritySchema,
+  priority: TaskPrioritySchema.optional(),
   dueDate: z.number().nullable().optional(),
   completedAt: z.number().nullable().optional(),
   createdAt: z.number(),
@@ -237,7 +235,7 @@ export const ProjectSchema = z.object({
   clientEmail: z.string().nullable().optional(),
   clientPhone: z.string().nullable().optional(),
   company: z.string().nullable().optional(),
-  serviceType: z.string().min(1),
+  serviceType: z.string().optional(),
   budget: z.string().nullable().optional(),
   status: ProjectStatusSchema,
   startDate: z.number().nullable().optional(),
@@ -257,9 +255,9 @@ export const CreateProjectSchema = z.object({
   clientEmail: z.string().trim().email('Invalid email').optional().or(z.literal('')),
   clientPhone: z.string().trim().optional().or(z.literal('')),
   company: z.string().trim().optional(),
-  serviceType: z.string().trim().min(1, 'Service type is required'),
+  serviceType: z.string().trim().optional(),
   budget: z.string().trim().optional(),
-  status: ProjectStatusSchema.default('planning'),
+  status: ProjectStatusSchema.default('in_progress'),
   startDate: z.number().nullable().optional(),
   targetDate: z.number().nullable().optional(),
   description: z.string().trim().optional(),
@@ -272,7 +270,7 @@ export const UpdateProjectSchema = z.object({
   clientEmail: z.string().trim().email().optional().or(z.literal('')),
   clientPhone: z.string().trim().optional().or(z.literal('')),
   company: z.string().trim().optional(),
-  serviceType: z.string().trim().min(1).optional(),
+  serviceType: z.string().trim().optional(),
   budget: z.string().trim().optional(),
   status: ProjectStatusSchema.optional(),
   startDate: z.number().nullable().optional(),
@@ -285,7 +283,7 @@ export const CreateTaskSchema = z.object({
   title: z.string().trim().min(1, 'Task title is required'),
   description: z.string().trim().optional(),
   status: TaskStatusSchema.default('todo'),
-  priority: TaskPrioritySchema.default('medium'),
+  priority: TaskPrioritySchema.default('medium').optional(),
   dueDate: z.number().nullable().optional(),
 });
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
@@ -308,9 +306,8 @@ export interface ProjectDetailResponse {
 
 export const PaymentStatusSchema = z.enum([
   'pending',
-  'paid',
-  'overdue',
-  'cancelled',
+  'received',
+  'failed',
 ]);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
@@ -327,8 +324,8 @@ export const PaymentSchema = z.object({
   id: z.string(),
   projectId: z.string(),
   leadId: z.string().nullable().optional(),
-  title: z.string().min(1),
-  amount: z.number().positive(),
+  title: z.string().optional(),
+  amount: z.number(),
   currency: z.string().default('INR'),
   status: PaymentStatusSchema,
   paymentMethod: PaymentMethodSchema.nullable().optional(),
@@ -337,7 +334,7 @@ export const PaymentSchema = z.object({
   paidAt: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
   createdAt: z.number(),
-  updatedAt: z.number(),
+  updatedAt: z.number().optional(),
   // Joined details for list display
   projectTitle: z.string().optional(),
   clientName: z.string().optional(),
@@ -347,7 +344,7 @@ export type Payment = z.infer<typeof PaymentSchema>;
 
 export const CreatePaymentSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
-  title: z.string().trim().min(1, 'Milestone title is required'),
+  title: z.string().trim().optional(),
   amount: z.coerce.number().positive('Amount must be greater than zero'),
   currency: z.string().trim().default('INR'),
   invoiceNumber: z.string().trim().optional(),
@@ -357,7 +354,7 @@ export const CreatePaymentSchema = z.object({
 export type CreatePaymentInput = z.infer<typeof CreatePaymentSchema>;
 
 export const UpdatePaymentSchema = z.object({
-  title: z.string().trim().min(1).optional(),
+  title: z.string().trim().optional(),
   amount: z.coerce.number().positive().optional(),
   currency: z.string().trim().optional(),
   status: PaymentStatusSchema.optional(),
@@ -368,7 +365,7 @@ export const UpdatePaymentSchema = z.object({
 export type UpdatePaymentInput = z.infer<typeof UpdatePaymentSchema>;
 
 export const RecordPaymentSchema = z.object({
-  paymentMethod: PaymentMethodSchema.default('bank_transfer'),
+  paymentMethod: PaymentMethodSchema.default('bank_transfer').optional(),
   notes: z.string().trim().optional(),
   paidAt: z.number().default(() => Date.now()),
 });

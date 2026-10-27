@@ -94,8 +94,8 @@ export const PaymentsView: React.FC = () => {
   const STATUS_TABS: Array<{ key: string; label: string }> = [
     { key: 'all', label: 'All Invoices' },
     { key: 'pending', label: 'Pending' },
-    { key: 'paid', label: 'Collected / Paid' },
-    { key: 'overdue', label: 'Overdue' },
+    { key: 'received', label: 'Received' },
+    { key: 'failed', label: 'Failed' },
   ];
 
   return (
@@ -253,7 +253,7 @@ export const PaymentsView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-brand-border">
                 {payments.map((py) => {
-                  const isPaid = py.status === 'paid';
+                  const isPaid = py.status === 'received';
                   const isOverdue =
                     py.status === 'pending' && py.dueDate && py.dueDate < Date.now();
 
@@ -298,7 +298,7 @@ export const PaymentsView: React.FC = () => {
                         {isPaid && py.paidAt ? (
                           <div className="flex items-center gap-1 text-green-700 font-medium">
                             <CheckCircle2 size={13} />
-                            <span>Paid {new Date(py.paidAt).toLocaleDateString()}</span>
+                            <span>Received {new Date(py.paidAt).toLocaleDateString()}</span>
                           </div>
                         ) : py.dueDate ? (
                           <div
@@ -318,7 +318,11 @@ export const PaymentsView: React.FC = () => {
                       <td className="py-3 px-4">
                         {isPaid ? (
                           <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                            Paid
+                            Received
+                          </span>
+                        ) : py.status === 'failed' ? (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                            Failed
                           </span>
                         ) : isOverdue ? (
                           <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
