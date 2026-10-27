@@ -5,6 +5,7 @@ import { LeadsInbox } from '../leads/LeadsInbox.js';
 import { PipelineView } from '../pipeline/PipelineView.js';
 import { ProjectsList } from '../projects/ProjectsList.js';
 import { PaymentsView } from '../payments/PaymentsView.js';
+import { OverviewDashboard } from '../dashboard/OverviewDashboard.js';
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -14,9 +15,6 @@ import {
   CreditCard,
   Mail,
   LogOut,
-  Database,
-  Server,
-  Lock,
 } from 'lucide-react';
 
 interface ShellProps {
@@ -25,9 +23,9 @@ interface ShellProps {
   apiError: string | null;
 }
 
-export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
+export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _apiError }) => {
   const { signOut } = useClerk();
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'pipeline' | 'projects' | 'payments'>('leads');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'pipeline' | 'projects' | 'payments'>('overview');
 
   return (
     <div className="min-h-screen bg-brand-page flex flex-col md:flex-row">
@@ -198,164 +196,23 @@ export const Shell: React.FC<ShellProps> = ({ user, health, apiError }) => {
 
         {/* Page Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto space-y-6 pb-20 md:pb-8">
-          {activeTab === 'payments' ? (
+          {activeTab === 'overview' ? (
+            <OverviewDashboard
+              onNavigateTab={setActiveTab}
+              onOpenAddLead={() => setActiveTab('leads')}
+              onOpenCreateProject={() => setActiveTab('projects')}
+              onOpenCreatePayment={() => setActiveTab('payments')}
+              onSelectLeadId={(_id) => setActiveTab('leads')}
+              onSelectProjectId={(_id) => setActiveTab('projects')}
+            />
+          ) : activeTab === 'payments' ? (
             <PaymentsView />
           ) : activeTab === 'projects' ? (
             <ProjectsList />
           ) : activeTab === 'pipeline' ? (
             <PipelineView />
-          ) : activeTab === 'leads' ? (
-            <LeadsInbox />
           ) : (
-            <>
-              {/* Welcome & Stage Banner */}
-              <div className="hq-card bg-white border-brand-border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold text-brand-heading">
-                      System Overview
-                    </h1>
-                    <p className="text-sm text-brand-body mt-1">
-                      InfoHQ Command Center: Leads Inbox, 5-stage opportunity pipeline, Projects & Tasks, and Milestone Billing.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                    <button
-                      onClick={() => setActiveTab('payments')}
-                      className="hq-btn-primary text-xs"
-                    >
-                      <CreditCard size={14} />
-                      Milestone Billing
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('projects')}
-                      className="hq-btn-secondary text-xs"
-                    >
-                      <Briefcase size={14} />
-                      Projects & Tasks
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('pipeline')}
-                      className="hq-btn-secondary text-xs"
-                    >
-                      <Kanban size={14} />
-                      Sales Pipeline
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('leads')}
-                      className="hq-btn-secondary text-xs"
-                    >
-                      <Inbox size={14} />
-                      Leads Inbox
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Infrastructure Health & Status Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Clerk Authentication card */}
-                <div className="hq-card bg-white border-brand-border p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-control bg-brand-subtle flex items-center justify-center text-brand-primary">
-                      <Lock size={18} />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-semibold text-brand-heading">
-                        Clerk Identity
-                      </h2>
-                      <div className="text-xs text-brand-muted">Server Allowlist</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">Clerk User ID</span>
-                      <span className="font-mono text-brand-heading truncate max-w-[150px]">
-                        {user.clerkUserId}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">Role</span>
-                      <span className="font-semibold text-brand-primary uppercase text-[11px]">
-                        {user.role}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-brand-muted">Public Signup</span>
-                      <span className="text-brand-destructive font-medium">Blocked</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cloudflare Worker API card */}
-                <div className="hq-card bg-white border-brand-border p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-control bg-brand-subtle flex items-center justify-center text-brand-primary">
-                      <Server size={18} />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-semibold text-brand-heading">
-                        Cloudflare Worker
-                      </h2>
-                      <div className="text-xs text-brand-muted">Hono API</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">Health Endpoint</span>
-                      <span
-                        className={
-                          health?.status === 'ok'
-                            ? 'text-green-600 font-semibold'
-                            : 'text-brand-muted'
-                        }
-                      >
-                        {health?.status === 'ok' ? 'Online' : apiError ? 'Offline' : 'Checking...'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">API Version</span>
-                      <span className="font-mono text-brand-heading">
-                        {health?.version || '0.1.0'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-brand-muted">Route Protection</span>
-                      <span className="text-green-600 font-medium">Active (Fail-closed)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cloudflare Storage card */}
-                <div className="hq-card bg-white border-brand-border p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-control bg-brand-subtle flex items-center justify-center text-brand-primary">
-                      <Database size={18} />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-semibold text-brand-heading">
-                        Cloudflare D1
-                      </h2>
-                      <div className="text-xs text-brand-muted">Relational Storage</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">D1 Database</span>
-                      <span className="font-mono text-brand-heading">DB (active)</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-brand-border">
-                      <span className="text-brand-muted">Schema Version</span>
-                      <span className="font-mono text-brand-heading">0002_leads_core</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-brand-muted">Atomic Writes</span>
-                      <span className="text-green-600 font-medium">Active (Batching)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
+            <LeadsInbox />
           )}
         </main>
       </div>
