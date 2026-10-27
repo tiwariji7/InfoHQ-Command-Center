@@ -62,7 +62,18 @@ const Root: React.FC = () => {
 
   if (hasValidKey) {
     return (
-      <ClerkProvider publishableKey={clerkKey}>
+      <ClerkProvider
+        publishableKey={clerkKey}
+        localization={{
+          formFieldInputPlaceholder__emailAddress: 'Enter your email address',
+          formFieldInputPlaceholder__emailAddress_username: 'Enter your email address',
+          formFieldInputPlaceholder__password: 'Enter your password',
+          formFieldLabel__emailAddress: 'Email address',
+          formFieldLabel__password: 'Password',
+          formButtonPrimary: 'Continue →',
+          formFieldAction__forgotPassword: 'Forgot password?',
+        }}
+      >
         <App />
       </ClerkProvider>
     );
