@@ -289,7 +289,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               >
                 <option value="planning">Planning</option>
                 <option value="in_progress">In Progress</option>
-                <option value="in_review">In Review</option>
+                <option value="review">In Review</option>
                 <option value="completed">Completed</option>
                 <option value="on_hold">On Hold</option>
               </select>

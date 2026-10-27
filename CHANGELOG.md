@@ -73,6 +73,12 @@ Append-only project history. Do not rewrite earlier entries.
 - Added: `apps/web/src/components/payments/CreatePaymentModal.tsx` for creating milestone invoices standalone or directly attached to a project.
 - Enhanced: `apps/web/src/components/projects/ProjectDetailDrawer.tsx` with dedicated "Milestone Billing" tab showing project financial breakdown (invoiced vs collected vs pending) and inline payment milestones list.
 - Added: `Billing` tab in desktop sidebar and mobile bottom navigation in `Shell.tsx`.
-- Updated: `wrangler.jsonc` with custom domain route `commandcenter.infohq.in` to match remote Cloudflare configuration.
-- Verified: `npm run typecheck`, `npm run build`, and `npx wrangler deploy --dry-run` all pass cleanly with zero errors.
-
+## 2026-10-27 | D1 Studio Existing Schema Alignment (Zero Database Changes)
+- Audited: Full schema inspection of remote Cloudflare D1 database `infohq-command-center` (`65a48298-6c06-4494-af0b-71e020d68a68`, binding `COMMAND_DB`).
+- Confirmed: 100% exact match on `users`, `leads` (3 live leads preserved), `lead_activities`, and `lead_notes`.
+- Adapted: `apps/api/src/services/projectService.ts` to strictly use the existing D1 Studio `projects` table (`id, lead_id, title, client_name, status, budget, start_date, deadline, created_at, updated_at`) and original `tasks` table (`id, project_id, title, status, due_date, created_at, updated_at`). Joined `leads` on `projects.lead_id` to retrieve client company, email, and phone.
+- Adapted: `apps/api/src/services/paymentService.ts` to strictly use the existing D1 Studio `payments` table (`id, project_id, amount, status, invoice_number, paid_at, created_at`) with status constraint `('pending', 'received', 'failed')`.
+- Aligned: `@infohq/shared` models and Zod schemas (`ProjectStatusSchema`, `TaskStatusSchema`, `PaymentStatusSchema`, `ProjectSchema`, `PaymentSchema`) to match live D1 constraints.
+- Aligned: Frontend views in `apps/web` (`ProjectsList.tsx`, `ProjectDetailDrawer.tsx`, `CreateProjectModal.tsx`, `PaymentsView.tsx`) to support `review`, `received`, and `failed` statuses.
+- Documented: `migrations/0003_projects_tasks.sql` and `migrations/0004_payments_billing.sql` updated to accurately record D1 Studio schemas for version control without executing remote migrations.
+- Verified: `npm run build` and `npm test` passing with zero errors across all packages.
