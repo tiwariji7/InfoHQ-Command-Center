@@ -60,3 +60,19 @@ Append-only project history. Do not rewrite earlier entries.
 - Added: "Convert to Project" workflow in `LeadDetailDrawer.tsx` allowing one-click transition from lead to active project.
 - Added: `Projects` tab in desktop sidebar and mobile bottom navigation in `Shell.tsx`.
 - Verified: `npm run typecheck` and `npm run build` both pass with zero errors across the entire monorepo.
+
+## 2026-10-27 | Option B — Payments & Milestone Billing Module
+- Added: D1 SQL migration `migrations/0004_payments_billing.sql` creating `payments` table with foreign keys, indexes, and status constraints (`pending`, `paid`, `overdue`, `cancelled`).
+- Applied: Migration `0004_payments_billing.sql` applied with 100% success on local D1 (`COMMAND_DB`).
+- Added: Shared models in `@infohq/shared` for `Payment`, `PaymentStatus`, `PaymentMethod`, `CreatePaymentSchema`, `UpdatePaymentSchema`, `RecordPaymentSchema`, and `PaymentSummary`.
+- Added: Backend service `apps/api/src/services/paymentService.ts` for milestone invoice CRUD operations, financial balance calculations (total invoiced, collected, pending, overdue), and payment receipt recording.
+- Added: Backend router `apps/api/src/routes/payments.ts` mounted at `/api/payments` protected by `requireSuperadmin`.
+- Added: Frontend API client methods in `apps/web/src/lib/api.ts` (`fetchPayments`, `fetchPaymentDetail`, `createPaymentApi`, `recordPaymentApi`, `updatePaymentApi`, `deletePaymentApi`).
+- Added: `apps/web/src/components/payments/PaymentsView.tsx` with live financial metrics cards, search filter, milestone invoices table, and quick actions.
+- Added: `apps/web/src/components/payments/RecordPaymentModal.tsx` for capturing payment date, method, and transaction/UTR reference numbers.
+- Added: `apps/web/src/components/payments/CreatePaymentModal.tsx` for creating milestone invoices standalone or directly attached to a project.
+- Enhanced: `apps/web/src/components/projects/ProjectDetailDrawer.tsx` with dedicated "Milestone Billing" tab showing project financial breakdown (invoiced vs collected vs pending) and inline payment milestones list.
+- Added: `Billing` tab in desktop sidebar and mobile bottom navigation in `Shell.tsx`.
+- Updated: `wrangler.jsonc` with custom domain route `commandcenter.infohq.in` to match remote Cloudflare configuration.
+- Verified: `npm run typecheck`, `npm run build`, and `npx wrangler deploy --dry-run` all pass cleanly with zero errors.
+

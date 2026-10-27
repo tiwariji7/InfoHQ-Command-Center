@@ -4,6 +4,7 @@ import type { AppContext } from './types/env.js';
 import { requireSuperadmin } from './middleware/auth.js';
 import { leadsRouter } from './routes/leads.js';
 import { projectsRouter } from './routes/projects.js';
+import { paymentsRouter } from './routes/payments.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
@@ -91,5 +92,8 @@ app.route('/api/leads', leadsRouter);
 
 // Protected: Projects and tasks router
 app.route('/api/projects', projectsRouter);
+
+// Protected: Payments and milestone billing router
+app.route('/api/payments', paymentsRouter);
 
 export default app;

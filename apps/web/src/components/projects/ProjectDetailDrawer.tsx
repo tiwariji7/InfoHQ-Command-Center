@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type {
   Project,
@@ -6,6 +6,7 @@ import type {
   TaskPriority,
   TaskStatus,
   ProjectDetailResponse,
+  Payment,
 } from '@infohq/shared';
 import {
   fetchProjectDetail,
@@ -13,6 +14,8 @@ import {
   createTaskApi,
   updateTaskApi,
   deleteTaskApi,
+  fetchPayments,
+  deletePaymentApi,
 } from '../../lib/api.js';
 import {
   X,
@@ -29,7 +32,11 @@ import {
   Loader2,
   Clock,
   Briefcase,
+  Receipt,
+  CheckSquare,
 } from 'lucide-react';
+import { CreatePaymentModal } from '../payments/CreatePaymentModal.js';
+import { RecordPaymentModal } from '../payments/RecordPaymentModal.js';
 
 interface ProjectDetailDrawerProps {
   projectId: string | null;
@@ -48,13 +55,22 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // New task form state
+  // Tab state inside drawer
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'tasks' | 'billing'>('tasks');
+
+  // Tasks state
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>('medium');
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'completed'>('all');
 
-  // Load project details on mount or projectId change
+  // Billing & Payments state
+  const [projectPayments, setProjectPayments] = useState<Payment[]>([]);
+  const [isPaymentsLoading, setIsPaymentsLoading] = useState(false);
+  const [isCreatePaymentOpen, setIsCreatePaymentOpen] = useState(false);
+  const [recordPaymentTarget, setRecordPaymentTarget] = useState<Payment | null>(null);
+
+  // Load project details
   useEffect(() => {
     if (!projectId) {
       setProjectData(null);
@@ -87,6 +103,26 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     };
   }, [projectId, getToken]);
 
+  // Load project payments
+  const loadProjectPayments = useCallback(async () => {
+    if (!projectId) return;
+    setIsPaymentsLoading(true);
+    try {
+      const res = await fetchPayments(getToken, { projectId });
+      setProjectPayments(res.payments);
+    } catch (err: unknown) {
+      console.error('Failed to load project payments:', err);
+    } finally {
+      setIsPaymentsLoading(false);
+    }
+  }, [projectId, getToken]);
+
+  useEffect(() => {
+    if (projectId) {
+      loadProjectPayments();
+    }
+  }, [projectId, loadProjectPayments]);
+
   // Handle escape key
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -108,7 +144,6 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     if (!project) return;
     const previousStatus = project.status;
 
-    // Optimistic update
     setProjectData((prev) =>
       prev ? { ...prev, project: { ...prev.project, status: newStatus } } : null
     );
@@ -118,7 +153,6 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
       onProjectUpdated(res.project);
     } catch (err: unknown) {
       console.error('Failed to update project status:', err);
-      // Rollback
       setProjectData((prev) =>
         prev ? { ...prev, project: { ...prev.project, status: previousStatus } } : null
       );
@@ -168,7 +202,6 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     if (!project) return;
     const newStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done';
 
-    // Optimistic task update
     setProjectData((prev) => {
       if (!prev) return null;
       const updatedTasks = prev.tasks.map((t) =>
@@ -190,7 +223,6 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
       await updateTaskApi(getToken, project.id, task.id, { status: newStatus });
     } catch (err: unknown) {
       console.error('Failed to toggle task:', err);
-      // Re-fetch to sync
       fetchProjectDetail(getToken, project.id).then((data) => setProjectData(data));
     }
   };
@@ -200,7 +232,6 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     if (!project) return;
     if (!confirm('Are you sure you want to delete this task?')) return;
 
-    // Optimistic deletion
     setProjectData((prev) => {
       if (!prev) return null;
       const updatedTasks = prev.tasks.filter((t) => t.id !== taskId);
@@ -225,7 +256,18 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     }
   };
 
-  // Client Quick Contacts
+  // Delete payment handler
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Are you sure you want to delete this milestone payment?')) return;
+    try {
+      await deletePaymentApi(getToken, paymentId);
+      setProjectPayments((prev) => prev.filter((p) => p.id !== paymentId));
+    } catch (err: unknown) {
+      console.error('Failed to delete payment:', err);
+    }
+  };
+
+  // Quick Client Contact URLs
   const cleanPhone = project?.clientPhone?.replace(/\D/g, '') || '';
   const waUrl = cleanPhone
     ? `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encodeURIComponent(
@@ -250,6 +292,23 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   const completedTasksCount = tasks.filter((t) => t.status === 'done').length;
   const progressPercent =
     totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+
+  // Milestone financial summary
+  let totalProjectInvoiced = 0;
+  let totalProjectCollected = 0;
+  for (const py of projectPayments) {
+    if (py.status !== 'cancelled') totalProjectInvoiced += py.amount;
+    if (py.status === 'paid') totalProjectCollected += py.amount;
+  }
+  const projectPendingBalance = totalProjectInvoiced - totalProjectCollected;
+
+  const formatCurrency = (amt: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amt);
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end">
@@ -410,161 +469,347 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Tasks Management Section */}
-              <div className="space-y-3">
-                {/* Filter and Add Task Bar */}
-                <div className="flex items-center justify-between gap-2 border-b border-brand-border pb-2">
-                  <div className="flex items-center gap-1 text-xs">
-                    <button
-                      onClick={() => setTaskFilter('all')}
-                      className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
-                        taskFilter === 'all'
-                          ? 'bg-brand-primary text-white'
-                          : 'text-brand-muted hover:text-brand-heading'
-                      }`}
-                    >
-                      All ({totalTasksCount})
-                    </button>
-                    <button
-                      onClick={() => setTaskFilter('active')}
-                      className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
-                        taskFilter === 'active'
-                          ? 'bg-brand-primary text-white'
-                          : 'text-brand-muted hover:text-brand-heading'
-                      }`}
-                    >
-                      Active ({totalTasksCount - completedTasksCount})
-                    </button>
-                    <button
-                      onClick={() => setTaskFilter('completed')}
-                      className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
-                        taskFilter === 'completed'
-                          ? 'bg-brand-primary text-white'
-                          : 'text-brand-muted hover:text-brand-heading'
-                      }`}
-                    >
-                      Done ({completedTasksCount})
-                    </button>
-                  </div>
-                </div>
+              {/* Section Tabs: Tasks vs Milestone Billing */}
+              <div className="flex items-center gap-2 border-b border-brand-border pb-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveDrawerTab('tasks')}
+                  className={`px-3 py-1.5 rounded-control text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    activeDrawerTab === 'tasks'
+                      ? 'bg-brand-primary text-white shadow-sm'
+                      : 'text-brand-muted hover:bg-brand-section'
+                  }`}
+                >
+                  <CheckSquare size={14} />
+                  <span>Tasks & Milestones ({totalTasksCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveDrawerTab('billing')}
+                  className={`px-3 py-1.5 rounded-control text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    activeDrawerTab === 'billing'
+                      ? 'bg-brand-primary text-white shadow-sm'
+                      : 'text-brand-muted hover:bg-brand-section'
+                  }`}
+                >
+                  <Receipt size={14} />
+                  <span>Milestone Billing ({projectPayments.length})</span>
+                </button>
+              </div>
 
-                {/* Inline Add Task Form */}
-                <form onSubmit={handleAddTask} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Add a new milestone or task..."
-                    className="flex-1 px-3 py-2 text-xs border border-brand-border rounded-control focus:border-brand-primary focus:outline-none"
-                  />
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                    className="px-2.5 py-2 text-xs border border-brand-border rounded-control bg-white text-brand-heading focus:border-brand-primary focus:outline-none capitalize"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                  <button
-                    type="submit"
-                    disabled={isAddingTask || !newTaskTitle.trim()}
-                    className="hq-btn-primary text-xs py-2 px-3 flex items-center gap-1 shrink-0"
-                  >
-                    {isAddingTask ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <Plus size={13} />
-                    )}
-                    <span>Add</span>
-                  </button>
-                </form>
-
-                {/* Task List */}
-                <div className="space-y-2 mt-2">
-                  {filteredTasks.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-brand-muted border border-dashed border-brand-border rounded-card bg-brand-section/50">
-                      No tasks found in this view. Add a task above to start tracking deliverables.
+              {/* Tab 1: Tasks Management */}
+              {activeDrawerTab === 'tasks' ? (
+                <div className="space-y-3">
+                  {/* Filter and Add Task Bar */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 text-xs">
+                      <button
+                        onClick={() => setTaskFilter('all')}
+                        className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
+                          taskFilter === 'all'
+                            ? 'bg-brand-section text-brand-heading font-semibold'
+                            : 'text-brand-muted hover:text-brand-heading'
+                        }`}
+                      >
+                        All ({totalTasksCount})
+                      </button>
+                      <button
+                        onClick={() => setTaskFilter('active')}
+                        className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
+                          taskFilter === 'active'
+                            ? 'bg-brand-section text-brand-heading font-semibold'
+                            : 'text-brand-muted hover:text-brand-heading'
+                        }`}
+                      >
+                        Active ({totalTasksCount - completedTasksCount})
+                      </button>
+                      <button
+                        onClick={() => setTaskFilter('completed')}
+                        className={`px-2.5 py-1 rounded-control font-medium transition-colors ${
+                          taskFilter === 'completed'
+                            ? 'bg-brand-section text-brand-heading font-semibold'
+                            : 'text-brand-muted hover:text-brand-heading'
+                        }`}
+                      >
+                        Done ({completedTasksCount})
+                      </button>
                     </div>
-                  ) : (
-                    filteredTasks.map((task) => {
-                      const isDone = task.status === 'done';
-                      return (
-                        <div
-                          key={task.id}
-                          className={`p-3 rounded-control border transition-all flex items-start justify-between gap-3 ${
-                            isDone
-                              ? 'bg-brand-section/40 border-brand-border text-brand-muted opacity-80'
-                              : 'bg-white border-brand-border hover:border-brand-primary/40'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleTaskStatus(task)}
-                              className={`mt-0.5 transition-colors ${
-                                isDone ? 'text-green-600' : 'text-brand-muted hover:text-brand-primary'
-                              }`}
-                              aria-label={isDone ? 'Mark task as todo' : 'Mark task as done'}
-                            >
-                              {isDone ? (
-                                <CheckCircle2 size={16} className="fill-green-100" />
-                              ) : (
-                                <Circle size={16} />
-                              )}
-                            </button>
-                            <div className="min-w-0">
-                              <span
-                                className={`text-xs font-medium block break-words ${
-                                  isDone ? 'line-through text-brand-muted' : 'text-brand-heading'
+                  </div>
+
+                  {/* Inline Add Task Form */}
+                  <form onSubmit={handleAddTask} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      placeholder="Add a new milestone or task..."
+                      className="flex-1 px-3 py-2 text-xs border border-brand-border rounded-control focus:border-brand-primary focus:outline-none"
+                    />
+                    <select
+                      value={newTaskPriority}
+                      onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+                      className="px-2.5 py-2 text-xs border border-brand-border rounded-control bg-white text-brand-heading focus:border-brand-primary focus:outline-none capitalize"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={isAddingTask || !newTaskTitle.trim()}
+                      className="hq-btn-primary text-xs py-2 px-3 flex items-center gap-1 shrink-0"
+                    >
+                      {isAddingTask ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Plus size={13} />
+                      )}
+                      <span>Add</span>
+                    </button>
+                  </form>
+
+                  {/* Task List */}
+                  <div className="space-y-2 mt-2">
+                    {filteredTasks.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-brand-muted border border-dashed border-brand-border rounded-card bg-brand-section/50">
+                        No tasks found in this view. Add a task above to start tracking deliverables.
+                      </div>
+                    ) : (
+                      filteredTasks.map((task) => {
+                        const isDone = task.status === 'done';
+                        return (
+                          <div
+                            key={task.id}
+                            className={`p-3 rounded-control border transition-all flex items-start justify-between gap-3 ${
+                              isDone
+                                ? 'bg-brand-section/40 border-brand-border text-brand-muted opacity-80'
+                                : 'bg-white border-brand-border hover:border-brand-primary/40'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleTaskStatus(task)}
+                                className={`mt-0.5 transition-colors ${
+                                  isDone ? 'text-green-600' : 'text-brand-muted hover:text-brand-primary'
                                 }`}
+                                aria-label={isDone ? 'Mark task as todo' : 'Mark task as done'}
                               >
-                                {task.title}
-                              </span>
-                              <div className="flex items-center gap-2 mt-1">
+                                {isDone ? (
+                                  <CheckCircle2 size={16} className="fill-green-100" />
+                                ) : (
+                                  <Circle size={16} />
+                                )}
+                              </button>
+                              <div className="min-w-0">
                                 <span
-                                  className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border ${
-                                    task.priority === 'urgent'
-                                      ? 'bg-red-50 text-red-700 border-red-200'
-                                      : task.priority === 'high'
-                                      ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                      : task.priority === 'medium'
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : 'bg-gray-50 text-gray-700 border-gray-200'
+                                  className={`text-xs font-medium block break-words ${
+                                    isDone ? 'line-through text-brand-muted' : 'text-brand-heading'
                                   }`}
                                 >
-                                  {task.priority}
+                                  {task.title}
                                 </span>
-                                {task.completedAt && (
-                                  <span className="text-[10px] text-brand-muted flex items-center gap-0.5">
-                                    <Clock size={10} />
-                                    Done {new Date(task.completedAt).toLocaleDateString()}
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span
+                                    className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border ${
+                                      task.priority === 'urgent'
+                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        : task.priority === 'high'
+                                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                        : task.priority === 'medium'
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : 'bg-gray-50 text-gray-700 border-gray-200'
+                                    }`}
+                                  >
+                                    {task.priority}
+                                  </span>
+                                  {task.completedAt && (
+                                    <span className="text-[10px] text-brand-muted flex items-center gap-0.5">
+                                      <Clock size={10} />
+                                      Done {new Date(task.completedAt).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="text-brand-lightGray hover:text-brand-destructive p-1 rounded transition-colors shrink-0"
+                              title="Delete task"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Tab 2: Milestone Billing */
+                <div className="space-y-4">
+                  {/* Financial Snapshot */}
+                  <div className="grid grid-cols-3 gap-2.5 p-3.5 bg-brand-section rounded-card border border-brand-border">
+                    <div>
+                      <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider">
+                        Invoiced
+                      </span>
+                      <div className="text-sm font-bold text-brand-heading mt-0.5">
+                        {formatCurrency(totalProjectInvoiced)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-green-700 uppercase font-bold tracking-wider">
+                        Collected
+                      </span>
+                      <div className="text-sm font-bold text-green-700 mt-0.5">
+                        {formatCurrency(totalProjectCollected)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-700 uppercase font-bold tracking-wider">
+                        Pending
+                      </span>
+                      <div className="text-sm font-bold text-amber-700 mt-0.5">
+                        {formatCurrency(projectPendingBalance)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add Milestone Invoice Button */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-brand-heading">
+                      Payment Milestones & Invoices
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatePaymentOpen(true)}
+                      className="hq-btn-primary text-xs py-1 px-2.5 flex items-center gap-1"
+                    >
+                      <Plus size={13} />
+                      <span>Add Milestone</span>
+                    </button>
+                  </div>
+
+                  {/* Milestone List */}
+                  {isPaymentsLoading ? (
+                    <div className="py-8 flex justify-center">
+                      <Loader2 size={20} className="animate-spin text-brand-primary" />
+                    </div>
+                  ) : projectPayments.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-brand-muted border border-dashed border-brand-border rounded-card bg-brand-section/50">
+                      No payment milestones added for this project yet. Click &quot;Add Milestone&quot; to set up billing.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {projectPayments.map((py) => {
+                        const isPaid = py.status === 'paid';
+                        const isOverdue =
+                          py.status === 'pending' && py.dueDate && py.dueDate < Date.now();
+
+                        return (
+                          <div
+                            key={py.id}
+                            className={`p-3.5 rounded-control border flex items-center justify-between gap-3 ${
+                              isPaid
+                                ? 'bg-green-50/30 border-green-200'
+                                : 'bg-white border-brand-border'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-brand-heading">
+                                  {py.title}
+                                </span>
+                                {isPaid ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-green-100 text-green-800">
+                                    Paid
+                                  </span>
+                                ) : isOverdue ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-red-100 text-red-800">
+                                    Overdue
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                    Pending
                                   </span>
                                 )}
                               </div>
+
+                              <div className="text-[11px] text-brand-muted mt-0.5 flex items-center gap-3">
+                                {py.invoiceNumber && <span>Inv: {py.invoiceNumber}</span>}
+                                {py.dueDate && (
+                                  <span>Due: {new Date(py.dueDate).toLocaleDateString()}</span>
+                                )}
+                                {py.notes && <span>Ref: {py.notes}</span>}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-brand-heading">
+                                  {formatCurrency(py.amount)}
+                                </div>
+                              </div>
+
+                              {!isPaid && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRecordPaymentTarget(py)}
+                                  className="px-2 py-1 rounded bg-brand-primary text-white text-[11px] font-semibold hover:bg-brand-primary/90 flex items-center gap-1"
+                                >
+                                  <CheckCircle2 size={12} />
+                                  <span>Mark Paid</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePayment(py.id)}
+                                className="p-1 text-brand-lightGray hover:text-brand-destructive rounded"
+                                title="Delete milestone"
+                              >
+                                <Trash2 size={13} />
+                              </button>
                             </div>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="text-brand-lightGray hover:text-brand-destructive p-1 rounded transition-colors shrink-0"
-                            title="Delete task"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      );
-                    })
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {/* Add Milestone Invoice Modal */}
+      {project && (
+        <CreatePaymentModal
+          isOpen={isCreatePaymentOpen}
+          onClose={() => setIsCreatePaymentOpen(false)}
+          onSuccess={() => {
+            loadProjectPayments();
+          }}
+          preSelectedProjectId={project.id}
+          preSelectedProjectTitle={project.title}
+        />
+      )}
+
+      {/* Record Payment Receipt Modal */}
+      <RecordPaymentModal
+        isOpen={Boolean(recordPaymentTarget)}
+        onClose={() => setRecordPaymentTarget(null)}
+        onSuccess={() => {
+          loadProjectPayments();
+        }}
+        payment={recordPaymentTarget}
+      />
     </div>
   );
 };
