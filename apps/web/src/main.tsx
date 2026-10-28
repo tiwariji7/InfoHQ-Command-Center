@@ -61,9 +61,15 @@ const Root: React.FC = () => {
   );
 
   if (hasValidKey) {
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
     return (
       <ClerkProvider
         publishableKey={clerkKey}
+        proxyUrl={isLocalhost && clerkKey.startsWith('pk_live_') ? '/__clerk' : undefined}
+        clerkJSUrl="https://clerk.infohq.in/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
         localization={{
           formFieldInputPlaceholder__emailAddress: 'Enter your email address',
           formFieldInputPlaceholder__emailAddress_username: 'Enter your email address',
