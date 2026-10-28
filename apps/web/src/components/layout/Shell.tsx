@@ -307,18 +307,18 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F3FF] flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-[#F8F7FC] flex flex-col lg:flex-row font-sans">
       {/* ========================================================= */}
       {/* LAPTOP / DESKTOP SIDEBAR (>= 1024px)                      */}
-      {/* Pale Lavender background: #F0EDFF, scrollable, collapsible*/}
+      {/* Whisper Pale Lavender background: #FAF9FD, scrollable     */}
       {/* ========================================================= */}
       <aside
-        className={`hidden lg:flex flex-col bg-[#F0EDFF] border-r border-[#EDE9FE] h-screen sticky top-0 z-20 shrink-0 select-none transition-all duration-300 ${
+        className={`hidden lg:flex flex-col bg-[#FAF9FD] border-r border-[#EDE8F5] h-screen sticky top-0 z-20 shrink-0 select-none transition-all duration-300 ${
           sidebarCollapsed ? 'w-[76px]' : 'w-[260px] xl:w-[276px]'
         }`}
       >
         {/* Brand Header: InfoHQ with Capital I and Command Center gradient */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE9FE] shrink-0 bg-[#F0EDFF]">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE8F5] shrink-0 bg-[#FAF9FD]">
           {!sidebarCollapsed ? (
             <div className="flex flex-col">
               <div className="flex items-center">
@@ -385,7 +385,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                       className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
                         isActive
                           ? 'bg-[#7C3AED] text-white shadow-xs'
-                          : 'bg-white border border-[#EDE9FE] text-brand-muted group-hover:text-brand-heading group-hover:border-[#7C3AED]/40'
+                          : 'bg-white border border-[#EDE8F5] text-brand-muted group-hover:text-brand-heading group-hover:border-[#7C3AED]/40'
                       }`}
                     >
                       <Icon size={15} className="stroke-[2.2]" />
@@ -435,9 +435,9 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           />
 
           {/* Drawer Menu */}
-          <div className="relative w-4/5 max-w-xs bg-[#F0EDFF] h-full flex flex-col z-10 shadow-2xl">
+          <div className="relative w-4/5 max-w-xs bg-[#FAF9FD] h-full flex flex-col z-10 shadow-2xl">
             {/* Drawer Header */}
-            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE9FE] shrink-0 bg-[#F0EDFF]">
+            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE8F5] shrink-0 bg-[#FAF9FD]">
               <div className="flex flex-col select-none">
                 <div className="flex items-center">
                   <span className="text-xl font-black tracking-tight bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
@@ -484,7 +484,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                           className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                             isActive
                               ? 'bg-[#7C3AED] text-white shadow-xs'
-                              : 'bg-white border border-[#EDE9FE] text-brand-muted'
+                              : 'bg-white border border-[#EDE8F5] text-brand-muted'
                           }`}
                         >
                           <Icon size={15} className="stroke-[2.2]" />
@@ -509,7 +509,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </nav>
 
             {/* Drawer Logout Footer */}
-            <div className="p-3 border-t border-[#EDE9FE] bg-[#F0EDFF] shrink-0">
+            <div className="p-3 border-t border-[#EDE8F5] bg-[#FAF9FD] shrink-0">
               <button
                 onClick={() => signOut()}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-control text-xs font-semibold text-rose-600 bg-white border border-rose-100 hover:bg-rose-50 transition-colors cursor-pointer shadow-xs"
@@ -529,13 +529,13 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
         {/* ========================================================= */}
         {/* TOP FLOATING NAVBAR (Inspired by Reference Image)         */}
         {/* ========================================================= */}
-        <header className="h-16 bg-white border-b border-[#EDE9FE] flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 shadow-[0_2px_12px_rgba(124,58,237,0.03)]">
+        <header className="h-16 bg-white border-b border-[#EDE8F5] flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 shadow-[0_2px_12px_rgba(124,58,237,0.03)]">
           {/* Left section: Hamburger / Collapse / Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {/* 3-Lines Hamburger Button: visible on Mobile & Tablet (< 1024px) */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-brand-muted hover:text-[#7C3AED] rounded-control hover:bg-[#F5F3FF] transition-colors cursor-pointer"
+              className="lg:hidden p-2 text-brand-muted hover:text-[#7C3AED] rounded-control hover:bg-[#F8F7FC] transition-colors cursor-pointer"
               aria-label="Open navigation menu"
               title="Open menu"
             >
@@ -570,7 +570,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             {/* Desktop Collapse / Expand Toggle Pill Button */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden lg:flex w-9 h-9 rounded-full bg-[#F5F3FF] border border-[#EDE9FE] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
+              className="hidden lg:flex w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -589,9 +589,9 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search leads, clients, projects, invoices..."
-                className="w-full h-10 pl-9 pr-14 rounded-full bg-[#F5F3FF]/70 border border-[#EDE9FE] text-xs sm:text-sm text-brand-heading placeholder:text-brand-muted/70 focus:bg-white focus:border-[#7C3AED] focus:ring-3 focus:ring-[#7C3AED]/15 transition-all outline-none"
+                className="w-full h-10 pl-9 pr-14 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] text-xs sm:text-sm text-brand-heading placeholder:text-brand-muted/70 focus:bg-white focus:border-[#7C3AED] focus:ring-3 focus:ring-[#7C3AED]/15 transition-all outline-none"
               />
-              <div className="absolute right-2.5 px-1.5 py-0.5 rounded bg-white border border-[#EDE9FE] text-[10px] font-mono text-brand-muted pointer-events-none">
+              <div className="absolute right-2.5 px-1.5 py-0.5 rounded bg-white border border-[#EDE8F5] text-[10px] font-mono text-brand-muted pointer-events-none">
                 ⌘ K
               </div>
             </div>
@@ -601,7 +601,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Theme Toggle Pill */}
             <button
-              className="w-9 h-9 rounded-full bg-[#F5F3FF] border border-[#EDE9FE] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Theme mode"
               aria-label="Theme mode"
             >
@@ -610,7 +610,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
 
             {/* Notifications Pill with Red Badge Dot */}
             <button
-              className="w-9 h-9 rounded-full bg-[#F5F3FF] border border-[#EDE9FE] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer relative shadow-2xs"
+              className="w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer relative shadow-2xs"
               title="Notifications"
               aria-label="Notifications"
             >
@@ -620,7 +620,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
 
             {/* Help / Support Pill */}
             <button
-              className="hidden sm:flex w-9 h-9 rounded-full bg-[#F5F3FF] border border-[#EDE9FE] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
+              className="hidden sm:flex w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
               title="Help and documentation"
               aria-label="Help and documentation"
             >
@@ -631,7 +631,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             <div className="relative pl-1 sm:pl-2" ref={dropdownRef}>
               <div
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2.5 py-1 px-1.5 sm:px-2 rounded-full hover:bg-[#F5F3FF] border border-transparent hover:border-[#EDE9FE] transition-all cursor-pointer select-none"
+                className="flex items-center gap-2.5 py-1 px-1.5 sm:px-2 rounded-full hover:bg-[#F8F7FC] border border-transparent hover:border-[#EDE8F5] transition-all cursor-pointer select-none"
                 role="button"
                 tabIndex={0}
                 aria-label="User profile menu"
@@ -666,9 +666,9 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
 
               {/* Profile Dropdown Popover */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-[#EDE9FE] shadow-[0_12px_36px_rgba(124,58,237,0.12)] p-4 z-50 animate-fadeIn text-xs">
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-[#EDE8F5] shadow-[0_12px_36px_rgba(124,58,237,0.12)] p-4 z-50 animate-fadeIn text-xs">
                   {/* User Profile Header */}
-                  <div className="flex items-center gap-3 pb-3 border-b border-[#EDE9FE]">
+                  <div className="flex items-center gap-3 pb-3 border-b border-[#EDE8F5]">
                     <div className="w-11 h-11 rounded-full bg-[#8B5CF6] text-white flex items-center justify-center font-extrabold text-base shadow-xs shrink-0 ring-2 ring-purple-100">
                       {avatarLetter}
                     </div>
@@ -686,7 +686,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                   </div>
 
                   {/* Clerk User Info Rows */}
-                  <div className="py-3 space-y-2 text-[11px] text-brand-muted border-b border-[#EDE9FE]">
+                  <div className="py-3 space-y-2 text-[11px] text-brand-muted border-b border-[#EDE8F5]">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <User size={13} className="text-[#7C3AED]" />
@@ -738,7 +738,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           </div>
         </header>
 
-        {/* Dynamic Page Container: Very Light Lavender #F5F3FF */}
+        {/* Dynamic Page Container: Whisper Slate-Lavender #F8F7FC */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-12">
           {renderActiveView()}
         </main>
