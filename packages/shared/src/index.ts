@@ -444,3 +444,86 @@ export interface DashboardOverviewResponse {
 
 
 
+
+// --- Automations, Cron & Alert Models ---
+
+export const AutomationJobTypeSchema = z.enum([
+  'daily_briefing',
+  'lead_followup_check',
+  'overdue_invoice_check',
+  'stale_lead_check',
+  'system',
+]);
+export type AutomationJobType = z.infer<typeof AutomationJobTypeSchema>;
+
+export const AlertTypeSchema = z.enum([
+  'followup_due',
+  'invoice_overdue',
+  'invoice_upcoming',
+  'stale_lead',
+  'milestone_deadline',
+  'system',
+]);
+export type AlertType = z.infer<typeof AlertTypeSchema>;
+
+export const AlertSeveritySchema = z.enum(['info', 'warning', 'critical']);
+export type AlertSeverity = z.infer<typeof AlertSeveritySchema>;
+
+export interface AutomationLog {
+  id: string;
+  jobType: AutomationJobType;
+  status: 'success' | 'partial' | 'failed';
+  summary: string;
+  detailsJson?: string | null;
+  createdAt: number;
+}
+
+export interface AutomationAlert {
+  id: string;
+  type: AlertType;
+  title: string;
+  message: string;
+  severity: AlertSeverity;
+  link?: string | null;
+  isRead: boolean;
+  metadataJson?: string | null;
+  createdAt: number;
+}
+
+export interface MorningBriefingDigest {
+  generatedAt: number;
+  greeting: string;
+  summary: {
+    newLeads24h: number;
+    dueFollowUpsCount: number;
+    staleLeadsCount: number;
+    overdueInvoicesCount: number;
+    overdueInvoicesTotal: number;
+    pendingInvoicesTotal: number;
+    upcomingDeadlinesCount: number;
+  };
+  dueFollowUps: Array<{
+    leadId: string;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    serviceNeeded?: string | null;
+    nextFollowUpAt: number;
+    isOverdue: boolean;
+  }>;
+  overdueInvoices: Array<{
+    paymentId: string;
+    invoiceNumber: string | null;
+    clientName: string;
+    amount: number;
+    dueDate?: number | null;
+  }>;
+  upcomingDeadlines: Array<{
+    projectId: string;
+    title: string;
+    clientName: string;
+    deadline: number;
+  }>;
+  recentAlerts: AutomationAlert[];
+  latestCronLog?: AutomationLog | null;
+}

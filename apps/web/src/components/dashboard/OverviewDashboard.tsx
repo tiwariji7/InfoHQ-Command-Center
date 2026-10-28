@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse, RecentProjectItem, RecentPaymentItem } from '@infohq/shared';
 import { fetchDashboardOverview } from '../../lib/api.js';
+import { MorningBriefingBanner } from './MorningBriefingBanner.js';
 import {
   Users,
   FolderKanban,
@@ -277,6 +278,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </button>
         </div>
       </div>
+
+            {/* Daily Command Briefing & Automated Edge Cron Reminders */}
+      <MorningBriefingBanner onNavigateTab={onNavigateTab} onSelectLeadId={onSelectLeadId} />
 
       {/* ========================================================= */}
       {/* 1. SABSE UPAR: 4 KPI CARDS (Vertix V14 Glass-Card Style)   */}

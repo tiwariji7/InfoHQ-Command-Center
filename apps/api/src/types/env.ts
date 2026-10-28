@@ -10,6 +10,11 @@ export interface Bindings {
   VITE_CLERK_PUBLISHABLE_KEY?: string;
   SUPERADMIN_CLERK_USER_ID: string;
   INTAKE_SECRET?: string;
+  ADMIN_NOTIFY_WEBHOOK?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
+  RESEND_API_KEY?: string;
+  ADMIN_EMAIL?: string;
 }
 
 export interface Variables {

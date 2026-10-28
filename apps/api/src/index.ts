@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { AppContext } from './types/env.js';
+import type { AppContext, Bindings } from './types/env.js';
 import { requireSuperadmin } from './middleware/auth.js';
 import { leadsRouter } from './routes/leads.js';
 import { projectsRouter } from './routes/projects.js';
 import { paymentsRouter } from './routes/payments.js';
 import { overviewRouter } from './routes/overview.js';
+import { automationsRouter } from './routes/automations.js';
+import { runMorningBriefingAndAudits } from './services/automationService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
@@ -100,4 +102,28 @@ app.route('/api/payments', paymentsRouter);
 // Protected: Dashboard overview and analytics router
 app.route('/api/overview', overviewRouter);
 
-export default app;
+// Protected: Automations, daily briefing & alerts router
+app.route('/api/automations', automationsRouter);
+
+// Export Cloudflare Worker fetch & scheduled cron handler
+export default {
+  fetch: app.fetch,
+  async scheduled(
+    event: { cron: string },
+    env: Bindings,
+    ctx: { waitUntil: (promise: Promise<unknown>) => void }
+  ) {
+    console.log(`[Cloudflare Cron] Scheduled trigger: ${event.cron} at ${new Date().toISOString()}`);
+    const db = env.DB || env.COMMAND_DB;
+    if (!db) {
+      console.error('[Cloudflare Cron] Database binding not found.');
+      return;
+    }
+
+    ctx.waitUntil(
+      runMorningBriefingAndAudits(db, env)
+        .then(() => console.log('[Cloudflare Cron] Daily morning briefing & audit completed.'))
+        .catch((err) => console.error('[Cloudflare Cron] Audit failed:', err))
+    );
+  },
+};

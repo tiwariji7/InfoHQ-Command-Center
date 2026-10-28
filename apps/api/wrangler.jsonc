@@ -7,6 +7,9 @@
   "vars": {
     "VITE_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaW5mb2hxLmluJA"
   },
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",

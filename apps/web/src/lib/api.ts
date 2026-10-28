@@ -23,6 +23,8 @@ import type {
   RecordPaymentInput,
   PaymentListResponse,
   DashboardOverviewResponse,
+  MorningBriefingDigest,
+  AutomationAlert,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -325,5 +327,47 @@ export async function fetchDashboardOverview(
   return fetchWithAuth<DashboardOverviewResponse>('/api/overview', getToken);
 }
 
+// --- Automations & Morning Briefing API ---
 
+export async function fetchAutomationDigest(
+  getToken: () => Promise<string | null>
+): Promise<MorningBriefingDigest> {
+  return fetchWithAuth<MorningBriefingDigest>('/api/automations/digest', getToken);
+}
 
+export async function triggerAutomationAudit(
+  getToken: () => Promise<string | null>
+): Promise<{ success: boolean; digest: MorningBriefingDigest }> {
+  return fetchWithAuth<{ success: boolean; digest: MorningBriefingDigest }>(
+    '/api/automations/run',
+    getToken,
+    { method: 'POST' }
+  );
+}
+
+export async function fetchAutomationAlerts(
+  getToken: () => Promise<string | null>,
+  unreadOnly = false
+): Promise<{ alerts: AutomationAlert[] }> {
+  const query = unreadOnly ? '?unreadOnly=true' : '';
+  return fetchWithAuth<{ alerts: AutomationAlert[] }>(`/api/automations/alerts${query}`, getToken);
+}
+
+export async function markAlertRead(
+  getToken: () => Promise<string | null>,
+  alertId: string
+): Promise<{ success: boolean }> {
+  return fetchWithAuth<{ success: boolean }>(`/api/automations/alerts/${alertId}/read`, getToken, {
+    method: 'PATCH',
+  });
+}
+
+export async function markAllAlertsRead(
+  getToken: () => Promise<string | null>
+): Promise<{ success: boolean; updatedCount: number }> {
+  return fetchWithAuth<{ success: boolean; updatedCount: number }>(
+    '/api/automations/alerts/read-all',
+    getToken,
+    { method: 'POST' }
+  );
+}
