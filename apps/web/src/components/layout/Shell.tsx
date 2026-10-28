@@ -29,8 +29,8 @@ import {
   Sun,
   HelpCircle,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
   Mail,
   User,
@@ -313,6 +313,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
       {/* Whisper Pale Lavender background: #FAF9FD, scrollable     */}
       {/* ========================================================= */}
       <aside
+        data-lenis-prevent
         className={`hidden lg:flex flex-col bg-[#FAF9FD] border-r border-[#EDE8F5] h-screen sticky top-0 z-20 shrink-0 select-none transition-all duration-300 ${
           sidebarCollapsed ? 'w-[76px]' : 'w-[260px] xl:w-[276px]'
         }`}
@@ -341,19 +342,13 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
               <span className="text-xl font-black text-[#1A085C]">HQ</span>
             </div>
           )}
-
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden xl:flex p-1.5 rounded-lg text-brand-muted hover:text-[#7C3AED] hover:bg-white transition-all cursor-pointer"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-          </button>
         </div>
 
-        {/* Scrollable Navigation List - Only scrolls when cursor is over sidebar */}
-        <nav className="flex-1 px-3 py-3.5 overflow-y-auto space-y-4 text-xs overscroll-contain scrollbar-thin">
+        {/* Scrollable Navigation List - Scrolls smoothly whenever cursor is over sidebar */}
+        <nav
+          data-lenis-prevent
+          className="flex-1 px-3 py-3.5 sidebar-scroll space-y-4 text-xs overscroll-contain"
+        >
           {navigationSections.map((sec) => (
             <div key={sec.title} className="space-y-1">
               {/* Clean Section Header (Hidden when collapsed) */}
@@ -435,7 +430,10 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           />
 
           {/* Drawer Menu */}
-          <div className="relative w-4/5 max-w-xs bg-[#FAF9FD] h-full flex flex-col z-10 shadow-2xl">
+          <div
+            data-lenis-prevent
+            className="relative w-4/5 max-w-xs bg-[#FAF9FD] h-[100dvh] max-h-screen flex flex-col z-10 shadow-2xl"
+          >
             {/* Drawer Header */}
             <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE8F5] shrink-0 bg-[#FAF9FD]">
               <div className="flex flex-col select-none">
@@ -459,7 +457,10 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </div>
 
             {/* Drawer Navigation List - Smoothly scrollable */}
-            <nav className="flex-1 px-3 py-3.5 overflow-y-auto space-y-4 text-xs overscroll-contain">
+            <nav
+              data-lenis-prevent
+              className="flex-1 px-3 py-3.5 sidebar-scroll space-y-4 text-xs overscroll-contain"
+            >
               {navigationSections.map((sec) => (
                 <div key={sec.title} className="space-y-1">
                   <div className="text-[10px] font-bold text-brand-muted uppercase tracking-wider px-3 py-1">
@@ -567,14 +568,14 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
               </div>
             )}
 
-            {/* Desktop Collapse / Expand Toggle Pill Button */}
+            {/* Desktop Collapse / Expand Toggle Pill Button (Single Arrow) */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="hidden lg:flex w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {sidebarCollapsed ? <ChevronsRight size={17} /> : <ChevronsLeft size={17} />}
+              {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </button>
           </div>
 
