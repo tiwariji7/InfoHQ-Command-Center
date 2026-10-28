@@ -107,7 +107,16 @@ export const App: React.FC = () => {
     };
   }, [isSignedIn, clerkUser, getToken]);
 
-  if (!isLoaded) {
+  const [initTimeoutReached, setInitTimeoutReached] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitTimeoutReached(true);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!isLoaded && !initTimeoutReached) {
     return (
       <div className="min-h-screen bg-brand-page flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">
