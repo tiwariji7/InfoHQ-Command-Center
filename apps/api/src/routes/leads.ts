@@ -7,7 +7,9 @@ import {
   UpdateLeadStageSchema,
   CreateLeadNoteSchema,
   SetFollowUpSchema,
+  AutoConvertWonLeadSchema,
 } from '@infohq/shared';
+import { autoConvertWonLeadToProjectAndInvoice } from '../services/billingService.js';
 import {
   getLeads,
   createLead,
@@ -257,3 +259,48 @@ leadsRouter.patch('/:id/follow-up', async (c) => {
     return c.json({ error: 'internal_error', message: 'Failed to schedule follow-up.' }, 500);
   }
 });
+
+// POST /api/leads/:id/auto-convert - Convert won deal to project, generate 40% advance invoice, Razorpay link, Telegram alert & Resend email
+leadsRouter.post('/:id/auto-convert', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const leadId = c.req.param('id');
+  let body: unknown = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    // empty body fallback
+  }
+
+  const parseResult = AutoConvertWonLeadSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json(
+      {
+        error: 'validation_error',
+        message: 'Invalid budget or advance percentage provided.',
+        details: parseResult.error.format(),
+      },
+      400
+    );
+  }
+
+  try {
+    const result = await autoConvertWonLeadToProjectAndInvoice(
+      c.env.DB,
+      leadId,
+      parseResult.data,
+      c.env,
+      c.executionCtx
+    );
+    return c.json({ success: true, ...result });
+  } catch (err: unknown) {
+    console.error('Error auto-converting lead:', err instanceof Error ? err.message : err);
+    return c.json(
+      { error: 'internal_error', message: err instanceof Error ? err.message : 'Failed to auto-convert lead.' },
+      500
+    );
+  }
+});
+

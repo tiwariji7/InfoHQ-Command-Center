@@ -25,6 +25,7 @@ import type {
   DashboardOverviewResponse,
   MorningBriefingDigest,
   AutomationAlert,
+  AutoConvertWonLeadInput,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -371,3 +372,34 @@ export async function markAllAlertsRead(
     { method: 'POST' }
   );
 }
+
+// --- Won Deal Auto-Convert & Razorpay Link Generation API ---
+
+export async function autoConvertWonLeadApi(
+  getToken: () => Promise<string | null>,
+  leadId: string,
+  input: AutoConvertWonLeadInput
+): Promise<{ success: boolean; project: any; payment: Payment; paymentLinkUrl?: string }> {
+  return fetchWithAuth<{ success: boolean; project: any; payment: Payment; paymentLinkUrl?: string }>(
+    `/api/leads/${leadId}/auto-convert`,
+    getToken,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function generateRazorpayPaymentLinkApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<{ success: boolean; paymentLinkUrl: string }> {
+  return fetchWithAuth<{ success: boolean; paymentLinkUrl: string }>(
+    `/api/payments/${paymentId}/generate-payment-link`,
+    getToken,
+    {
+      method: 'POST',
+    }
+  );
+}
+

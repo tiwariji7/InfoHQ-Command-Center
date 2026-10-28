@@ -328,7 +328,7 @@ export const PaymentSchema = z.object({
   amount: z.number(),
   currency: z.string().default('INR'),
   status: PaymentStatusSchema,
-  paymentMethod: PaymentMethodSchema.nullable().optional(),
+  paymentMethod: z.string().nullable().optional(),
   invoiceNumber: z.string().nullable().optional(),
   dueDate: z.number().nullable().optional(),
   paidAt: z.number().nullable().optional(),
@@ -338,8 +338,22 @@ export const PaymentSchema = z.object({
   // Joined details for list display
   projectTitle: z.string().optional(),
   clientName: z.string().optional(),
+  clientEmail: z.string().nullable().optional(),
+  clientPhone: z.string().nullable().optional(),
   company: z.string().nullable().optional(),
+  razorpayPaymentLinkId: z.string().nullable().optional(),
+  razorpayPaymentLinkUrl: z.string().nullable().optional(),
+  razorpayPaymentId: z.string().nullable().optional(),
+  itemsJson: z.string().nullable().optional(),
 });
+
+export const AutoConvertWonLeadSchema = z.object({
+  totalBudget: z.coerce.number().positive('Total budget must be positive'),
+  advancePercentage: z.coerce.number().min(5).max(100).default(40),
+  deadlineDays: z.coerce.number().min(1).default(30),
+  sendEmail: z.boolean().default(true),
+});
+export type AutoConvertWonLeadInput = z.infer<typeof AutoConvertWonLeadSchema>;
 export type Payment = z.infer<typeof PaymentSchema>;
 
 export const CreatePaymentSchema = z.object({

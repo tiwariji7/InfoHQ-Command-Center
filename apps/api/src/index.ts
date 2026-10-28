@@ -8,6 +8,7 @@ import { paymentsRouter } from './routes/payments.js';
 import { overviewRouter } from './routes/overview.js';
 import { automationsRouter } from './routes/automations.js';
 import { intakeRouter } from './routes/intake.js';
+import { webhooksRouter } from './routes/webhooks.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
@@ -32,7 +33,7 @@ app.use(
       return null;
     },
     allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'x-intake-secret'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-intake-secret', 'x-razorpay-signature'],
     maxAge: 86400,
   })
 );
@@ -93,6 +94,9 @@ app.get('/api/me', requireSuperadmin, (c) => {
 
 // Public: Website and landing page inbound lead intake webhook
 app.route('/api/intake', intakeRouter);
+
+// Public: Razorpay & external payment webhooks
+app.route('/api/webhooks', webhooksRouter);
 
 // Protected: Leads core router
 app.route('/api/leads', leadsRouter);

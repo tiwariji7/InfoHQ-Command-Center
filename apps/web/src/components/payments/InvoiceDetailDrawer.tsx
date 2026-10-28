@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { generateRazorpayPaymentLinkApi } from '../../lib/api.js';
+import { PrintableInvoiceModal } from './PrintableInvoiceModal.js';
 import type { Payment } from '@infohq/shared';
 import {
   X,
@@ -11,6 +14,9 @@ import {
   Layers,
   Phone,
   Mail,
+  ExternalLink,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 interface InvoiceDetailDrawerProps {
@@ -70,6 +76,30 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'items' | 'payments' | 'timeline' | 'notes'>('items');
   const [reminderCopied, setReminderCopied] = useState(false);
+  const { getToken } = useAuth();
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isGeneratingRzp, setIsGeneratingRzp] = useState(false);
+  const [localPaymentLink, setLocalPaymentLink] = useState<string | null>(payment?.razorpayPaymentLinkUrl || null);
+
+  useEffect(() => {
+    setLocalPaymentLink(payment?.razorpayPaymentLinkUrl || null);
+  }, [payment?.razorpayPaymentLinkUrl]);
+
+  const handleGenerateRazorpayLink = async () => {
+    if (!payment) return;
+    setIsGeneratingRzp(true);
+    try {
+      const res = await generateRazorpayPaymentLinkApi(getToken, payment.id);
+      if (res.paymentLinkUrl) {
+        setLocalPaymentLink(res.paymentLinkUrl);
+      }
+    } catch (err) {
+      console.error('Failed to create Razorpay link:', err);
+    } finally {
+      setIsGeneratingRzp(false);
+    }
+  };
+
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // Close on Escape
@@ -130,7 +160,7 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
   };
 
   const handlePrintOrView = () => {
-    window.print();
+    setIsPrintModalOpen(true);
   };
 
   return (
@@ -317,6 +347,43 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
             </div>
           </div>
 
+
+          {/* Razorpay Online Link CTA */}
+          {!isPaid && (
+            <div>
+              {localPaymentLink ? (
+                <a
+                  href={localPaymentLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+                >
+                  <span>Pay Online via Razorpay</span>
+                  <ExternalLink size={12} />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleGenerateRazorpayLink}
+                  disabled={isGeneratingRzp}
+                  className="w-full h-9 rounded-lg bg-[#FAF9FD] hover:bg-[#EDE9FE]/50 text-[#7C3AED] border border-[#DDD6FE] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingRzp ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Creating Razorpay Link...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} />
+                      <span>Generate Razorpay Payment Link</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Utility Action Buttons Row */}
           <div className="flex items-center gap-2">
             <button
@@ -476,6 +543,18 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
           )}
         </div>
       </div>
+
+      {/* Printable Real PDF Invoice Modal */}
+      {payment && (
+        <PrintableInvoiceModal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          payment={{
+            ...payment,
+            razorpayPaymentLinkUrl: localPaymentLink || payment.razorpayPaymentLinkUrl,
+          }}
+        />
+      )}
     </div>
   );
 };

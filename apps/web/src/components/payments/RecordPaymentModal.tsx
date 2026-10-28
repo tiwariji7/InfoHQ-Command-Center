@@ -37,7 +37,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   useEffect(() => {
     if (payment) {
-      setPaymentMethod(payment.paymentMethod || 'bank_transfer');
+      setPaymentMethod((payment.paymentMethod as PaymentMethod) || 'bank_transfer');
       setNotes(payment.notes || '');
       setPaidDateStr(new Date().toISOString().split('T')[0]);
       setError(null);

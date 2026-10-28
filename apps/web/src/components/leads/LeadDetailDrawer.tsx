@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Globe,
   Plus,
-  Briefcase,
+  Trophy,
+  Sparkles,
   Share2,
   ExternalLink,
   MessageCircle,
@@ -25,7 +26,7 @@ import {
   FileText,
   User,
 } from 'lucide-react';
-import { CreateProjectModal } from '../projects/CreateProjectModal.js';
+import { AutoConvertWonDealModal } from './AutoConvertDealModal.js';
 
 interface LeadDetailDrawerProps {
   leadId: string | null;
@@ -693,22 +694,23 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 </form>
               </div>
 
-              {/* Convert to Project Footer CTA */}
-              <div className="p-3 rounded-xl bg-gradient-to-r from-[#EDE9FE] to-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-between gap-2">
+              {/* Convert to Project & 40% Advance Invoice Footer CTA */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-[#EDE9FE] to-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-between gap-2 shadow-2xs">
                 <div>
-                  <div className="text-xs font-black text-[#1A085C]">
-                    Ready to execute delivery?
+                  <div className="text-xs font-black text-[#1A085C] flex items-center gap-1">
+                    <Trophy size={13} className="text-amber-500" />
+                    <span>Won Deal & 40% Advance</span>
                   </div>
                   <div className="text-[10px] text-brand-muted">
-                    Convert won deal into client project
+                    Auto-create project, Razorpay link & Resend invoice
                   </div>
                 </div>
                 <button
                   onClick={() => setIsConvertModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-[#7C3AED] text-white text-xs font-bold hover:bg-[#6D28D9] flex items-center gap-1 shrink-0 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs font-bold hover:opacity-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-md shadow-[#7C3AED]/20"
                 >
-                  <Briefcase size={12} />
-                  <span>Convert</span>
+                  <Sparkles size={12} />
+                  <span>Win Deal</span>
                 </button>
               </div>
             </>
@@ -716,15 +718,19 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
         </div>
       </div>
 
-      {/* Convert Project Modal */}
+      {/* Auto-Convert Won Deal & Generate Advance Invoice Modal */}
       {isConvertModalOpen && lead && (
-        <CreateProjectModal
+        <AutoConvertWonDealModal
           isOpen={isConvertModalOpen}
           onClose={() => setIsConvertModalOpen(false)}
-          initialLead={lead}
+          lead={lead}
           onSuccess={() => {
             setIsConvertModalOpen(false);
-            handleStageChange('won');
+            setLead((prev) => (prev ? { ...prev, stage: 'won' } : null));
+            loadData();
+            if (onLeadUpdated && lead) {
+              onLeadUpdated({ ...lead, stage: 'won' });
+            }
           }}
         />
       )}

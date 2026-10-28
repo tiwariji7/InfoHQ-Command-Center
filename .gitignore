@@ -17,6 +17,7 @@ build/
 .dev.vars.*
 *.pem
 *.key
+.env.example
 
 # Logs
 logs/

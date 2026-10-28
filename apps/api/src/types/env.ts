@@ -15,6 +15,9 @@ export interface Bindings {
   TELEGRAM_CHAT_ID?: string;
   RESEND_API_KEY?: string;
   ADMIN_EMAIL?: string;
+  RAZORPAY_KEY_ID?: string;
+  RAZORPAY_KEY_SECRET?: string;
+  RAZORPAY_WEBHOOK_SECRET?: string;
 }
 
 export interface Variables {

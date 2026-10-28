@@ -6,6 +6,7 @@ import {
   UpdatePaymentSchema,
   RecordPaymentSchema,
 } from '@infohq/shared';
+import { createRazorpayPaymentLink, sendTelegramPaymentLinkAlert, sendInvoiceEmailViaResend } from '../services/billingService.js';
 import {
   getPayments,
   getPaymentById,
@@ -183,3 +184,95 @@ paymentsRouter.delete('/:id', async (c) => {
     return c.json({ error: 'internal_error', message: 'Failed to delete payment.' }, 500);
   }
 });
+
+// POST /api/payments/:id/generate-payment-link - Generate a live Razorpay link for this invoice
+paymentsRouter.post('/:id/generate-payment-link', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const paymentId = c.req.param('id');
+  const payment = await getPaymentById(c.env.DB, paymentId);
+  if (!payment) {
+    return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
+  }
+
+  const keyId = c.env.RAZORPAY_KEY_ID;
+  const keySecret = c.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    return c.json({ error: 'config_missing', message: 'Razorpay keys not configured.' }, 500);
+  }
+
+  const invoiceNumber = payment.invoiceNumber || `INV-2026-${paymentId.slice(-3).toUpperCase()}`;
+  const rzpResult = await createRazorpayPaymentLink(
+    {
+      amount: payment.amount,
+      invoiceNumber,
+      description: payment.title || 'InfoHQ Service Milestone',
+      customer: {
+        name: payment.clientName || 'Valued Client',
+        email: payment.clientEmail,
+        contact: payment.clientPhone,
+      },
+    },
+    { keyId, keySecret }
+  );
+
+  if (!rzpResult) {
+    return c.json({ error: 'razorpay_error', message: 'Failed to create payment link on Razorpay.' }, 502);
+  }
+
+  await c.env.DB.prepare(`
+    UPDATE payments
+    SET razorpay_payment_link_id = ?,
+        razorpay_payment_link_url = ?,
+        invoice_number = ?
+    WHERE id = ?
+  `)
+    .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, paymentId)
+    .run();
+
+  // Send Telegram Alert 1
+  c.executionCtx.waitUntil(
+    sendTelegramPaymentLinkAlert(
+      {
+        clientName: payment.clientName || 'Client',
+        projectTitle: payment.projectTitle || payment.title || 'Client Project',
+        invoiceNumber,
+        amount: payment.amount,
+        totalBudget: payment.amount,
+        paymentLinkUrl: rzpResult.shortUrl,
+      },
+      c.env
+    )
+  );
+
+  // Send Resend Email if email is available
+  if (payment.clientEmail && c.env.RESEND_API_KEY) {
+    const dueDateFormatted = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(payment.dueDate || Date.now() + 3 * 24 * 60 * 60 * 1000));
+
+    c.executionCtx.waitUntil(
+      sendInvoiceEmailViaResend(
+        {
+          clientName: payment.clientName || 'Valued Client',
+          clientEmail: payment.clientEmail,
+          invoiceNumber,
+          projectTitle: payment.projectTitle || payment.title || 'Milestone Delivery',
+          amount: payment.amount,
+          totalBudget: payment.amount,
+          paymentLinkUrl: rzpResult.shortUrl,
+          dueDateFormatted,
+        },
+        c.env.RESEND_API_KEY
+      )
+    );
+  }
+
+  return c.json({ success: true, paymentLinkUrl: rzpResult.shortUrl });
+});
+
