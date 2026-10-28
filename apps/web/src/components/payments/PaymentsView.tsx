@@ -4,6 +4,7 @@ import type { Payment, PaymentSummary } from '@infohq/shared';
 import { fetchPayments, deletePaymentApi } from '../../lib/api.js';
 import { CreatePaymentModal } from './CreatePaymentModal.js';
 import { RecordPaymentModal } from './RecordPaymentModal.js';
+import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
 import {
   Plus,
   Search,
@@ -34,9 +35,10 @@ export const PaymentsView: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Modals
+  // Modals & Drawers
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedPaymentForRecord, setSelectedPaymentForRecord] = useState<Payment | null>(null);
+  const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<Payment | null>(null);
 
   const loadPayments = async () => {
     setIsLoading(true);
@@ -323,7 +325,8 @@ export const PaymentsView: React.FC = () => {
                   return (
                     <tr
                       key={py.id}
-                      className="hover:bg-[#FAF9FD]/80 transition-colors group"
+                      onClick={() => setSelectedInvoiceForDetail(py)}
+                      className="hover:bg-[#FAF9FD]/80 transition-colors group cursor-pointer"
                     >
                       {/* Milestone Title & Invoice # */}
                       <td className="py-4 px-5">
@@ -408,7 +411,7 @@ export const PaymentsView: React.FC = () => {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-5 text-right">
+                      <td className="py-4 px-5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center gap-1.5 justify-end">
                           {!isPaid && (
                             <button
@@ -452,6 +455,17 @@ export const PaymentsView: React.FC = () => {
         payment={selectedPaymentForRecord}
         onClose={() => setSelectedPaymentForRecord(null)}
         onSuccess={handlePaymentRecorded}
+      />
+
+      {/* Invoice Detail Drawer */}
+      <InvoiceDetailDrawer
+        payment={selectedInvoiceForDetail}
+        onClose={() => setSelectedInvoiceForDetail(null)}
+        onRecordPayment={(py) => {
+          setSelectedInvoiceForDetail(null);
+          setSelectedPaymentForRecord(py);
+        }}
+        onDeletePayment={handleDelete}
       />
     </div>
   );
