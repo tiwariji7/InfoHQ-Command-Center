@@ -11,8 +11,14 @@ import {
   MessageCircle,
   Mail,
   Clock,
-  TrendingUp,
   AlertCircle,
+  Building2,
+  ChevronLeft,
+  CheckCircle2,
+  Flame,
+  ArrowRight,
+  XCircle,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface StageColumnConfig {
@@ -22,48 +28,54 @@ interface StageColumnConfig {
   badgeBorder: string;
   badgeText: string;
   dotColor: string;
+  gradient: string;
 }
 
 const STAGES: StageColumnConfig[] = [
   {
     id: 'new',
-    label: 'New',
-    badgeBg: 'bg-purple-50',
+    label: '1. Inbound Leads',
+    badgeBg: 'bg-[#FAF5FF]',
     badgeBorder: 'border-purple-200',
-    badgeText: 'text-purple-700',
-    dotColor: 'bg-purple-500',
+    badgeText: 'text-[#6B21A8]',
+    dotColor: 'bg-[#9333EA]',
+    gradient: 'from-[#7C3AED] to-[#8B5CF6]',
   },
   {
     id: 'contacted',
-    label: 'Contacted',
-    badgeBg: 'bg-blue-50',
+    label: '2. Contacted & Discovery',
+    badgeBg: 'bg-[#EFF6FF]',
     badgeBorder: 'border-blue-200',
-    badgeText: 'text-blue-700',
-    dotColor: 'bg-blue-500',
+    badgeText: 'text-[#1D4ED8]',
+    dotColor: 'bg-[#2563EB]',
+    gradient: 'from-[#2563EB] to-[#3B82F6]',
   },
   {
     id: 'proposal_sent',
-    label: 'Proposal Sent',
-    badgeBg: 'bg-orange-50',
+    label: '3. Proposal & Negotiation',
+    badgeBg: 'bg-[#FFF7ED]',
     badgeBorder: 'border-orange-200',
-    badgeText: 'text-orange-700',
-    dotColor: 'bg-orange-500',
+    badgeText: 'text-[#C2410C]',
+    dotColor: 'bg-[#EA580C]',
+    gradient: 'from-[#EA580C] to-[#F97316]',
   },
   {
     id: 'won',
-    label: 'Won',
-    badgeBg: 'bg-green-50',
+    label: '4. Closed Won',
+    badgeBg: 'bg-[#F0FDF4]',
     badgeBorder: 'border-green-200',
-    badgeText: 'text-green-700',
-    dotColor: 'bg-green-500',
+    badgeText: 'text-[#15803D]',
+    dotColor: 'bg-[#16A34A]',
+    gradient: 'from-[#059669] to-[#10B981]',
   },
   {
     id: 'lost',
-    label: 'Lost',
-    badgeBg: 'bg-neutral-100',
-    badgeBorder: 'border-neutral-200',
-    badgeText: 'text-neutral-600',
-    dotColor: 'bg-neutral-400',
+    label: '5. Disqualified / Lost',
+    badgeBg: 'bg-slate-50',
+    badgeBorder: 'border-slate-200',
+    badgeText: 'text-slate-600',
+    dotColor: 'bg-slate-400',
+    gradient: 'from-slate-400 to-slate-500',
   },
 ];
 
@@ -94,6 +106,13 @@ function getWhatsAppDigits(phone: string): string {
   return cleaned;
 }
 
+function getInitials(name: string): string {
+  if (!name) return 'HQ';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export const PipelineView: React.FC = () => {
   const { getToken } = useAuth();
 
@@ -106,6 +125,9 @@ export const PipelineView: React.FC = () => {
   const [lostModalLead, setLostModalLead] = useState<Lead | null>(null);
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
 
+  // Filter
+  const [searchFilter, setSearchFilter] = useState('');
+
   const loadPipelineLeads = useCallback(
     async (showRefreshIndicator = false) => {
       if (showRefreshIndicator) {
@@ -116,8 +138,7 @@ export const PipelineView: React.FC = () => {
       setErrorMessage(null);
 
       try {
-        // Fetch up to 50 active leads for the pipeline
-        const res = await fetchLeads(getToken, { page: 1, pageSize: 50 });
+        const res = await fetchLeads(getToken, { page: 1, pageSize: 60 });
         setLeads(res.data);
       } catch (err: unknown) {
         setErrorMessage(
@@ -135,6 +156,18 @@ export const PipelineView: React.FC = () => {
     loadPipelineLeads();
   }, [loadPipelineLeads]);
 
+  // Filtered leads
+  const filteredLeads = useMemo(() => {
+    if (!searchFilter.trim()) return leads;
+    const term = searchFilter.toLowerCase();
+    return leads.filter(
+      (l) =>
+        l.name.toLowerCase().includes(term) ||
+        (l.company && l.company.toLowerCase().includes(term)) ||
+        (l.serviceNeeded && l.serviceNeeded.toLowerCase().includes(term))
+    );
+  }, [leads, searchFilter]);
+
   // Group leads by stage
   const groupedLeads = useMemo(() => {
     const map: Record<LeadStage, Lead[]> = {
@@ -144,7 +177,7 @@ export const PipelineView: React.FC = () => {
       won: [],
       lost: [],
     };
-    for (const lead of leads) {
+    for (const lead of filteredLeads) {
       if (map[lead.stage]) {
         map[lead.stage].push(lead);
       } else {
@@ -152,9 +185,9 @@ export const PipelineView: React.FC = () => {
       }
     }
     return map;
-  }, [leads]);
+  }, [filteredLeads]);
 
-  // Pipeline metrics
+  // Aggregate metrics
   const activePipelineValue = useMemo(() => {
     let total = 0;
     for (const lead of leads) {
@@ -179,7 +212,13 @@ export const PipelineView: React.FC = () => {
     return total;
   }, [leads]);
 
-  // Execute stage update with optimistic rollback
+  const winRate = useMemo(() => {
+    const totalDecided = groupedLeads.won.length + groupedLeads.lost.length;
+    if (totalDecided === 0) return 0;
+    return Math.round((groupedLeads.won.length / totalDecided) * 100);
+  }, [groupedLeads]);
+
+  // Perform optimistic stage update
   async function performStageUpdate(leadId: string, newStage: LeadStage, lostReason?: string) {
     const originalLeads = [...leads];
     const targetLead = leads.find((l) => l.id === leadId);
@@ -192,7 +231,7 @@ export const PipelineView: React.FC = () => {
           ? {
               ...l,
               stage: newStage,
-              lostReason: newStage === 'lost' ? (lostReason || null) : null,
+              lostReason: newStage === 'lost' ? lostReason || null : null,
               updatedAt: Date.now(),
             }
           : l
@@ -206,134 +245,184 @@ export const PipelineView: React.FC = () => {
         lostReason: newStage === 'lost' ? lostReason : undefined,
       });
     } catch (err: unknown) {
-      // Rollback on failure
       setLeads(originalLeads);
       const msg = err instanceof Error ? err.message : 'Stage update failed';
-      setErrorMessage(`Failed to move lead to ${newStage}: ${msg}`);
+      setErrorMessage(`Failed to move opportunity: ${msg}`);
     } finally {
       setIsUpdatingStage(false);
     }
   }
 
-  function handleStageSelect(lead: Lead, targetStage: LeadStage) {
-    if (lead.stage === targetStage) return;
-    if (targetStage === 'lost') {
-      // Prompt for lost reason
-      setLostModalLead(lead);
-    } else {
-      performStageUpdate(lead.id, targetStage);
-    }
+  function advanceStage(lead: Lead) {
+    if (lead.stage === 'new') performStageUpdate(lead.id, 'contacted');
+    else if (lead.stage === 'contacted') performStageUpdate(lead.id, 'proposal_sent');
+    else if (lead.stage === 'proposal_sent') performStageUpdate(lead.id, 'won');
+  }
+
+  function regressStage(lead: Lead) {
+    if (lead.stage === 'won') performStageUpdate(lead.id, 'proposal_sent');
+    else if (lead.stage === 'proposal_sent') performStageUpdate(lead.id, 'contacted');
+    else if (lead.stage === 'contacted') performStageUpdate(lead.id, 'new');
   }
 
   return (
     <div className="space-y-6">
-      {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ========================================================= */}
+      {/* 0. HEADER & ACTIONS                                       */}
+      {/* ========================================================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-brand-heading">
-            Sales Pipeline
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]">
+              <Flame size={12} className="text-[#7C3AED]" />
+              Revenue Pipeline
+            </span>
+            <span className="text-xs text-brand-muted hidden sm:inline">•</span>
+            <span className="text-xs font-semibold text-brand-muted hidden sm:inline">
+              5-Stage Opportunity Funnel
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#1A085C] mt-1">
+            Sales &{' '}
+            <span className="bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent">
+              Opportunity Velocity
+            </span>
           </h1>
-          <p className="text-xs sm:text-sm text-brand-muted mt-0.5">
-            5-stage opportunity funnel with optimistic state updates and activity logging.
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          {/* Quick Search in board */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Search deals..."
+              className="h-10 pl-8 pr-3 rounded-xl border border-[#EDE8F5] bg-white text-xs font-semibold text-brand-heading placeholder:text-brand-muted outline-none focus:border-[#7C3AED] w-40 sm:w-52 transition-all shadow-2xs"
+            />
+            <SlidersHorizontal
+              size={13}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-brand-muted pointer-events-none"
+            />
+          </div>
+
           <button
             onClick={() => loadPipelineLeads(true)}
             disabled={isRefreshing || isLoading}
-            className="hq-btn-secondary text-xs h-10 px-3"
+            className="p-2.5 rounded-xl bg-white border border-[#EDE8F5] text-brand-muted hover:text-[#7C3AED] shadow-2xs transition-all cursor-pointer"
             title="Refresh Pipeline"
           >
             <RefreshCw
               size={15}
-              className={isRefreshing ? 'animate-spin text-brand-primary' : ''}
+              className={isRefreshing ? 'animate-spin text-[#7C3AED]' : ''}
             />
-            <span className="hidden sm:inline">Refresh</span>
           </button>
+
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="hq-btn-primary text-xs h-10"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs sm:text-sm font-bold shadow-[0_4px_16px_rgba(124,58,237,0.25)] hover:shadow-[0_8px_24px_rgba(124,58,237,0.35)] transition-all cursor-pointer"
           >
-            <Plus size={16} />
-            <span>Add Lead</span>
+            <Plus size={16} className="stroke-[2.5]" />
+            <span>Create Opportunity</span>
           </button>
         </div>
       </div>
 
-      {/* Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="hq-card bg-white border-brand-border p-4 sm:p-5 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-brand-muted font-medium">
-              Active Pipeline Value
+      {/* ========================================================= */}
+      {/* 1. BESPOKE PIPELINE CONVERSION FUNNEL (Unique to this page) */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-[0_4px_24px_rgba(124,58,237,0.04)] space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-[#EDE8F5] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center font-bold shadow-2xs">
+              ₹
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-brand-heading mt-1 tabular-nums">
-              {formatInr(activePipelineValue)}
-            </div>
-            <div className="text-[11px] text-brand-muted mt-0.5">
-              Across New, Contacted & Proposal stages
+            <div>
+              <div className="text-xs font-bold text-brand-muted uppercase tracking-wider">
+                Live Active Pipeline
+              </div>
+              <div className="text-2xl sm:text-3xl font-black tabular-nums bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
+                {formatInr(activePipelineValue)}
+              </div>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-control bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <TrendingUp size={20} />
+
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+            <div>
+              <div className="text-[11px] font-bold text-brand-muted uppercase">Closed Revenue</div>
+              <div className="text-lg font-black text-emerald-700 tabular-nums">
+                {formatInr(wonPipelineValue)}
+              </div>
+            </div>
+            <div className="h-8 w-px bg-[#EDE8F5]" />
+            <div>
+              <div className="text-[11px] font-bold text-brand-muted uppercase">Funnel Win Rate</div>
+              <div className="text-lg font-black text-[#7C3AED] tabular-nums">
+                {winRate}%
+              </div>
+            </div>
+            <div className="h-8 w-px bg-[#EDE8F5]" />
+            <div>
+              <div className="text-[11px] font-bold text-brand-muted uppercase">Total In Flight</div>
+              <div className="text-lg font-black text-brand-heading tabular-nums">
+                {groupedLeads.new.length + groupedLeads.contacted.length + groupedLeads.proposal_sent.length} deals
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="hq-card bg-white border-brand-border p-4 sm:p-5 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-brand-muted font-medium">
-              Closed Won Revenue
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-green-700 mt-1 tabular-nums">
-              {formatInr(wonPipelineValue)}
-            </div>
-            <div className="text-[11px] text-brand-muted mt-0.5">
-              {groupedLeads.won.length} converted opportunities
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-control bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-            <TrendingUp size={20} />
-          </div>
-        </div>
+        {/* Connected Funnel Chevron Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          {STAGES.map((s) => {
+            const list = groupedLeads[s.id] || [];
+            const sumValue = list.reduce((acc, l) => acc + parseNumericBudget(l.budget), 0);
 
-        <div className="hq-card bg-white border-brand-border p-4 sm:p-5 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-brand-muted font-medium">
-              Total Opportunities
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-brand-heading mt-1 tabular-nums">
-              {leads.length}
-            </div>
-            <div className="text-[11px] text-brand-muted mt-0.5">
-              Active inquiries in Command Center
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-control bg-brand-subtle text-brand-primary flex items-center justify-center shrink-0">
-            <Clock size={20} />
-          </div>
+            return (
+              <div
+                key={s.id}
+                className="p-3 rounded-xl bg-[#FAF9FD] border border-[#EDE8F5] hover:border-[#7C3AED]/40 transition-colors flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-2 h-2 rounded-full ${s.dotColor}`} />
+                    <span className="text-xs font-bold text-brand-heading truncate">
+                      {s.label.split('. ')[1] || s.label}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold bg-white border border-[#EDE8F5] px-1.5 py-0.2 rounded-full">
+                    {list.length}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm font-black text-brand-heading tabular-nums">
+                  {sumValue > 0 ? formatInr(sumValue) : '—'}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Error alert if any */}
+      {/* Error alert */}
       {errorMessage && (
-        <div className="p-3.5 rounded-control bg-brand-errorBg border border-red-200 text-xs text-brand-destructive flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-brand-destructive flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle size={16} />
+            <AlertCircle size={15} />
             <span>{errorMessage}</span>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-xs font-semibold hover:underline"
+            className="text-xs font-bold hover:underline"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Pipeline Board Container (Horizontal Scroll for mobile/tablet) */}
+      {/* ========================================================= */}
+      {/* 2. PIPELINE BOARD LANES WITH DEAL VELOCITY CARDS          */}
+      {/* ========================================================= */}
       <div className="overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex gap-4 min-w-[1280px]">
+        <div className="flex gap-4 min-w-[1300px]">
           {STAGES.map((col) => {
             const stageLeads = groupedLeads[col.id] || [];
             const stageTotalValue = stageLeads.reduce(
@@ -344,150 +433,190 @@ export const PipelineView: React.FC = () => {
             return (
               <div
                 key={col.id}
-                className="w-[280px] lg:w-[300px] shrink-0 flex flex-col rounded-card bg-[#F9F8FD] border border-brand-border/80 p-3"
+                className="w-[285px] shrink-0 flex flex-col rounded-2xl bg-[#FAF9FD] border border-[#EDE8F5] p-3.5 shadow-2xs"
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-brand-border/60 mb-3">
+                <div className="flex items-center justify-between pb-3 border-b border-[#EDE8F5] mb-3">
                   <div className="flex items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${col.dotColor}`} />
-                    <h3 className="text-sm font-bold text-brand-heading">
+                    <h3 className="text-xs font-bold text-brand-heading">
                       {col.label}
                     </h3>
-                    <span
-                      className={`px-2 py-0.5 rounded-chip text-[11px] font-semibold border ${col.badgeBg} ${col.badgeBorder} ${col.badgeText}`}
-                    >
-                      {stageLeads.length}
-                    </span>
                   </div>
-
-                  {stageTotalValue > 0 && (
-                    <span className="text-[11px] font-medium text-brand-muted tabular-nums">
-                      {formatInr(stageTotalValue)}
-                    </span>
-                  )}
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${col.badgeBg} ${col.badgeBorder} ${col.badgeText}`}
+                  >
+                    {stageLeads.length}
+                  </span>
                 </div>
 
+                {stageTotalValue > 0 && (
+                  <div className="mb-2.5 px-2.5 py-1 rounded-lg bg-white border border-[#EDE8F5] flex items-center justify-between text-[11px]">
+                    <span className="text-brand-muted font-medium">Stage Volume</span>
+                    <span className="font-bold text-brand-heading tabular-nums">
+                      {formatInr(stageTotalValue)}
+                    </span>
+                  </div>
+                )}
+
                 {/* Cards Container */}
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[300px]">
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-360px)] min-h-[320px] pr-1">
                   {isLoading ? (
-                    <div className="p-6 text-center text-xs text-brand-muted">
-                      Loading cards...
+                    <div className="p-8 text-center text-xs text-brand-muted font-medium">
+                      Loading opportunities...
                     </div>
                   ) : stageLeads.length === 0 ? (
-                    <div className="h-32 border-2 border-dashed border-brand-border/60 rounded-control flex flex-col items-center justify-center p-4 text-center">
-                      <p className="text-xs text-brand-lightGray font-medium">
-                        No leads in this stage
+                    <div className="h-36 border border-dashed border-[#EDE8F5] rounded-xl flex flex-col items-center justify-center p-4 text-center bg-white/40">
+                      <p className="text-xs text-brand-muted font-semibold">
+                        No active deals
                       </p>
+                      <span className="text-[10px] text-brand-muted/70 mt-0.5">
+                        In {col.label}
+                      </span>
                     </div>
                   ) : (
                     stageLeads.map((lead) => {
                       const daysInStage = calculateDaysInStage(lead);
+                      const initials = getInitials(lead.name);
+                      const whatsappDigits = getWhatsAppDigits(lead.phone || '');
+
+                      const isStale = daysInStage > 10;
+                      const isFresh = daysInStage <= 2;
+
                       return (
                         <div
                           key={lead.id}
-                          className="bg-white rounded-control p-3.5 border border-brand-border shadow-sm hover:shadow-md transition-shadow space-y-2.5"
+                          className="bg-white rounded-xl p-3.5 border border-[#EDE8F5] shadow-2xs hover:shadow-md hover:border-[#7C3AED]/40 transition-all space-y-3 group"
                         >
-                          {/* Card Header: Client & Days */}
+                          {/* Deal Header: Avatar Monogram + Velocity Tag */}
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="text-sm font-bold text-brand-heading leading-tight">
-                                {lead.name}
-                              </h4>
-                              {lead.company && (
-                                <div className="text-[11px] text-brand-muted font-medium mt-0.5">
-                                  {lead.company}
-                                </div>
-                              )}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#8B5CF6] text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                                {initials}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-bold text-brand-heading leading-tight truncate group-hover:text-[#7C3AED] transition-colors">
+                                  {lead.name}
+                                </h4>
+                                {lead.company ? (
+                                  <div className="text-[10px] text-brand-muted font-medium flex items-center gap-1 mt-0.5 truncate">
+                                    <Building2 size={10} />
+                                    <span>{lead.company}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-brand-muted">Direct Prospect</div>
+                                )}
+                              </div>
                             </div>
+
+                            {/* Velocity tag */}
                             <span
-                              className="text-[10px] text-brand-muted font-medium shrink-0 flex items-center gap-1"
-                              title={`Updated ${daysInStage} day(s) ago`}
+                              className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md shrink-0 flex items-center gap-0.5 ${
+                                isFresh
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : isStale
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-slate-50 text-slate-600 border border-slate-200'
+                              }`}
                             >
-                              <Clock size={11} />
+                              <Clock size={9} />
                               {daysInStage}d
                             </span>
                           </div>
 
-                          {/* Service & Budget Row */}
-                          <div className="flex items-center justify-between text-xs pt-1 border-t border-brand-border/40">
-                            <span className="text-brand-heading font-medium text-[11px] truncate max-w-[140px]">
+                          {/* Deal Value & Scope Box */}
+                          <div className="bg-[#FAF9FD] p-2.5 rounded-lg border border-[#EDE8F5] flex items-center justify-between">
+                            <div className="text-[11px] font-semibold text-brand-heading truncate max-w-[130px]">
                               {lead.serviceNeeded || 'General Inquiry'}
-                            </span>
-                            {lead.budget ? (
-                              <span className="font-semibold text-brand-heading tabular-nums text-[11px]">
-                                ₹{lead.budget}
-                              </span>
-                            ) : (
-                              <span className="text-brand-lightGray text-[10px] italic">
-                                No budget
-                              </span>
-                            )}
+                            </div>
+                            <div className="text-xs font-black text-emerald-700 tabular-nums">
+                              {lead.budget ? `₹${lead.budget}` : '—'}
+                            </div>
                           </div>
 
                           {/* Lost Reason if in lost stage */}
                           {lead.stage === 'lost' && lead.lostReason && (
-                            <div className="text-[10px] bg-red-50 text-red-700 p-1.5 rounded border border-red-100 leading-tight">
-                              Reason: {lead.lostReason}
+                            <div className="text-[10px] bg-red-50 text-red-700 p-2 rounded-lg border border-red-100">
+                              <span className="font-bold">Lost Reason:</span> {lead.lostReason}
                             </div>
                           )}
 
-                          {/* Quick Contact & Move Selector */}
-                          <div className="flex items-center justify-between pt-2 border-t border-brand-border/50">
-                            {/* Contact icons */}
-                            <div className="flex items-center gap-1 text-brand-muted">
+                          {/* Action Footer: 1-Click Advance Buttons & Channels */}
+                          <div className="pt-2 border-t border-[#EDE8F5] flex items-center justify-between">
+                            {/* Communication channels */}
+                            <div className="flex items-center gap-1">
                               {lead.phone && (
                                 <>
                                   <a
                                     href={`tel:${lead.phone}`}
-                                    title="Call"
-                                    className="p-1 rounded text-brand-muted hover:text-brand-primary hover:bg-brand-subtle transition-colors"
+                                    title="Call Prospect"
+                                    className="p-1 rounded-md text-brand-muted hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition-colors"
                                   >
-                                    <Phone size={13} />
+                                    <Phone size={12} />
                                   </a>
                                   <a
-                                    href={`https://wa.me/${getWhatsAppDigits(lead.phone)}`}
+                                    href={`https://wa.me/${whatsappDigits}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    title="WhatsApp"
-                                    className="p-1 rounded text-brand-muted hover:text-green-600 hover:bg-green-50 transition-colors"
+                                    title="WhatsApp Chat"
+                                    className="p-1 rounded-md text-brand-muted hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                                   >
-                                    <MessageCircle size={13} />
+                                    <MessageCircle size={12} />
                                   </a>
                                 </>
                               )}
                               {lead.email && (
                                 <a
                                   href={`mailto:${lead.email}`}
-                                  title="Email"
-                                  className="p-1 rounded text-brand-muted hover:text-brand-primary hover:bg-brand-subtle transition-colors"
+                                  title="Send Email"
+                                  className="p-1 rounded-md text-brand-muted hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition-colors"
                                 >
-                                  <Mail size={13} />
+                                  <Mail size={12} />
                                 </a>
                               )}
                             </div>
 
-                            {/* Move Stage Selector */}
+                            {/* 1-Click Stage Steppers */}
                             <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-brand-muted">
-                                Move:
-                              </span>
-                              <select
-                                value={lead.stage}
-                                onChange={(e) =>
-                                  handleStageSelect(
-                                    lead,
-                                    e.target.value as LeadStage
-                                  )
-                                }
-                                disabled={isUpdatingStage}
-                                className="h-7 text-[10px] px-1.5 rounded border border-brand-border bg-white text-brand-heading font-medium focus:border-brand-primary focus:ring-0 cursor-pointer"
-                              >
-                                {STAGES.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.label}
-                                  </option>
-                                ))}
-                              </select>
+                              {col.id !== 'new' && col.id !== 'lost' && (
+                                <button
+                                  onClick={() => regressStage(lead)}
+                                  disabled={isUpdatingStage}
+                                  title="Move to Previous Stage"
+                                  className="p-1 rounded-md bg-[#FAF9FD] border border-[#EDE8F5] text-brand-muted hover:text-brand-heading hover:bg-white transition-colors"
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                              )}
+
+                              {col.id !== 'won' && col.id !== 'lost' && (
+                                <>
+                                  <button
+                                    onClick={() => setLostModalLead(lead)}
+                                    disabled={isUpdatingStage}
+                                    title="Mark as Lost"
+                                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  >
+                                    <XCircle size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => advanceStage(lead)}
+                                    disabled={isUpdatingStage}
+                                    title="Advance to Next Stage"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#EDE9FE] text-[#7C3AED] hover:bg-[#DDD6FE] text-[10px] font-bold transition-all shadow-2xs"
+                                  >
+                                    <span>Advance</span>
+                                    <ArrowRight size={10} />
+                                  </button>
+                                </>
+                              )}
+
+                              {col.id === 'won' && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                  <CheckCircle2 size={11} />
+                                  Won
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
