@@ -91,3 +91,4 @@ automationsRouter.post('/alerts/read-all', async (c) => {
     return c.json({ error: 'internal_error', message: 'Failed to clear alerts.' }, 500);
   }
 });
+

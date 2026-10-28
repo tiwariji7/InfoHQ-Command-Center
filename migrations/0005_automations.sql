@@ -29,3 +29,4 @@ CREATE TABLE IF NOT EXISTS automation_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_automation_alerts_is_read ON automation_alerts(is_read, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_automation_alerts_type ON automation_alerts(type);
+

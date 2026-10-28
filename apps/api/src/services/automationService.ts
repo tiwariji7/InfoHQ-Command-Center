@@ -387,3 +387,4 @@ export async function markAllAlertsAsRead(db: D1Database): Promise<number> {
   const res = await db.prepare('UPDATE automation_alerts SET is_read = 1 WHERE is_read = 0').run();
   return res.meta.changes || 0;
 }
+
