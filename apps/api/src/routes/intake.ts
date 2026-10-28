@@ -1,24 +1,38 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from '../types/env.js';
 import { LeadSourceSchema } from '@infohq/shared';
 
 export const intakeRouter = new Hono<AppContext>();
 
-// Schema for inbound website/landing page lead submissions
+// Flexible schema supporting both InfoHQ website Astro form and standard CRM intake
 export const InboundLeadIntakeSchema = z
   .object({
-    name: z.string().trim().min(1, 'Name is required'),
+    name: z.string().trim().optional(),
+    fullName: z.string().trim().optional(),
     email: z.string().trim().email('Invalid email address').optional().or(z.literal('')),
     phone: z.string().trim().optional().or(z.literal('')),
     company: z.string().trim().optional(),
     serviceNeeded: z.string().trim().optional(),
+    serviceType: z.string().trim().optional(),
     budget: z.string().trim().optional(),
     timeline: z.string().trim().optional(),
     preferredContact: z.string().trim().optional(),
     message: z.string().trim().optional(),
+    projectBrief: z.string().trim().optional(),
+    website: z.string().trim().optional(), // Honeypot anti-spam field
     source: LeadSourceSchema.default('website_contact'),
   })
+  .refine(
+    (data) => {
+      const hasName = (data.fullName && data.fullName.trim().length > 0) || (data.name && data.name.trim().length > 0);
+      return hasName;
+    },
+    {
+      message: 'Full Name is required',
+      path: ['fullName'],
+    }
+  )
   .refine(
     (data) => (data.email && data.email.length > 0) || (data.phone && data.phone.length > 0),
     {
@@ -27,8 +41,8 @@ export const InboundLeadIntakeSchema = z
     }
   );
 
-// Public webhook endpoint: POST /api/intake/lead
-intakeRouter.post('/lead', async (c) => {
+// Handler shared across /lead and /contact
+async function handleInboundLead(c: Context<AppContext>) {
   const db = c.env.DB || c.env.COMMAND_DB;
   if (!db) {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
@@ -56,6 +70,23 @@ intakeRouter.post('/lead', async (c) => {
   }
 
   const data = parseResult.data;
+
+  // Anti-Spam Honeypot check: If hidden 'website' input was filled by a spam bot, ignore silently
+  if (data.website && data.website.trim().length > 0) {
+    console.warn('[Honeypot Triggered] Spam bot submission ignored.');
+    return c.json(
+      {
+        success: true,
+        message: 'Free Consultation Booked! We will review your idea and get back to you within 1 business day.',
+        targetEmail: 'contact@infohq.in',
+      },
+      200
+    );
+  }
+
+  const clientName = (data.fullName || data.name || 'Website Inquiry').trim();
+  const serviceNeeded = (data.serviceType || data.serviceNeeded || 'General Inquiry').trim();
+  const clientMessage = (data.projectBrief || data.message || '').trim();
   const normalizedEmail = data.email && data.email.trim().length > 0 ? data.email.trim().toLowerCase() : null;
   const normalizedPhone = data.phone && data.phone.trim().length > 0 ? data.phone.trim() : null;
   const now = Date.now();
@@ -92,7 +123,7 @@ intakeRouter.post('/lead', async (c) => {
     if (isRepeatLead && existingLeadId) {
       // Append inquiry as a high-priority note and activity to existing lead
       const noteId = `note_${crypto.randomUUID()}`;
-      const noteBody = `[New Inbound Website Inquiry] Service: ${data.serviceNeeded || 'General'}, Budget: ${data.budget || 'N/A'}. Message: "${data.message || 'No additional note'}"`;
+      const noteBody = `[New Inbound Website Consultation]\nService: ${serviceNeeded}\nBudget: ${data.budget || 'Not specified'}\nTimeline: ${data.timeline || 'Not specified'}\nPreferred Contact: ${data.preferredContact || 'Email/Phone'}\nMessage: "${clientMessage || 'No brief provided'}"`;
 
       await db
         .prepare(`
@@ -106,7 +137,7 @@ intakeRouter.post('/lead', async (c) => {
       await db
         .prepare(`
           INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, created_at)
-          VALUES (?, ?, 'system_webhook', 'inbound_inquiry', 'Repeat website inquiry received', ?)
+          VALUES (?, ?, 'system_webhook', 'inbound_inquiry', 'Repeat website consultation request received', ?)
         `)
         .bind(actId, existingLeadId, now)
         .run();
@@ -130,15 +161,15 @@ intakeRouter.post('/lead', async (c) => {
         `)
         .bind(
           leadId,
-          data.name.trim(),
+          clientName,
           normalizedEmail,
           normalizedPhone,
           data.company?.trim() || null,
-          data.serviceNeeded?.trim() || null,
+          serviceNeeded,
           data.budget?.trim() || null,
           data.timeline?.trim() || null,
           data.preferredContact?.trim() || null,
-          data.message?.trim() || null,
+          clientMessage || null,
           data.source || 'website_contact',
           now,
           now
@@ -150,7 +181,7 @@ intakeRouter.post('/lead', async (c) => {
       await db
         .prepare(`
           INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, created_at)
-          VALUES (?, ?, 'system_webhook', 'lead_created', 'Inbound lead received via website contact webhook', ?)
+          VALUES (?, ?, 'system_webhook', 'lead_created', 'Inbound consultation request received from website form', ?)
         `)
         .bind(actId, leadId, now)
         .run();
@@ -164,8 +195,8 @@ intakeRouter.post('/lead', async (c) => {
         `)
         .bind(
           alertId,
-          `New Inbound Lead: ${data.name.trim()}`,
-          `${data.serviceNeeded || 'Website inquiry'} from ${normalizedPhone || normalizedEmail || 'Direct'}`,
+          `New Inbound Lead: ${clientName}`,
+          `${serviceNeeded} from ${normalizedPhone || normalizedEmail || 'Direct'}`,
           now
         )
         .run();
@@ -178,19 +209,20 @@ intakeRouter.post('/lead', async (c) => {
     if (botToken && chatId) {
       const tgHeader = isRepeatLead
         ? '⚡️ *Repeat Inbound Inquiry (Existing Client)*'
-        : '🔥 *New Inbound Website Lead Received!*';
+        : '🔥 *New Consultation Booked on Website!*';
 
       const tgMessage =
         `${tgHeader}\n\n` +
-        `👤 *Client:* ${data.name.trim()}\n` +
-        `💼 *Service:* ${data.serviceNeeded || 'General Inquiry'}\n` +
+        `👤 *Client Name:* ${clientName}\n` +
+        `💼 *Service:* ${serviceNeeded}\n` +
         `💰 *Budget:* ${data.budget || 'Not specified'}\n` +
-        `📞 *Phone:* ${normalizedPhone || 'N/A'}\n` +
-        `✉️ *Email:* ${normalizedEmail || 'N/A'}\n` +
-        `🏢 *Company:* ${data.company || 'N/A'}\n` +
-        `🌐 *Source:* ${data.source.replace('_', ' ')}\n\n` +
-        `📝 *Message:*\n_"${(data.message || 'No message text').slice(0, 200)}"_\n\n` +
-        `⚡️ [Open in Command Center](https://commandcenter.infohq.in)`;
+        `⏱ *Timeline:* ${data.timeline || 'Not specified'}\n` +
+        `📞 *Phone / WhatsApp:* ${normalizedPhone || 'N/A'}\n` +
+        `✉️ *Work Email:* ${normalizedEmail || 'N/A'}\n` +
+        `🏢 *Company:* ${data.company?.trim() || 'N/A'}\n` +
+        `🎯 *Preferred Connect:* ${data.preferredContact || 'Any'}\n\n` +
+        `📝 *Project Brief:*\n_"${(clientMessage || 'No brief provided').slice(0, 300)}"_\n\n` +
+        `⚡️ [Open Lead in Command Center](https://commandcenter.infohq.in)`;
 
       c.executionCtx.waitUntil(
         fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -211,7 +243,8 @@ intakeRouter.post('/lead', async (c) => {
     return c.json(
       {
         success: true,
-        message: 'Inquiry received successfully. Our team will get in touch shortly.',
+        message: 'Free Consultation Booked! We will review your idea and get back to you within 1 business day.',
+        targetEmail: 'contact@infohq.in',
         leadId: finalLeadId,
         isRepeatLead,
       },
@@ -227,4 +260,8 @@ intakeRouter.post('/lead', async (c) => {
       500
     );
   }
-});
+}
+
+// Support both /api/intake/lead and /api/intake/contact
+intakeRouter.post('/lead', handleInboundLead);
+intakeRouter.post('/contact', handleInboundLead);
