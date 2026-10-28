@@ -281,6 +281,94 @@ export async function sendTelegramPaymentSuccessAlert(
   }
 }
 
+// 4.1 Telegram Alert: Payment Attempt Failed
+export async function sendTelegramPaymentFailedAlert(
+  params: {
+    clientName: string;
+    projectTitle: string;
+    invoiceNumber: string;
+    amount: number;
+    paymentId: string;
+    errorReason: string;
+    failedAtIST: string;
+  },
+  env: Bindings
+) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+
+  const msg =
+    `⚠️ *Payment Attempt Failed Alert!*\n\n` +
+    `👤 *Client:* ${params.clientName}\n` +
+    `💼 *Project:* ${params.projectTitle}\n` +
+    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
+    `💰 *Amount:* ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `❌ *Reason:* ${params.errorReason}\n` +
+    `🆔 *Payment ID:* \`${params.paymentId}\`\n` +
+    `⏱ *Failed At:* ${params.failedAtIST}\n\n` +
+    `ℹ️ Client se contact karein ya link dobara verify karein.\n` +
+    `⚡️ [Open Billing in Command Center](https://commandcenter.infohq.in/billing)`;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: msg,
+        parse_mode: 'Markdown',
+      }),
+    });
+  } catch (err) {
+    console.error('[Telegram Payment Failed Alert Exception]:', err);
+  }
+}
+
+// 4.2 Telegram Alert: Refund Processed
+export async function sendTelegramRefundProcessedAlert(
+  params: {
+    clientName: string;
+    projectTitle: string;
+    invoiceNumber: string;
+    refundAmount: number;
+    refundId: string;
+    paymentId: string;
+    processedAtIST: string;
+  },
+  env: Bindings
+) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+
+  const msg =
+    `🔄 *Refund Processed Alert*\n\n` +
+    `👤 *Client:* ${params.clientName}\n` +
+    `💼 *Project:* ${params.projectTitle}\n` +
+    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
+    `💸 *Refunded Amount:* ₹${params.refundAmount.toLocaleString('en-IN')}\n` +
+    `🆔 *Refund ID:* \`${params.refundId}\`\n` +
+    `💳 *Original Payment ID:* \`${params.paymentId}\`\n` +
+    `⏱ *Processed At:* ${params.processedAtIST}\n\n` +
+    `ℹ️ Refund client ke original payment method par 5-7 din me settle hoga.\n` +
+    `⚡️ [Open Billing in Command Center](https://commandcenter.infohq.in/billing)`;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: msg,
+        parse_mode: 'Markdown',
+      }),
+    });
+  } catch (err) {
+    console.error('[Telegram Refund Alert Exception]:', err);
+  }
+}
+
 // 5. Complete Won Deal to Project & Advance Invoice Auto-Generator
 export async function autoConvertWonLeadToProjectAndInvoice(
   db: D1Database,
@@ -642,6 +730,160 @@ export async function handleRazorpayWebhookEvent(
         .run();
 
       return { success: true, message: `Payment for ${invoiceNumber} marked as received.` };
+    }
+  }
+
+  // B. Event: payment.failed (Payment Attempt Failed / Declined)
+  else if (eventType === 'payment.failed') {
+    const payload = eventBody.payload as Record<string, unknown>;
+    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
+
+    if (paymentObj) {
+      const razorpayPaymentId = String(paymentObj.id || 'pay_unknown');
+      const amountInPaise = Number(paymentObj.amount || 0);
+      const amountInRupees = amountInPaise > 0 ? amountInPaise / 100 : 0;
+      const errorDescription = String(
+        paymentObj.error_description || paymentObj.error_reason || 'Transaction declined by bank or user cancelled'
+      );
+      const notes = (paymentObj.notes as Record<string, unknown>) || {};
+      const invoiceNumber = String(notes.invoiceNumber || 'INV');
+
+      // Find payment record in D1 if available
+      let paymentRow: Record<string, unknown> | null = null;
+      if (notes.invoiceNumber) {
+        paymentRow = await db
+          .prepare('SELECT * FROM payments WHERE invoice_number = ?')
+          .bind(String(notes.invoiceNumber))
+          .first<Record<string, unknown>>();
+      }
+
+      const clientName = String(paymentRow?.client_name || notes.customerName || 'Client');
+      const projectTitle = String(paymentRow?.title || 'Client Project');
+      const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
+      const now = Date.now();
+      const timeIST = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(now));
+
+      // Dispatch Telegram Alert: Payment Failed
+      await sendTelegramPaymentFailedAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber: paymentRow ? String(paymentRow.invoice_number) : invoiceNumber,
+          amount: actualAmount,
+          paymentId: razorpayPaymentId,
+          errorReason: errorDescription,
+          failedAtIST: timeIST,
+        },
+        env
+      );
+
+      // Log alert in CRM
+      const alertId = `alert_fail_${now}`;
+      await db
+        .prepare(`
+          INSERT INTO automation_alerts (
+            id, type, title, message, severity, link, is_read, created_at
+          ) VALUES (?, 'system', ?, ?, 'warning', '/billing', 0, ?)
+        `)
+        .bind(
+          alertId,
+          `Payment Failed: ${invoiceNumber}`,
+          `Payment attempt of ₹${actualAmount.toLocaleString('en-IN')} for ${clientName} failed (${errorDescription})`,
+          now
+        )
+        .run();
+
+      return { success: true, message: `Payment failure logged for ${invoiceNumber}.` };
+    }
+  }
+
+  // C. Event: refund.processed / refund.created (Refund Processed)
+  else if (eventType === 'refund.processed' || eventType === 'refund.created') {
+    const payload = eventBody.payload as Record<string, unknown>;
+    const refundObj = (payload?.refund as { entity?: Record<string, unknown> })?.entity;
+    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
+
+    if (refundObj) {
+      const refundId = String(refundObj.id || 'rfnd_unknown');
+      const razorpayPaymentId = String(refundObj.payment_id || paymentObj?.id || '');
+      const refundAmountPaise = Number(refundObj.amount || 0);
+      const refundAmountRupees = refundAmountPaise > 0 ? refundAmountPaise / 100 : 0;
+      const now = Date.now();
+      const timeIST = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(now));
+
+      // Find payment in D1 by razorpay_payment_id
+      let paymentRow: Record<string, unknown> | null = null;
+      if (razorpayPaymentId) {
+        paymentRow = await db
+          .prepare('SELECT * FROM payments WHERE razorpay_payment_id = ?')
+          .bind(razorpayPaymentId)
+          .first<Record<string, unknown>>();
+      }
+
+      const clientName = String(paymentRow?.client_name || 'Client');
+      const projectTitle = String(paymentRow?.title || 'Client Project');
+      const invoiceNumber = String(paymentRow?.invoice_number || 'INV');
+
+      // Update payment status in D1 if found
+      if (paymentRow) {
+        await db
+          .prepare(`
+            UPDATE payments
+            SET status = 'refunded',
+                notes = COALESCE(notes, '') || ?
+            WHERE id = ?
+          `)
+          .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, String(paymentRow.id))
+          .run();
+      }
+
+      // Dispatch Telegram Alert: Refund Processed
+      await sendTelegramRefundProcessedAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber,
+          refundAmount: refundAmountRupees,
+          refundId,
+          paymentId: razorpayPaymentId,
+          processedAtIST: timeIST,
+        },
+        env
+      );
+
+      // Log alert in CRM
+      const alertId = `alert_rfnd_${now}`;
+      await db
+        .prepare(`
+          INSERT INTO automation_alerts (
+            id, type, title, message, severity, link, is_read, created_at
+          ) VALUES (?, 'system', ?, ?, 'info', '/billing', 0, ?)
+        `)
+        .bind(
+          alertId,
+          `Refund Processed: ₹${refundAmountRupees.toLocaleString('en-IN')}`,
+          `Refund ${refundId} of ₹${refundAmountRupees.toLocaleString('en-IN')} issued for ${clientName}`,
+          now
+        )
+        .run();
+
+      return { success: true, message: `Refund ${refundId} processed.` };
     }
   }
 
