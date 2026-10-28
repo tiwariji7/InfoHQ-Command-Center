@@ -1,10 +1,11 @@
 /* Clerk Authentication Custom Styling - InfoHQ Command Center */
 
-/* Outer container and Card resetting */
+/* Outer container and Card resetting - fully responsive without overflow cuts */
 .cl-rootBox {
   width: 100% !important;
   display: flex !important;
   justify-content: center !important;
+  overflow: visible !important;
 }
 
 .cl-cardBox {
@@ -12,6 +13,7 @@
   box-shadow: none !important;
   border: none !important;
   background: transparent !important;
+  overflow: visible !important;
 }
 
 .cl-card {
@@ -20,10 +22,11 @@
   border: none !important;
   background: transparent !important;
   padding: 0 !important;
-  gap: 1.25rem !important;
+  gap: 1.15rem !important;
+  overflow: visible !important;
 }
 
-/* Hide Clerk internal title/subtitle so custom header displays cleanly */
+/* Hide Clerk internal title/subtitle so custom InfoHQ header displays cleanly */
 .cl-headerTitle,
 .cl-headerSubtitle {
   display: none !important;
@@ -48,39 +51,67 @@
 /* Form fields container */
 .cl-form {
   gap: 1rem !important;
+  overflow: visible !important;
 }
 
 .cl-formField {
-  gap: 0.375rem !important;
+  gap: 0.35rem !important;
+  overflow: visible !important;
 }
 
+/* Form field label: crisp, left-aligned, no clipping or cuts */
 .cl-formFieldLabel {
-  font-size: 13px !important;
+  font-size: 12.5px !important;
   font-weight: 600 !important;
   color: #1A085C !important;
   letter-spacing: -0.01em !important;
-  margin-bottom: 0.25rem !important;
+  margin: 0 0 6px 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  text-align: left !important;
+  overflow: visible !important;
+  text-indent: 0 !important;
+  line-height: 1.4 !important;
+}
+
+@media (min-width: 640px) {
+  .cl-formFieldLabel {
+    font-size: 13px !important;
+  }
 }
 
 .cl-formFieldLabelRow {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  margin-bottom: 0.25rem !important;
+  margin: 0 0 6px 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  overflow: visible !important;
 }
 
-/* Input Fields */
+/* Input Fields: responsive height, smooth focus ring, matching brand border */
 .cl-formFieldInput {
-  height: 48px !important;
+  height: 44px !important;
   border-radius: 12px !important;
   border: 1.5px solid #EAE6F7 !important;
   background-color: #FFFFFF !important;
-  font-size: 14px !important;
+  font-size: 13.5px !important;
   font-weight: 400 !important;
   color: #1A085C !important;
-  padding: 0 16px !important;
-  transition: all 0.2s ease !important;
+  padding: 0 14px !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
   box-shadow: 0 1px 2px rgba(26, 8, 92, 0.02) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 640px) {
+  .cl-formFieldInput {
+    height: 48px !important;
+    font-size: 14px !important;
+    padding: 0 16px !important;
+  }
 }
 
 .cl-formFieldInput:hover {
@@ -96,7 +127,13 @@
 
 .cl-formFieldInput::placeholder {
   color: #9CA3AF !important;
-  font-size: 14px !important;
+  font-size: 13.5px !important;
+}
+
+@media (min-width: 640px) {
+  .cl-formFieldInput::placeholder {
+    font-size: 14px !important;
+  }
 }
 
 /* Email field with left Mail icon */
@@ -133,14 +170,21 @@
   color: #1A085C !important;
 }
 
-/* Forgot Password Link */
+/* Forgot Password Link (right-aligned on password step) */
 .cl-formFieldAction[data-localization-key*="forgotPassword"],
 a.cl-formFieldAction {
-  color: #5B4BF0 !important;
-  font-size: 13px !important;
+  color: #5B4CF5 !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
   text-decoration: none !important;
   transition: color 0.15s ease !important;
+}
+
+@media (min-width: 640px) {
+  .cl-formFieldAction[data-localization-key*="forgotPassword"],
+  a.cl-formFieldAction {
+    font-size: 13px !important;
+  }
 }
 
 .cl-formFieldAction[data-localization-key*="forgotPassword"]:hover,
@@ -151,11 +195,11 @@ a.cl-formFieldAction:hover {
 
 /* Primary Button (Continue ->) */
 .cl-formButtonPrimary {
-  height: 48px !important;
+  height: 44px !important;
   border-radius: 12px !important;
   background: linear-gradient(90deg, #5B4CF5 0%, #7C5CE8 50%, #914FBB 100%) !important;
   color: #FFFFFF !important;
-  font-size: 15px !important;
+  font-size: 14px !important;
   font-weight: 600 !important;
   letter-spacing: -0.01em !important;
   border: none !important;
@@ -167,6 +211,14 @@ a.cl-formFieldAction:hover {
   justify-content: center !important;
   gap: 8px !important;
   margin-top: 0.5rem !important;
+  width: 100% !important;
+}
+
+@media (min-width: 640px) {
+  .cl-formButtonPrimary {
+    height: 48px !important;
+    font-size: 15px !important;
+  }
 }
 
 .cl-formButtonPrimary:hover {
@@ -180,24 +232,43 @@ a.cl-formFieldAction:hover {
   box-shadow: 0 2px 8px rgba(91, 76, 245, 0.25) !important;
 }
 
+/* Hide Clerk internal duplicate icon on submit button */
+.cl-formButtonPrimary svg,
+.cl-formButtonPrimary__icon,
+.cl-formButtonPrimary [data-localization-key*="icon"] {
+  display: none !important;
+}
+
 /* Step 2 Identity Preview (user's email pill on password step) */
 .cl-identityPreview {
   background-color: #F8F8FF !important;
   border: 1px solid #EAE6F7 !important;
   border-radius: 12px !important;
-  padding: 10px 14px !important;
+  padding: 8px 12px !important;
   margin-bottom: 0.5rem !important;
+}
+
+@media (min-width: 640px) {
+  .cl-identityPreview {
+    padding: 10px 14px !important;
+  }
 }
 
 .cl-identityPreviewText {
   color: #1A085C !important;
-  font-size: 13.5px !important;
+  font-size: 13px !important;
   font-weight: 500 !important;
 }
 
+@media (min-width: 640px) {
+  .cl-identityPreviewText {
+    font-size: 13.5px !important;
+  }
+}
+
 .cl-identityPreviewEditButton {
-  color: #5B4BF0 !important;
-  font-size: 12.5px !important;
+  color: #5B4CF5 !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
   transition: color 0.15s ease !important;
 }
@@ -226,9 +297,15 @@ a.cl-formFieldAction:hover {
   justify-content: center !important;
   gap: 6px !important;
   color: #6B7280 !important;
-  font-size: 12px !important;
+  font-size: 11.5px !important;
   opacity: 0.85 !important;
   transition: opacity 0.15s ease !important;
+}
+
+@media (min-width: 640px) {
+  .cl-footerPages {
+    font-size: 12px !important;
+  }
 }
 
 .cl-footerPages:hover {
@@ -243,7 +320,7 @@ a.cl-formFieldAction:hover {
 /* Back links if present in navigation */
 .cl-headerBackLink,
 .cl-backLink {
-  color: #5B4BF0 !important;
-  font-size: 13px !important;
+  color: #5B4CF5 !important;
+  font-size: 12.5px !important;
   font-weight: 500 !important;
 }

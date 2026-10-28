@@ -18,6 +18,16 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        '/__clerk': {
+          target: 'https://clerk.infohq.in',
+          changeOrigin: true,
+          followRedirects: true,
+          rewrite: (path) => path.replace(/^\/__clerk/, ''),
+          headers: {
+            Origin: 'https://infohq.in',
+          },
+          cookieDomainRewrite: 'localhost',
+        },
         '/api': {
           target: 'http://localhost:8787',
           changeOrigin: true,
