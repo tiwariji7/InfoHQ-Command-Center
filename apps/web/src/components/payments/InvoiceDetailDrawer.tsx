@@ -135,11 +135,15 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
 
   return (
     <div
+      data-lenis-prevent
       className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs transition-opacity overflow-hidden"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full sm:max-w-lg md:max-w-xl lg:max-w-xl bg-white shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 sm:rounded-l-3xl border-l border-[#EDE8F5]">
+      <div
+        data-lenis-prevent
+        className="w-full sm:max-w-lg md:max-w-xl lg:max-w-xl bg-white shadow-2xl h-[100dvh] max-h-screen flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 sm:rounded-l-3xl border-l border-[#EDE8F5]"
+      >
         {/* ========================================================= */}
         {/* 1. DRAWER TOP HEADER (Mobile / Tablet / Desktop)          */}
         {/* ========================================================= */}
@@ -163,9 +167,12 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 2. DRAWER BODY                                            */}
+        {/* 2. DRAWER BODY (Smoothly Scrollable on all devices)        */}
         {/* ========================================================= */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-5 bg-[#FAF9FD]/50 overscroll-contain">
+        <div
+          data-lenis-prevent
+          className="flex-1 min-h-0 drawer-scroll px-4 sm:px-6 py-5 space-y-5 bg-[#FAF9FD]/50"
+        >
           {/* Invoice ID & Issue/Due Dates Row */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
