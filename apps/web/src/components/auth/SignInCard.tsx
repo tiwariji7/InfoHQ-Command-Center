@@ -10,69 +10,133 @@ interface SignInCardProps {
 
 const SignInInner: React.FC = () => {
   const { signIn } = useSignIn();
-  const [savedEmail, setSavedEmail] = useState<string>(() => {
-    try {
-      return sessionStorage.getItem('infohq_signin_email') || '';
-    } catch {
-      return '';
-    }
-  });
+  const [typedEmail, setTypedEmail] = useState<string>('');
+  const typedEmailRef = React.useRef<string>('');
   const [isPasswordScreen, setIsPasswordScreen] = useState<boolean>(false);
 
-  // Capture user input from email field so we have the typed email address
+  // Clear any legacy sessionStorage email from previous builds
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('infohq_signin_email');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Listen to input, change, and submit events to capture email as user types
   useEffect(() => {
     const handleInput = (e: Event) => {
       const target = e.target as HTMLInputElement;
-      if (target && (target.name === 'identifier' || target.type === 'email')) {
+      if (
+        target &&
+        (target.name === 'identifier' ||
+          target.id === 'identifier-field' ||
+          target.type === 'email' ||
+          target.autocomplete === 'username' ||
+          target.autocomplete === 'email')
+      ) {
         const val = target.value?.trim();
         if (val) {
-          setSavedEmail(val);
-          try {
-            sessionStorage.setItem('infohq_signin_email', val);
-          } catch {
-            // ignore storage errors
-          }
+          typedEmailRef.current = val;
+          setTypedEmail(val);
         }
       }
     };
+
+    const handleFormSubmit = () => {
+      const input = document.querySelector<HTMLInputElement>(
+        'input[name="identifier"], input[id="identifier-field"], input[type="email"]'
+      );
+      if (input && input.value.trim()) {
+        const val = input.value.trim();
+        typedEmailRef.current = val;
+        setTypedEmail(val);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.closest('.cl-formButtonPrimary, button[type="submit"]')) {
+        handleFormSubmit();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        handleFormSubmit();
+      }
+    };
+
     document.addEventListener('input', handleInput);
     document.addEventListener('change', handleInput);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+
     return () => {
       document.removeEventListener('input', handleInput);
       document.removeEventListener('change', handleInput);
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, []);
 
-  // Detect whether Clerk is currently on the password screen (or factor one screen)
+  // Screen detection: strictly check DOM elements for email vs password step
   useEffect(() => {
     const checkScreen = () => {
-      const hasPasswordInput = Boolean(
-        document.querySelector('input[type="password"], input[name="password"]')
+      const emailInput = document.querySelector<HTMLInputElement>(
+        'input[name="identifier"], input[id="identifier-field"], input[type="email"]'
       );
-      const isFactorOne =
-        window.location.hash.includes('factor') || window.location.hash.includes('password');
-      const isNeedsFirstFactor = signIn?.status === 'needs_first_factor';
+      const passwordInput = document.querySelector<HTMLInputElement>(
+        'input[name="password"], input[id="password-field"], input[type="password"]'
+      );
 
-      // Also try to read email from Clerk's internal identity text if available
-      const domIdentityEmail = document.querySelector('.cl-identityPreviewText')?.textContent?.trim();
-      if (domIdentityEmail) {
-        setSavedEmail(domIdentityEmail);
-        try {
-          sessionStorage.setItem('infohq_signin_email', domIdentityEmail);
-        } catch {
-          // ignore
+      // Email field in DOM -> definitely on email screen
+      const hasEmailInput = Boolean(emailInput);
+      // Password field in DOM -> definitely on password screen
+      const hasPasswordInput = Boolean(passwordInput);
+
+      // If email input is present, capture any value it currently holds
+      if (emailInput && emailInput.value.trim()) {
+        const val = emailInput.value.trim();
+        if (val !== typedEmailRef.current) {
+          typedEmailRef.current = val;
+          setTypedEmail(val);
         }
       }
 
-      setIsPasswordScreen(hasPasswordInput || isFactorOne || isNeedsFirstFactor);
+      // Check Clerk's identity preview text if rendered
+      const domIdentityEmail =
+        document.querySelector('.cl-identityPreviewText')?.textContent?.trim() ||
+        document.querySelector('.cl-identityPreview')?.textContent?.trim();
+
+      if (domIdentityEmail) {
+        const cleanEmail = domIdentityEmail.replace(/Edit$/i, '').trim();
+        if (cleanEmail && cleanEmail !== typedEmailRef.current) {
+          typedEmailRef.current = cleanEmail;
+          setTypedEmail(cleanEmail);
+        }
+      }
+
+      if (hasEmailInput) {
+        setIsPasswordScreen(false);
+      } else if (hasPasswordInput) {
+        setIsPasswordScreen(true);
+      } else {
+        // Fallback during route transition
+        const isFactor =
+          window.location.hash.includes('factor') || window.location.hash.includes('password');
+        if (isFactor) {
+          setIsPasswordScreen(true);
+        }
+      }
     };
 
     checkScreen();
     const observer = new MutationObserver(checkScreen);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
     window.addEventListener('hashchange', checkScreen);
     window.addEventListener('popstate', checkScreen);
-
     const interval = setInterval(checkScreen, 200);
 
     return () => {
@@ -81,29 +145,53 @@ const SignInInner: React.FC = () => {
       window.removeEventListener('popstate', checkScreen);
       clearInterval(interval);
     };
-  }, [signIn?.status]);
+  }, []);
 
-  const handleEditEmail = () => {
-    // 1. Try clicking Clerk's native edit button inside identityPreview
-    const editBtn = document.querySelector<HTMLButtonElement>(
-      '.cl-identityPreviewEditButton, .cl-headerBackLink, button[aria-label*="Edit"], button[aria-label*="edit"], .cl-backLink'
-    );
-    if (editBtn) {
-      editBtn.click();
-      return;
+  const handleBackToEmail = () => {
+    setIsPasswordScreen(false);
+
+    // Try finding Clerk native back/edit button
+    const backOrEditSelectors = [
+      '.cl-identityPreviewEditButton',
+      '.cl-headerBackLink',
+      '.cl-backLink',
+      'button[aria-label*="Edit" i]',
+      'button[aria-label*="Back" i]',
+      '[data-localization-key*="edit" i]',
+      '[data-localization-key*="back" i]',
+    ];
+
+    let clicked = false;
+    for (const selector of backOrEditSelectors) {
+      const btn = document.querySelector<HTMLElement>(selector);
+      if (btn) {
+        btn.click();
+        clicked = true;
+        break;
+      }
     }
 
-    // 2. Try clearing hash to return to main identifier step
-    if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
+    // Reset hash if using hash routing
+    if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
       window.location.hash = '';
-      return;
     }
 
-    // 3. Fallback reload
-    window.location.reload();
+    // Safety timeout check: if still on password screen after 350ms, reload clean
+    setTimeout(() => {
+      const stillPassword = Boolean(
+        document.querySelector('input[type="password"], input[name="password"]')
+      );
+      if (stillPassword && !clicked) {
+        window.location.href = window.location.pathname;
+      }
+    }, 350);
   };
 
-  const currentEmail = signIn?.identifier || savedEmail;
+  const displayEmail =
+    typedEmail ||
+    document.querySelector('.cl-identityPreviewText')?.textContent?.trim() ||
+    signIn?.identifier ||
+    '';
 
   return (
     <div className="min-h-screen w-full bg-brand-page flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -125,15 +213,15 @@ const SignInInner: React.FC = () => {
             <span className="bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent font-bold">Command Center</span>
           </h1>
 
-          {/* Subtitle: switches to Email + Pencil on password screen as requested */}
-          {isPasswordScreen && currentEmail ? (
+          {/* Subtitle: on password page shows entered email + pencil icon; on email page shows Welcome back */}
+          {isPasswordScreen ? (
             <div className="mt-2 inline-flex items-center justify-center gap-1.5 py-1 px-3 bg-brand-subtle rounded-full border border-brand-border animate-fadeIn">
               <span className="text-xs sm:text-[13px] font-medium text-brand-heading max-w-[210px] sm:max-w-[250px] truncate">
-                {currentEmail}
+                {displayEmail || 'your email'}
               </span>
               <button
                 type="button"
-                onClick={handleEditEmail}
+                onClick={handleBackToEmail}
                 className="p-1 rounded-full text-[#5B4CF5] hover:text-brand-primary hover:bg-white transition-all inline-flex items-center justify-center cursor-pointer shadow-none hover:shadow-xs"
                 title="Change email address"
                 aria-label="Change email address"
