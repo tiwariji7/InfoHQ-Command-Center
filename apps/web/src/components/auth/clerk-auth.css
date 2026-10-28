@@ -181,6 +181,7 @@ a.cl-formFieldAction {
 }
 
 @media (min-width: 640px) {
+
   .cl-formFieldAction[data-localization-key*="forgotPassword"],
   a.cl-formFieldAction {
     font-size: 13px !important;
