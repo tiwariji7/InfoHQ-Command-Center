@@ -7,6 +7,7 @@ import { projectsRouter } from './routes/projects.js';
 import { paymentsRouter } from './routes/payments.js';
 import { overviewRouter } from './routes/overview.js';
 import { automationsRouter } from './routes/automations.js';
+import { intakeRouter } from './routes/intake.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
@@ -89,6 +90,9 @@ app.get('/api/me', requireSuperadmin, (c) => {
   };
   return c.json(response);
 });
+
+// Public: Website and landing page inbound lead intake webhook
+app.route('/api/intake', intakeRouter);
 
 // Protected: Leads core router
 app.route('/api/leads', leadsRouter);
