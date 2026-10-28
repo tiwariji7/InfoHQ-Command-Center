@@ -16,12 +16,13 @@ automationsRouter.use('*', requireSuperadmin);
 
 // GET /api/automations/digest - Returns the current morning briefing digest
 automationsRouter.get('/digest', async (c) => {
-  if (!c.env.DB) {
+  const db = c.env.DB || c.env.COMMAND_DB;
+  if (!db) {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
   }
 
   try {
-    const digest = await getLatestBriefingDigest(c.env.DB, c.env);
+    const digest = await getLatestBriefingDigest(db, c.env);
     return c.json(digest);
   } catch (err: unknown) {
     console.error('Failed to get automation digest:', err);
@@ -31,12 +32,13 @@ automationsRouter.get('/digest', async (c) => {
 
 // POST /api/automations/run - Manually trigger an on-demand audit and briefing run
 automationsRouter.post('/run', async (c) => {
-  if (!c.env.DB) {
+  const db = c.env.DB || c.env.COMMAND_DB;
+  if (!db) {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
   }
 
   try {
-    const digest = await runMorningBriefingAndAudits(c.env.DB, c.env);
+    const digest = await runMorningBriefingAndAudits(db, c.env, { sendTelegram: true, persistAlerts: true });
     return c.json({ success: true, digest });
   } catch (err: unknown) {
     console.error('Failed to run on-demand automation audit:', err);

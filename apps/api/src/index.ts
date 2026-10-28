@@ -129,7 +129,7 @@ export default {
     }
 
     ctx.waitUntil(
-      runMorningBriefingAndAudits(db, env)
+      runMorningBriefingAndAudits(db, env, { sendTelegram: true, persistAlerts: true })
         .then(() => console.log('[Cloudflare Cron] Daily morning briefing & audit completed.'))
         .catch((err) => console.error('[Cloudflare Cron] Audit failed:', err))
     );

@@ -18,10 +18,18 @@ interface DbPaymentRow {
   client_name: string | null;
 }
 
+export interface RunBriefingOptions {
+  sendTelegram?: boolean;
+  persistAlerts?: boolean;
+}
+
 export async function runMorningBriefingAndAudits(
   db: D1Database,
-  bindings?: Bindings
+  bindings?: Bindings,
+  options?: RunBriefingOptions
 ): Promise<MorningBriefingDigest> {
+  const sendTelegram = options?.sendTelegram ?? false;
+  const persistAlerts = options?.persistAlerts ?? false;
   const now = Date.now();
   const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
   const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
@@ -193,8 +201,8 @@ export async function runMorningBriefingAndAudits(
     });
   }
 
-  // Batch insert new alerts
-  if (newAlerts.length > 0) {
+  // Batch insert new alerts (only during scheduled cron or manual run)
+  if (persistAlerts && newAlerts.length > 0) {
     for (const a of newAlerts) {
       await db
         .prepare(`
@@ -206,7 +214,7 @@ export async function runMorningBriefingAndAudits(
     }
   }
 
-  // 7. Write to automation_logs table
+  // 7. Write to automation_logs table (only during scheduled cron or manual run)
   const logId = `log-cron-${now}`;
   const summaryText = `Daily briefing audit: ${dueFollowUps.length} follow-ups, ${overdueInvoices.length} overdue invoices (₹${overdueInvoicesTotal}), ${newLeads24h} new leads.`;
   const detailsJson = JSON.stringify({
@@ -219,23 +227,26 @@ export async function runMorningBriefingAndAudits(
     upcomingDeadlinesCount: upcomingDeadlines.length,
   });
 
-  await db
-    .prepare(`
-      INSERT INTO automation_logs (id, job_type, status, summary, details_json, created_at)
-      VALUES (?, 'daily_briefing', 'success', ?, ?, ?)
-    `)
-    .bind(logId, summaryText, detailsJson, now)
-    .run();
+  if (persistAlerts) {
+    await db
+      .prepare(`
+        INSERT INTO automation_logs (id, job_type, status, summary, details_json, created_at)
+        VALUES (?, 'daily_briefing', 'success', ?, ?, ?)
+      `)
+      .bind(logId, summaryText, detailsJson, now)
+      .run();
+  }
 
-  // 8. Optional Telegram / Webhook dispatch
-  if (bindings?.TELEGRAM_BOT_TOKEN && bindings?.TELEGRAM_CHAT_ID) {
+  // 8. Telegram dispatch ONLY when explicitly requested (scheduled 8:00 AM IST cron or manual run)
+  if (sendTelegram && bindings?.TELEGRAM_BOT_TOKEN && bindings?.TELEGRAM_CHAT_ID) {
     try {
-      const tgText = `🔔 *InfoHQ Command Center — Morning Briefing*\n\n` +
+      const tgText =
+        `🔔 *InfoHQ Command Center — Morning Briefing*\n\n` +
         `📈 *New Leads (24h):* ${newLeads24h}\n` +
         `📅 *Follow-Ups Due Today:* ${dueFollowUps.length}\n` +
         `💰 *Overdue Payments:* ₹${overdueInvoicesTotal.toLocaleString('en-IN')} (${overdueInvoices.length} invoices)\n` +
         `🚀 *Projects with Deadlines:* ${upcomingDeadlines.length}\n\n` +
-        `🔗 *Open Command Center:* https://command.infohq.in`;
+        `⚡️ [Open Command Center](https://commandcenter.infohq.in)`;
 
       await fetch(`https://api.telegram.org/bot${bindings.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -251,7 +262,7 @@ export async function runMorningBriefingAndAudits(
     }
   }
 
-  if (bindings?.ADMIN_NOTIFY_WEBHOOK) {
+  if (sendTelegram && bindings?.ADMIN_NOTIFY_WEBHOOK) {
     try {
       await fetch(bindings.ADMIN_NOTIFY_WEBHOOK, {
         method: 'POST',
@@ -318,28 +329,8 @@ export async function getLatestBriefingDigest(
   db: D1Database,
   bindings?: Bindings
 ): Promise<MorningBriefingDigest> {
-  // Check if a briefing was generated in the last 4 hours
-  const now = Date.now();
-  const fourHoursAgo = now - 4 * 60 * 60 * 1000;
-
-  const lastLog = await db
-    .prepare(`
-      SELECT id, job_type, status, summary, details_json, created_at
-      FROM automation_logs
-      WHERE job_type = 'daily_briefing' AND created_at >= ?
-      ORDER BY created_at DESC
-      LIMIT 1
-    `)
-    .bind(fourHoursAgo)
-    .first<Record<string, unknown>>();
-
-  // If no fresh briefing exists, execute and generate one
-  if (!lastLog) {
-    return runMorningBriefingAndAudits(db, bindings);
-  }
-
-  // Otherwise, compile live view
-  return runMorningBriefingAndAudits(db, bindings);
+  // Read-only compilation of latest digest for frontend dashboard (does NOT dispatch Telegram or duplicate alerts)
+  return runMorningBriefingAndAudits(db, bindings, { sendTelegram: false, persistAlerts: false });
 }
 
 export async function getAutomationAlerts(
