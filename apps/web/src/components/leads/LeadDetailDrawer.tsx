@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Lead, LeadActivity, LeadNote, LeadStage } from '@infohq/shared';
 import {
@@ -21,6 +21,9 @@ import {
   Share2,
   ExternalLink,
   MessageCircle,
+  Activity,
+  FileText,
+  User,
 } from 'lucide-react';
 import { CreateProjectModal } from '../projects/CreateProjectModal.js';
 
@@ -45,6 +48,22 @@ function formatISTDateTime(timestamp: number | string | null | undefined): strin
   }).format(new Date(epoch));
 }
 
+function getRelativeTime(timestamp: number | string | null | undefined): string {
+  if (!timestamp) return '';
+  const epoch = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+  if (isNaN(epoch)) return '';
+  const diffSec = Math.floor((Date.now() - epoch) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDays = Math.floor(diffHour / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return formatISTDateTime(epoch);
+}
+
 function formatCurrency(budgetStr?: string | null): string {
   if (!budgetStr) return '—';
   const clean = budgetStr.replace(/[^0-9.]/g, '');
@@ -67,9 +86,9 @@ function getInitials(name: string): string {
 function getSourceIcon(source?: string) {
   switch (source) {
     case 'website_contact':
-      return { icon: Globe, label: 'Website' };
+      return { icon: Globe, label: 'Website Contact' };
     case 'whatsapp_click':
-      return { icon: MessageCircle, label: 'WhatsApp' };
+      return { icon: MessageCircle, label: 'WhatsApp Click' };
     case 'linkedin':
       return { icon: Share2, label: 'LinkedIn' };
     case 'referral':
@@ -77,7 +96,7 @@ function getSourceIcon(source?: string) {
     case 'phone_call':
       return { icon: Phone, label: 'Phone Call' };
     default:
-      return { icon: Globe, label: source || 'Direct' };
+      return { icon: Globe, label: source || 'Direct Inquiry' };
   }
 }
 
@@ -99,7 +118,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
 
-  // Modals & Stage
+  // Modals & Scheduling
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -131,7 +150,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
       setActivities(data.activities);
       setNotes(data.notes);
 
-      // Initialize smart tags based on lead data
+      // Initialize tags
       const initialTags: string[] = [];
       if (data.lead.serviceNeeded) initialTags.push(data.lead.serviceNeeded);
       if (data.lead.source) initialTags.push(getSourceIcon(data.lead.source).label);
@@ -214,23 +233,113 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
   const sourceInfo = getSourceIcon(lead?.source);
   const SourceIcon = sourceInfo.icon;
 
+  // Real timeline events compilation
+  const sortedAuditTimeline = useMemo(() => {
+    if (!lead) return [];
+
+    const list: Array<{
+      id: string;
+      title: string;
+      subtitle: string;
+      timestamp: number;
+      type: 'created' | 'stage' | 'note' | 'followup' | 'upcoming';
+      badge?: string;
+    }> = [];
+
+    // 1. Upcoming follow-up if scheduled in future
+    if (lead.nextFollowUpAt && lead.nextFollowUpAt > Date.now()) {
+      list.push({
+        id: 'upcoming-followup',
+        title: 'Follow-Up Scheduled (Upcoming)',
+        subtitle: `Action planned with ${lead.name}`,
+        timestamp: lead.nextFollowUpAt,
+        type: 'upcoming',
+        badge: 'Scheduled',
+      });
+    }
+
+    // 2. Real activities from D1 database
+    activities.forEach((act) => {
+      let type: 'created' | 'stage' | 'note' | 'followup' = 'stage';
+      let title = act.summary;
+      let subtitle = `Logged by Admin (${act.actorClerkUserId.slice(0, 8)}...)`;
+
+      if (act.activityType === 'lead_created') {
+        type = 'created';
+        title = 'New lead received';
+        subtitle = `Inbound form via ${sourceInfo.label}`;
+      } else if (act.activityType === 'stage_changed') {
+        type = 'stage';
+        title = act.summary;
+        subtitle = 'Funnel stage transition';
+      } else if (act.activityType === 'note_added') {
+        type = 'note';
+        title = 'Note added to profile';
+        subtitle = act.summary;
+      } else if (act.activityType === 'follow_up_set') {
+        type = 'followup';
+        title = 'Follow-up set';
+        subtitle = act.summary;
+      }
+
+      list.push({
+        id: act.id,
+        title,
+        subtitle,
+        timestamp: act.createdAt,
+        type,
+      });
+    });
+
+    // 3. Fallback creation event if no audit activity table records exist yet
+    if (list.length === 0) {
+      list.push({
+        id: 'created-initial',
+        title: 'New lead received',
+        subtitle: `Inbound form via ${sourceInfo.label}`,
+        timestamp: lead.createdAt,
+        type: 'created',
+      });
+
+      if (lead.stage !== 'new') {
+        list.push({
+          id: 'stage-initial',
+          title: `Moved to ${lead.stage.replace('_', ' ')}`,
+          subtitle: 'Active sales qualification',
+          timestamp: lead.updatedAt || lead.createdAt,
+          type: 'stage',
+        });
+      }
+    }
+
+    // Sort descending by timestamp (newest first)
+    return list.sort((a, b) => b.timestamp - a.timestamp);
+  }, [lead, activities, sourceInfo.label]);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs transition-opacity overflow-hidden"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full sm:max-w-md md:max-w-lg bg-white shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="w-full sm:max-w-lg md:max-w-xl lg:max-w-xl bg-white shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 sm:rounded-l-3xl border-l border-[#EDE8F5]">
         {/* ========================================================= */}
-        {/* 1. DRAWER TOP HEADER (Exact Image 1 Style)                */}
+        {/* 1. DRAWER TOP HEADER (Mobile / Tablet / Desktop)          */}
         {/* ========================================================= */}
-        <div className="px-6 py-4 border-b border-[#EDE8F5] flex items-center justify-between bg-white shrink-0">
-          <h2 className="text-lg font-black text-[#1A085C]">
-            Lead Details
-          </h2>
+        <div className="px-5 sm:px-6 py-4 border-b border-[#EDE8F5] flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-black text-[#1A085C]">
+              Lead Details
+            </h2>
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Audit Active
+            </span>
+          </div>
+
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-[#1A085C] hover:bg-[#FAF9FD] transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl text-slate-400 hover:text-[#1A085C] hover:bg-[#FAF9FD] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close lead profile"
           >
             <X size={18} />
@@ -238,9 +347,9 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 2. DRAWER SCROLLABLE BODY                                 */}
+        {/* 2. DRAWER BODY                                            */}
         {/* ========================================================= */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-[#FAF9FD]/40">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-5 bg-[#FAF9FD]/50 overscroll-contain">
           {error && (
             <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-brand-destructive flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -255,53 +364,55 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
 
           {isLoading ? (
             <div className="py-24 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 rounded-full border-2 border-[#7C3AED] border-t-transparent animate-spin" />
-              <span className="text-xs font-semibold text-brand-muted">Fetching lead profile...</span>
+              <div className="w-9 h-9 rounded-full border-2 border-[#7C3AED] border-t-transparent animate-spin" />
+              <span className="text-xs font-bold text-brand-muted">Fetching live lead intelligence...</span>
             </div>
           ) : !lead ? (
             <div className="text-center py-20 text-xs text-brand-muted">Lead not found</div>
           ) : (
             <>
               {/* Profile Monogram Card */}
-              <div className="flex items-center gap-3.5 pt-1">
-                <div className="w-14 h-14 rounded-full bg-[#FCE7F3] text-[#DB2777] font-black text-lg flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="bg-white rounded-2xl border border-[#EDE8F5] p-4 sm:p-5 shadow-[0_4px_20px_rgba(124,58,237,0.04)] flex items-center gap-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#EDE9FE] to-[#FCE7F3] text-[#7C3AED] font-black text-xl flex items-center justify-center shrink-0 shadow-2xs border border-[#DDD6FE]">
                   {initials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-black text-[#1A085C] truncate">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg sm:text-xl font-black text-[#1A085C] truncate">
                       {lead.name}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 capitalize">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 capitalize">
                       {lead.stage.replace('_', ' ')}
                     </span>
                   </div>
                   {lead.email && (
-                    <div className="text-xs text-brand-muted font-medium truncate mt-0.5">
-                      {lead.email}
+                    <div className="text-xs text-brand-muted font-medium truncate mt-1 flex items-center gap-1.5">
+                      <User size={11} className="shrink-0 text-slate-400" />
+                      <span className="truncate">{lead.email}</span>
                     </div>
                   )}
                   {lead.phone && (
-                    <div className="text-xs text-brand-muted font-mono font-medium mt-0.5">
-                      {lead.phone}
+                    <div className="text-xs text-brand-muted font-mono font-semibold mt-0.5 flex items-center gap-1.5">
+                      <Phone size={11} className="shrink-0 text-slate-400" />
+                      <span>{lead.phone}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* 3 Action Buttons Row (Exact Image 1 Style) */}
-              <div className="grid grid-cols-3 gap-2.5">
-                {/* Button 1: Mark as Contacted / Move Stage */}
+              {/* 3 Action Buttons Row (Responsive Min-touch targets) */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                {/* Button 1: Mark as Contacted / Advance */}
                 <button
                   onClick={() =>
                     handleStageChange(lead.stage === 'new' ? 'contacted' : 'proposal_sent')
                   }
                   disabled={isUpdatingStage}
-                  className="h-10 px-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_4px_14px_rgba(124,58,237,0.22)] active:scale-98 transition-all cursor-pointer"
+                  className="h-11 sm:h-12 px-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] hover:opacity-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(124,58,237,0.22)] active:scale-98 transition-all cursor-pointer"
                 >
-                  <Phone size={13} />
+                  <Phone size={14} className="shrink-0" />
                   <span className="truncate">
-                    {lead.stage === 'new' ? 'Mark Contacted' : 'Advance'}
+                    {lead.stage === 'new' ? 'Contacted' : 'Advance'}
                   </span>
                 </button>
 
@@ -309,17 +420,17 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 {lead.email ? (
                   <a
                     href={`mailto:${lead.email}`}
-                    className="h-10 px-2 rounded-xl bg-white border border-[#EDE8F5] text-brand-heading hover:border-[#7C3AED]/40 hover:text-[#7C3AED] text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+                    className="h-11 sm:h-12 px-2 rounded-xl bg-white border border-[#EDE8F5] text-brand-heading hover:border-[#7C3AED]/40 hover:text-[#7C3AED] text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-98"
                   >
-                    <Send size={13} />
+                    <Send size={14} className="shrink-0" />
                     <span>Send Email</span>
                   </a>
                 ) : (
                   <button
                     disabled
-                    className="h-10 px-2 rounded-xl bg-white border border-[#EDE8F5] text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"
+                    className="h-11 sm:h-12 px-2 rounded-xl bg-white border border-[#EDE8F5] text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"
                   >
-                    <Send size={13} />
+                    <Send size={14} className="shrink-0" />
                     <span>Send Email</span>
                   </button>
                 )}
@@ -327,31 +438,31 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 {/* Button 3: Schedule */}
                 <button
                   onClick={() => setIsScheduleOpen(!isScheduleOpen)}
-                  className="h-10 px-2 rounded-xl bg-white border border-[#EDE8F5] text-brand-heading hover:border-[#7C3AED]/40 hover:text-[#7C3AED] text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="h-11 sm:h-12 px-2 rounded-xl bg-white border border-[#EDE8F5] text-brand-heading hover:border-[#7C3AED]/40 hover:text-[#7C3AED] text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-98 cursor-pointer"
                 >
-                  <Calendar size={13} />
+                  <Calendar size={14} className="shrink-0" />
                   <span>Schedule</span>
                 </button>
               </div>
 
               {/* Collapsible Follow-up Scheduler */}
               {isScheduleOpen && (
-                <div className="p-3.5 bg-white rounded-xl border border-[#EDE8F5] space-y-2 shadow-2xs">
+                <div className="p-4 bg-white rounded-2xl border border-[#EDE8F5] space-y-2.5 shadow-md animate-in fade-in duration-150">
                   <div className="text-xs font-bold text-brand-heading flex items-center gap-1.5">
                     <Clock size={13} className="text-[#7C3AED]" />
-                    <span>Set Next Follow-Up Schedule (IST)</span>
+                    <span>Set Follow-Up Reminder (Asia/Kolkata IST)</span>
                   </div>
                   <input
                     type="datetime-local"
                     value={followUpDateInput}
                     onChange={(e) => setFollowUpDateInput(e.target.value)}
-                    className="w-full h-9 px-3 text-xs rounded-lg border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:border-[#7C3AED]"
+                    className="w-full h-10 px-3 text-xs font-medium rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:border-[#7C3AED]"
                   />
                   <div className="flex justify-end gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setIsScheduleOpen(false)}
-                      className="px-3 py-1 rounded-lg border border-[#EDE8F5] text-xs font-medium text-brand-muted hover:bg-slate-50"
+                      className="px-3.5 py-1.5 rounded-lg border border-[#EDE8F5] text-xs font-bold text-brand-muted hover:bg-slate-50 cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -359,25 +470,25 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                       type="button"
                       onClick={handleSaveFollowUp}
                       disabled={isSavingFollowUp}
-                      className="px-3 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-bold hover:bg-[#6D28D9]"
+                      className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs font-bold cursor-pointer"
                     >
-                      {isSavingFollowUp ? 'Saving...' : 'Confirm'}
+                      {isSavingFollowUp ? 'Saving...' : 'Set Reminder'}
                     </button>
                   </div>
                 </div>
               )}
 
               {/* ========================================================= */}
-              {/* Card 1: Lead Information (Exact Image 1 Style)             */}
+              {/* Card 1: Lead Information (Clean 2-Column Specs)            */}
               {/* ========================================================= */}
-              <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-2xs space-y-3.5">
+              <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-[0_4px_20px_rgba(124,58,237,0.04)] space-y-3.5">
                 <h4 className="text-sm font-black text-[#1A085C]">
                   Lead Information
                 </h4>
 
-                <div className="space-y-2.5 text-xs">
+                <div className="space-y-3 text-xs">
                   {/* Source */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#EDE8F5]/60">
                     <span className="text-brand-muted font-medium">Source</span>
                     <span className="font-bold text-brand-heading flex items-center gap-1.5">
                       <SourceIcon size={13} className="text-[#7C3AED]" />
@@ -386,7 +497,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                   </div>
 
                   {/* Interest */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#EDE8F5]/60">
                     <span className="text-brand-muted font-medium">Interest</span>
                     <span className="font-bold text-brand-heading">
                       {lead.serviceNeeded || 'Website Design & Development'}
@@ -394,50 +505,48 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                   </div>
 
                   {/* Estimated Value */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#EDE8F5]/60">
                     <span className="text-brand-muted font-medium">Estimated Value</span>
-                    <span className="font-black text-[#1A085C] tabular-nums">
+                    <span className="font-black text-[#1A085C] tabular-nums text-sm">
                       {formatCurrency(lead.budget)}
                     </span>
                   </div>
 
                   {/* Date */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-brand-muted font-medium">Date</span>
-                    <span className="font-medium text-brand-heading">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#EDE8F5]/60">
+                    <span className="text-brand-muted font-medium">Inquiry Date</span>
+                    <span className="font-semibold text-brand-heading tabular-nums">
                       {formatISTDateTime(lead.createdAt)}
                     </span>
                   </div>
 
                   {/* Location / Company */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-brand-muted font-medium">Location</span>
-                    <span className="font-medium text-brand-heading">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#EDE8F5]/60">
+                    <span className="text-brand-muted font-medium">Location / Account</span>
+                    <span className="font-semibold text-brand-heading">
                       {lead.company || 'Prayagraj, Uttar Pradesh'}
                     </span>
                   </div>
 
                   {/* Notes */}
-                  <div className="pt-2 border-t border-[#EDE8F5] space-y-1">
-                    <span className="text-brand-muted font-medium">Notes</span>
-                    <p className="text-xs text-brand-heading font-normal leading-relaxed bg-[#FAF9FD] p-2.5 rounded-xl border border-[#EDE8F5]">
+                  <div className="pt-1 space-y-1">
+                    <span className="text-brand-muted font-medium">Requirement Brief</span>
+                    <div className="text-xs text-brand-heading leading-relaxed bg-[#FAF9FD] p-3 rounded-xl border border-[#EDE8F5]">
                       {lead.message ||
                         notes[0]?.body ||
                         'Interested in company website with premium UI. Asked for portfolio and pricing.'}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* ========================================================= */}
-              {/* Tags Section (Exact Image 1 Style)                        */}
+              {/* Tags Section                                              */}
               {/* ========================================================= */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-[#1A085C]">
-                    Tags
-                  </h4>
-                </div>
+                <h4 className="text-xs font-black text-[#1A085C]">
+                  Tags
+                </h4>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {tags.map((tag, idx) => (
@@ -456,12 +565,12 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                         value={newTagInput}
                         onChange={(e) => setNewTagInput(e.target.value)}
                         placeholder="Tag name..."
-                        className="h-7 px-2 text-xs rounded-lg border border-[#EDE8F5] outline-none focus:border-[#7C3AED] w-24"
+                        className="h-8 px-2.5 text-xs rounded-lg border border-[#EDE8F5] outline-none focus:border-[#7C3AED] w-28"
                         autoFocus
                       />
                       <button
                         type="submit"
-                        className="px-2 py-0.5 rounded-lg bg-[#7C3AED] text-white text-[11px] font-bold"
+                        className="px-2.5 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-bold"
                       >
                         Add
                       </button>
@@ -469,7 +578,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                   ) : (
                     <button
                       onClick={() => setIsAddingTag(true)}
-                      className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-white border border-[#EDE8F5] text-brand-muted hover:text-[#7C3AED] hover:border-[#7C3AED]/40 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-white border border-[#EDE8F5] text-brand-muted hover:text-[#7C3AED] hover:border-[#7C3AED]/40 transition-colors inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Plus size={12} />
                       <span>Add tag</span>
@@ -479,94 +588,105 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
               </div>
 
               {/* ========================================================= */}
-              {/* Card 2: Activity Timeline (Exact Image 1 Style)            */}
+              {/* Card 2: REAL LIVE TRACKING AUDIT STREAM                   */}
               {/* ========================================================= */}
-              <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-2xs space-y-4">
+              <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-[0_4px_20px_rgba(124,58,237,0.04)] space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-black text-[#1A085C]">
-                    Activity Timeline
-                  </h4>
-                  <span className="text-[10px] text-brand-muted font-bold">
-                    {activities.length} logged
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-black text-[#1A085C]">
+                      Activity Timeline
+                    </h4>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                  <span className="text-[10px] font-bold text-brand-muted bg-[#FAF9FD] px-2 py-0.5 rounded-full border border-[#EDE8F5]">
+                    {sortedAuditTimeline.length} real events
                   </span>
                 </div>
 
-                <div className="relative pl-6 space-y-4">
-                  {/* Vertical Connecting Line */}
-                  <div className="absolute left-2.5 top-2 bottom-2 w-0.5 bg-[#EDE8F5]" />
+                {/* Vertical Stream */}
+                <div className="relative pl-6 space-y-5">
+                  {/* Connected Track Line */}
+                  <div className="absolute left-2.5 top-2.5 bottom-2.5 w-0.5 bg-[#EDE8F5]" />
 
-                  {/* Item 1: Lead Received */}
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border-2 border-white shadow-xs">
-                      <CheckCircle2 size={12} className="stroke-[2.5]" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-brand-heading">
-                        New lead received
-                      </div>
-                      <div className="text-[11px] text-brand-muted mt-0.5">
-                        Website enquiry form
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-brand-muted font-medium tabular-nums shrink-0">
-                      {formatISTDateTime(lead.createdAt)}
-                    </span>
-                  </div>
+                  {sortedAuditTimeline.map((item) => {
+                    const isUpcoming = item.type === 'upcoming';
+                    const isCreated = item.type === 'created';
+                    const isStage = item.type === 'stage';
+                    const isNote = item.type === 'note';
 
-                  {/* Item 2: Stage / Email Update */}
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center border-2 border-white shadow-xs">
-                      <Send size={10} className="stroke-[2.5]" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-brand-heading">
-                        {lead.stage === 'new' ? 'Initial enquiry logged' : 'Stage updated to ' + lead.stage.replace('_', ' ')}
-                      </div>
-                      <div className="text-[11px] text-brand-muted mt-0.5">
-                        {lead.email ? `Email: ${lead.email}` : 'Direct outreach'}
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-brand-muted font-medium tabular-nums shrink-0">
-                      {formatISTDateTime(lead.updatedAt || lead.createdAt)}
-                    </span>
-                  </div>
-
-                  {/* Item 3: Follow-Up Scheduled */}
-                  {lead.nextFollowUpAt && (
-                    <div className="relative flex items-start justify-between gap-3">
-                      <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center border-2 border-white shadow-xs">
-                        <Clock size={11} className="stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-brand-heading">
-                          Follow-up scheduled
+                    return (
+                      <div key={item.id} className="relative flex items-start justify-between gap-3 group">
+                        {/* Dot / Icon Node */}
+                        <div
+                          className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs ${
+                            isUpcoming
+                              ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-400/40'
+                              : isCreated
+                              ? 'bg-emerald-50 text-emerald-600'
+                              : isStage
+                              ? 'bg-[#EDE9FE] text-[#7C3AED]'
+                              : isNote
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {isUpcoming ? (
+                            <Clock size={11} className="stroke-[2.5]" />
+                          ) : isCreated ? (
+                            <CheckCircle2 size={11} className="stroke-[2.5]" />
+                          ) : isStage ? (
+                            <Activity size={10} className="stroke-[2.5]" />
+                          ) : isNote ? (
+                            <FileText size={10} className="stroke-[2.5]" />
+                          ) : (
+                            <Clock size={10} />
+                          )}
                         </div>
-                        <div className="text-[11px] text-brand-muted mt-0.5">
-                          Follow up with client via phone / WhatsApp
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-brand-heading">
+                              {item.title}
+                            </span>
+                            {item.badge && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-brand-muted mt-0.5 leading-snug">
+                            {item.subtitle}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-[10px] font-bold text-[#1A085C] tabular-nums">
+                            {getRelativeTime(item.timestamp)}
+                          </div>
+                          <div className="text-[9px] text-brand-muted tabular-nums">
+                            {formatISTDateTime(item.timestamp).split(',')[1]}
+                          </div>
                         </div>
                       </div>
-                      <span className="text-[10px] text-amber-700 font-bold tabular-nums shrink-0">
-                        {formatISTDateTime(lead.nextFollowUpAt)}
-                      </span>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
 
-                {/* Add Quick Internal Note */}
-                <form onSubmit={handleAddNote} className="pt-2 border-t border-[#EDE8F5] flex gap-2">
+                {/* Real-time Post Note Form */}
+                <form onSubmit={handleAddNote} className="pt-3 border-t border-[#EDE8F5] flex gap-2">
                   <input
                     type="text"
                     value={noteInput}
                     onChange={(e) => setNoteInput(e.target.value)}
-                    placeholder="Log a client note or call update..."
-                    className="flex-1 h-9 px-3 text-xs rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:border-[#7C3AED]"
+                    placeholder="Log real-time update or call note..."
+                    className="flex-1 h-10 px-3.5 text-xs rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:bg-white focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/15 transition-all"
                   />
                   <button
                     type="submit"
                     disabled={isSubmittingNote || !noteInput.trim()}
-                    className="px-3 h-9 rounded-xl bg-[#7C3AED] text-white text-xs font-bold disabled:opacity-40"
+                    className="px-4 h-10 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs font-bold shadow-xs hover:opacity-95 disabled:opacity-40 transition-all cursor-pointer"
                   >
-                    Post
+                    Post Note
                   </button>
                 </form>
               </div>
@@ -583,7 +703,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 </div>
                 <button
                   onClick={() => setIsConvertModalOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-[#7C3AED] text-white text-xs font-bold shadow-xs hover:bg-[#6D28D9] flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#7C3AED] text-white text-xs font-bold shadow-xs hover:bg-[#6D28D9] flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Briefcase size={13} />
                   <span>Convert</span>
