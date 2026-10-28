@@ -158,7 +158,7 @@ export type LeadNote = z.infer<typeof LeadNoteSchema>;
 
 export const LeadListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(50).default(20),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
   stage: LeadStageSchema.optional(),
   source: LeadSourceSchema.optional(),
   search: z.string().trim().optional(),

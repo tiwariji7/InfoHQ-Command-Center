@@ -138,7 +138,7 @@ export const PipelineView: React.FC = () => {
       setErrorMessage(null);
 
       try {
-        const res = await fetchLeads(getToken, { page: 1, pageSize: 60 });
+        const res = await fetchLeads(getToken, { page: 1, pageSize: 50 });
         setLeads(res.data);
       } catch (err: unknown) {
         setErrorMessage(
