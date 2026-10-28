@@ -3,9 +3,9 @@ import { useAuth } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse, RecentProjectItem, RecentPaymentItem } from '@infohq/shared';
 import { fetchDashboardOverview } from '../../lib/api.js';
 import {
-  LayoutDashboard,
+  Compass,
   Users,
-  Briefcase,
+  FolderKanban,
   IndianRupee,
   Clock,
   ArrowUpRight,
@@ -16,10 +16,10 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
-  Kanban,
+  KanbanSquare,
   TrendingUp,
-  Building2,
-  CreditCard,
+  BriefcaseBusiness,
+  Receipt,
   ChevronRight,
 } from 'lucide-react';
 
@@ -249,7 +249,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <div>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-brand-subtle flex items-center justify-center text-brand-primary">
-                <LayoutDashboard size={18} />
+                <Compass size={18} />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-brand-heading">
                 Dashboard
@@ -353,7 +353,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-brand-muted">Active Sales Pipeline</span>
             <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Kanban size={16} />
+              <KanbanSquare size={16} />
             </div>
           </div>
           <div className="my-2.5">
@@ -379,7 +379,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-brand-muted">Active Projects</span>
             <div className="w-8 h-8 rounded-full bg-[#FAF5FF] text-[#6B21A8] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Briefcase size={16} />
+              <FolderKanban size={16} />
             </div>
           </div>
           <div className="my-2.5">
@@ -505,7 +505,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-brand-subtle text-brand-primary flex items-center justify-center">
-                  <Kanban size={16} />
+                  <KanbanSquare size={16} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-brand-heading tracking-tight">
@@ -728,7 +728,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-brand-subtle text-brand-primary flex items-center justify-center">
-                  <Briefcase size={16} />
+                  <FolderKanban size={16} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-brand-heading tracking-tight">
@@ -750,7 +750,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {recentProjects.length === 0 ? (
               <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
-                <Briefcase size={24} className="text-brand-muted mx-auto mb-2" />
+                <FolderKanban size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No active projects yet</span>
                 <span className="text-[11px] text-brand-muted">
                   Create a project to monitor delivery deadlines and sprints.
@@ -838,7 +838,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 flex items-center justify-center">
-                  <CreditCard size={16} />
+                  <Receipt size={16} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-brand-heading tracking-tight">
@@ -860,7 +860,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {recentPayments.length === 0 ? (
               <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
-                <CreditCard size={24} className="text-brand-muted mx-auto mb-2" />
+                <Receipt size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No recent transactions</span>
                 <span className="text-[11px] text-brand-muted">
                   Recorded invoices and payments will appear in this timeline.
@@ -928,7 +928,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">
-                  <Building2 size={16} />
+                  <BriefcaseBusiness size={16} />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-brand-heading tracking-tight">
@@ -950,7 +950,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {topClients.length === 0 ? (
               <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
-                <Building2 size={24} className="text-brand-muted mx-auto mb-2" />
+                <BriefcaseBusiness size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No active client accounts</span>
                 <span className="text-[11px] text-brand-muted">
                   Clients converted from won leads or ongoing projects will appear here.
