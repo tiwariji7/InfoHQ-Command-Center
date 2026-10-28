@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse, RecentProjectItem, RecentPaymentItem } from '@infohq/shared';
 import { fetchDashboardOverview } from '../../lib/api.js';
 import {
@@ -36,9 +36,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   onSelectProjectId,
 }) => {
   const { getToken } = useAuth();
+  const { user: clerkUser } = useUser();
   const [data, setData] = useState<DashboardOverviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const firstName = clerkUser?.firstName || 'Shivam';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   const loadDashboard = useCallback(
     async () => {
@@ -243,31 +248,62 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* 1. SABSE UPAR: 4 KPI CARDS (With Gradient Numbers)        */}
+      {/* 0. EXECUTIVE GREETING BANNER (Inspired by Vertix V14)     */}
+      {/* ========================================================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+        <div>
+          <h1 className="text-2xl sm:text-[28px] font-black tracking-tight text-brand-heading">
+            {greeting},{' '}
+            <span className="bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
+              {firstName}
+            </span>
+          </h1>
+          <p className="text-xs sm:text-sm text-brand-muted mt-0.5 font-medium">
+            Stay on top of your tasks, monitor progress, and track status.
+          </p>
+        </div>
+
+        {/* Live System Indicator Pill */}
+        <div className="flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-white border border-[#EDE9FE] shadow-2xs text-xs font-semibold text-brand-muted">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-brand-heading">Executive Command Active</span>
+          <button
+            onClick={loadDashboard}
+            disabled={isLoading}
+            className="ml-1 p-1 hover:text-[#7C3AED] transition-colors rounded-full cursor-pointer"
+            title="Refresh overview metrics"
+          >
+            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 1. SABSE UPAR: 4 KPI CARDS (Vertix V14 Glass-Card Style)   */}
       {/* ========================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {/* Card 1: Total Leads */}
         <div
           onClick={() => onNavigateTab('leads')}
-          className="bg-white rounded-[20px] border border-brand-border p-5 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] hover:border-brand-primary hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+          className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_20px_rgba(124,58,237,0.04)] hover:border-[#7C3AED]/40 hover:-translate-y-1.5 hover:shadow-[0_16px_36px_rgba(124,58,237,0.08)] transition-all duration-300 cursor-pointer group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-brand-muted">Total Inbound Leads</span>
-            <div className="w-8 h-8 rounded-full bg-brand-subtle text-brand-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Users size={16} />
+            <span className="text-xs sm:text-sm font-semibold text-brand-muted">Total Inbound Leads</span>
+            <div className="w-9 h-9 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+              <Users size={17} />
             </div>
           </div>
-          <div className="my-2.5">
-            <div className="text-2xl sm:text-[30px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
+          <div className="my-3">
+            <div className="text-2xl sm:text-[32px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
               {metrics?.totalLeads || 0}
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-brand-border/60">
+          <div className="flex items-center justify-between pt-3 border-t border-[#EDE9FE]/80">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-              <ArrowUpRight size={12} />
+              <ArrowUpRight size={13} />
               +{metrics?.newLeadsThisWeek || 0} this week
             </span>
-            <span className="text-[11px] text-brand-muted group-hover:text-brand-primary flex items-center transition-colors">
+            <span className="text-[11px] text-brand-muted group-hover:text-[#7C3AED] flex items-center gap-0.5 transition-colors font-medium">
               Inbox <ChevronRight size={12} />
             </span>
           </div>
@@ -276,24 +312,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         {/* Card 2: Active Pipeline */}
         <div
           onClick={() => onNavigateTab('pipeline')}
-          className="bg-white rounded-[20px] border border-brand-border p-5 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] hover:border-brand-primary hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+          className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_20px_rgba(124,58,237,0.04)] hover:border-[#7C3AED]/40 hover:-translate-y-1.5 hover:shadow-[0_16px_36px_rgba(124,58,237,0.08)] transition-all duration-300 cursor-pointer group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-brand-muted">Active Sales Pipeline</span>
-            <div className="w-8 h-8 rounded-full bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <KanbanSquare size={16} />
+            <span className="text-xs sm:text-sm font-semibold text-brand-muted">Active Sales Pipeline</span>
+            <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+              <KanbanSquare size={17} />
             </div>
           </div>
-          <div className="my-2.5">
-            <div className="text-2xl sm:text-[30px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#2563EB] via-[#4F46E5] to-[#7C5CE8] bg-clip-text text-transparent">
+          <div className="my-3">
+            <div className="text-2xl sm:text-[32px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#2563EB] via-[#4F46E5] to-[#7C3AED] bg-clip-text text-transparent">
               {totalPipelineOpportunities}
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-brand-border/60">
+          <div className="flex items-center justify-between pt-3 border-t border-[#EDE9FE]/80">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
               {metrics?.leadsByStage.proposal_sent || 0} proposals sent
             </span>
-            <span className="text-[11px] text-brand-muted group-hover:text-brand-primary flex items-center transition-colors">
+            <span className="text-[11px] text-brand-muted group-hover:text-[#7C3AED] flex items-center gap-0.5 transition-colors font-medium">
               Board <ChevronRight size={12} />
             </span>
           </div>
@@ -302,24 +338,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         {/* Card 3: Active Deliverables */}
         <div
           onClick={() => onNavigateTab('projects')}
-          className="bg-white rounded-[20px] border border-brand-border p-5 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] hover:border-brand-primary hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+          className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_20px_rgba(124,58,237,0.04)] hover:border-[#7C3AED]/40 hover:-translate-y-1.5 hover:shadow-[0_16px_36px_rgba(124,58,237,0.08)] transition-all duration-300 cursor-pointer group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-brand-muted">Active Projects</span>
-            <div className="w-8 h-8 rounded-full bg-[#FAF5FF] text-[#6B21A8] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <FolderKanban size={16} />
+            <span className="text-xs sm:text-sm font-semibold text-brand-muted">Active Projects</span>
+            <div className="w-9 h-9 rounded-xl bg-[#FAF5FF] text-[#7C3AED] flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+              <FolderKanban size={17} />
             </div>
           </div>
-          <div className="my-2.5">
-            <div className="text-2xl sm:text-[30px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#9333EA] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent">
+          <div className="my-3">
+            <div className="text-2xl sm:text-[32px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#9333EA] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent">
               {metrics?.activeProjectsCount || 0}
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-brand-border/60">
+          <div className="flex items-center justify-between pt-3 border-t border-[#EDE9FE]/80">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
               {metrics?.completedProjectsCount || 0} delivered
             </span>
-            <span className="text-[11px] text-brand-muted group-hover:text-brand-primary flex items-center transition-colors">
+            <span className="text-[11px] text-brand-muted group-hover:text-[#7C3AED] flex items-center gap-0.5 transition-colors font-medium">
               Projects <ChevronRight size={12} />
             </span>
           </div>
@@ -328,24 +364,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         {/* Card 4: Revenue Collected */}
         <div
           onClick={() => onNavigateTab('billing')}
-          className="bg-white rounded-[20px] border border-brand-border p-5 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] hover:border-brand-primary hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+          className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_20px_rgba(124,58,237,0.04)] hover:border-[#7C3AED]/40 hover:-translate-y-1.5 hover:shadow-[0_16px_36px_rgba(124,58,237,0.08)] transition-all duration-300 cursor-pointer group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-brand-muted">Revenue Collected</span>
-            <div className="w-8 h-8 rounded-full bg-[#F3F0FF] text-[#7C5CE8] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <IndianRupee size={16} />
+            <span className="text-xs sm:text-sm font-semibold text-brand-muted">Revenue Collected</span>
+            <div className="w-9 h-9 rounded-xl bg-[#F0EDFF] text-[#7C3AED] flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+              <IndianRupee size={17} />
             </div>
           </div>
-          <div className="my-2.5">
-            <div className="text-2xl sm:text-[28px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent truncate">
+          <div className="my-3">
+            <div className="text-2xl sm:text-[30px] font-black tracking-tight tabular-nums bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent truncate">
               {formatCurrency(totalCollected)}
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-brand-border/60">
+          <div className="flex items-center justify-between pt-3 border-t border-[#EDE9FE]/80">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 truncate max-w-[170px]">
               Pending: {formatCurrency(totalPending)}
             </span>
-            <span className="text-[11px] text-brand-muted group-hover:text-brand-primary flex items-center transition-colors shrink-0">
+            <span className="text-[11px] text-brand-muted group-hover:text-[#7C3AED] flex items-center gap-0.5 transition-colors shrink-0 font-medium">
               Billing <ChevronRight size={12} />
             </span>
           </div>
@@ -357,12 +393,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       {/* ========================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         {/* Card 2A: Revenue Overview & Realization Trends */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <TrendingUp size={16} />
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shadow-2xs">
+                  <TrendingUp size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -378,7 +414,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('billing')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Invoices</span>
                 <ArrowUpRight size={13} />
@@ -386,16 +422,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {/* Progress Bar of Recovery */}
-            <div className="p-4 bg-brand-page rounded-control border border-brand-border mb-4">
+            <div className="p-4 bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] mb-4">
               <div className="flex items-center justify-between text-xs mb-2">
                 <span className="font-semibold text-brand-heading">Cashflow Realization Rate</span>
-                <span className="font-black tabular-nums bg-gradient-to-r from-[#7C5CE8] via-[#A855F7] to-[#FF4D8D] bg-clip-text text-transparent">
+                <span className="font-black tabular-nums bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#FF4D8D] bg-clip-text text-transparent">
                   {recoveryPercentage}% Collected
                 </span>
               </div>
-              <div className="h-2.5 w-full bg-[#EAE6F7] rounded-full overflow-hidden">
+              <div className="h-2.5 w-full bg-[#EDE9FE] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#5B4CF5] via-[#7C5CE8] to-[#FF4D8D] rounded-full transition-all duration-700"
+                  className="h-full bg-gradient-to-r from-[#5B4CF5] via-[#7C3AED] to-[#FF4D8D] rounded-full transition-all duration-700"
                   style={{ width: `${recoveryPercentage}%` }}
                 />
               </div>
@@ -403,19 +439,19 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             {/* Financial Metric Triple Breakdown with Gradient Data Numbers */}
             <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-              <div className="p-3 bg-brand-section rounded-control border border-brand-border text-center">
+              <div className="p-3 bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] text-center">
                 <div className="text-[11px] font-medium text-brand-muted">Total Invoiced</div>
                 <div className="text-xs sm:text-sm md:text-base font-extrabold mt-1 tabular-nums truncate bg-gradient-to-r from-[#1A085C] to-[#5B4CF5] bg-clip-text text-transparent">
                   {formatCurrency(totalInvoiced)}
                 </div>
               </div>
-              <div className="p-3 bg-emerald-50/70 rounded-control border border-emerald-100 text-center">
+              <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-100 text-center">
                 <div className="text-[11px] font-medium text-emerald-800">Received</div>
                 <div className="text-xs sm:text-sm md:text-base font-extrabold mt-1 tabular-nums truncate bg-gradient-to-r from-[#059669] to-[#10B981] bg-clip-text text-transparent">
                   {formatCurrency(totalCollected)}
                 </div>
               </div>
-              <div className="p-3 bg-amber-50/70 rounded-control border border-amber-100 text-center">
+              <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-100 text-center">
                 <div className="text-[11px] font-medium text-amber-800">Pending Dues</div>
                 <div className="text-xs sm:text-sm md:text-base font-extrabold mt-1 tabular-nums truncate bg-gradient-to-r from-[#D97706] to-[#F59E0B] bg-clip-text text-transparent">
                   {formatCurrency(totalPending)}
@@ -424,21 +460,21 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-brand-border/60 flex items-center justify-between text-[11px] text-brand-muted">
+          <div className="mt-4 pt-3 border-t border-[#EDE9FE]/80 flex items-center justify-between text-[11px] text-brand-muted">
             <span>Milestone reconciliation</span>
-            <span className="font-bold bg-gradient-to-r from-[#7C5CE8] to-[#5B4CF5] bg-clip-text text-transparent">
+            <span className="font-bold bg-gradient-to-r from-[#7C3AED] to-[#5B4CF5] bg-clip-text text-transparent">
               Verified live from D1 DB
             </span>
           </div>
         </div>
 
         {/* Card 2B: Lead Trends & Pipeline Velocity */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-brand-subtle text-brand-primary flex items-center justify-center">
-                  <KanbanSquare size={16} />
+                <div className="w-9 h-9 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shadow-2xs">
+                  <KanbanSquare size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -454,7 +490,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('pipeline')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Pipeline</span>
                 <ArrowUpRight size={13} />
@@ -467,7 +503,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 {
                   label: 'New Enquiries',
                   count: metrics?.leadsByStage.new || 0,
-                  color: 'bg-[#7C5CE8]',
+                  color: 'bg-[#7C3AED]',
                 },
                 {
                   label: 'Contacted & Discovery',
@@ -497,11 +533,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   <div key={stageItem.label} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-brand-heading">{stageItem.label}</span>
-                      <span className="font-bold tabular-nums bg-gradient-to-r from-[#5B4CF5] to-[#7C5CE8] bg-clip-text text-transparent">
+                      <span className="font-bold tabular-nums bg-gradient-to-r from-[#5B4CF5] to-[#7C3AED] bg-clip-text text-transparent">
                         {stageItem.count} ({pct}%)
                       </span>
                     </div>
-                    <div className="h-1.5 w-full bg-brand-page rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-[#F5F3FF] rounded-full overflow-hidden">
                       <div
                         className={`h-full ${stageItem.color} rounded-full transition-all duration-500`}
                         style={{ width: `${Math.max(pct, stageItem.count > 0 ? 8 : 0)}%` }}
@@ -513,7 +549,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-brand-border/60 flex items-center justify-between text-[11px] text-brand-muted">
+          <div className="mt-4 pt-3 border-t border-[#EDE9FE]/80 flex items-center justify-between text-[11px] text-brand-muted">
             <span>Overall Conversion Rate</span>
             <span className="font-black bg-gradient-to-r from-[#059669] to-[#10B981] bg-clip-text text-transparent">
               {metrics?.totalLeads
@@ -530,12 +566,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       {/* ========================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         {/* Card 3A: Needs Your Attention (Actionable Follow-ups) */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <Clock size={16} />
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shadow-2xs">
+                  <Clock size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -551,7 +587,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('leads')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>All Leads</span>
                 <ArrowUpRight size={13} />
@@ -559,7 +595,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {urgentFollowUps.length === 0 ? (
-              <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
+              <div className="p-8 text-center bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] text-xs text-brand-muted">
                 <CheckCircle2 size={24} className="text-emerald-600 mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">All follow-ups up to date!</span>
                 <span className="text-[11px] text-brand-muted">
@@ -567,7 +603,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="divide-y divide-brand-border">
+              <div className="divide-y divide-[#EDE9FE]">
                 {urgentFollowUps.slice(0, 4).map((item) => {
                   const cleanPhone = item.phone ? item.phone.replace(/\D/g, '') : '';
                   const isOverdue = item.nextFollowUpAt < Date.now();
@@ -575,7 +611,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-brand-page/50 transition-colors rounded-control px-2 -mx-2"
+                      className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-[#F5F3FF]/50 transition-colors rounded-xl px-2 -mx-2"
                     >
                       <div className="flex items-start sm:items-center gap-2.5 min-w-0">
                         <div
@@ -635,7 +671,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         {onSelectLeadId && (
                           <button
                             onClick={() => onSelectLeadId(item.id)}
-                            className="px-2.5 py-1 text-[11px] rounded font-semibold bg-brand-subtle text-brand-primary border border-purple-200 hover:bg-brand-primary hover:text-white transition-colors cursor-pointer"
+                            className="px-2.5 py-1 text-[11px] rounded font-semibold bg-[#EDE9FE] text-[#7C3AED] border border-purple-200 hover:bg-[#7C3AED] hover:text-white transition-colors cursor-pointer"
                           >
                             Open
                           </button>
@@ -648,7 +684,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-brand-border/60 flex items-center justify-between text-[11px] text-brand-muted">
+          <div className="mt-4 pt-3 border-t border-[#EDE9FE]/80 flex items-center justify-between text-[11px] text-brand-muted">
             <span>Pending follow-ups count</span>
             <span className="font-bold tabular-nums bg-gradient-to-r from-[#D97706] to-[#F59E0B] bg-clip-text text-transparent">
               {metrics?.followUpsDueTodayCount || 0} scheduled today
@@ -657,12 +693,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </div>
 
         {/* Card 3B: Project Health & Milestones */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-brand-subtle text-brand-primary flex items-center justify-center">
-                  <FolderKanban size={16} />
+                <div className="w-9 h-9 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shadow-2xs">
+                  <FolderKanban size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -678,7 +714,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('projects')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>All Projects</span>
                 <ArrowUpRight size={13} />
@@ -686,7 +722,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {recentProjects.length === 0 ? (
-              <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
+              <div className="p-8 text-center bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] text-xs text-brand-muted">
                 <FolderKanban size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No active projects yet</span>
                 <span className="text-[11px] text-brand-muted">
@@ -705,7 +741,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <div
                       key={proj.id}
                       onClick={() => onSelectProjectId && onSelectProjectId(proj.id)}
-                      className="p-3.5 bg-brand-page hover:bg-brand-section rounded-control border border-brand-border hover:border-brand-primary/40 transition-all cursor-pointer group"
+                      className="p-3.5 bg-[#F5F3FF]/70 hover:bg-[#F5F3FF] rounded-xl border border-[#EDE9FE] hover:border-[#7C3AED]/40 transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2 truncate">
@@ -775,12 +811,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       {/* ========================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         {/* Card 4A: Recent Activity (Financials & Milestone Logs) */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 flex items-center justify-center">
-                  <Receipt size={16} />
+                <div className="w-9 h-9 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shadow-2xs">
+                  <Receipt size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -796,7 +832,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('billing')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>All Billing</span>
                 <ArrowUpRight size={13} />
@@ -804,7 +840,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {recentPayments.length === 0 ? (
-              <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
+              <div className="p-8 text-center bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] text-xs text-brand-muted">
                 <Receipt size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No recent transactions</span>
                 <span className="text-[11px] text-brand-muted">
@@ -812,12 +848,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="divide-y divide-brand-border">
+              <div className="divide-y divide-[#EDE9FE]">
                 {recentPayments.slice(0, 5).map((py: RecentPaymentItem) => {
                   return (
                     <div
                       key={py.id}
-                      className="py-3 flex items-center justify-between gap-3 hover:bg-brand-page/50 transition-colors rounded-control px-2 -mx-2"
+                      className="py-3 flex items-center justify-between gap-3 hover:bg-[#F5F3FF]/50 transition-colors rounded-xl px-2 -mx-2"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
@@ -861,7 +897,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-brand-border/60 flex items-center justify-between text-[11px] text-brand-muted">
+          <div className="mt-4 pt-3 border-t border-[#EDE9FE]/80 flex items-center justify-between text-[11px] text-brand-muted">
             <span>Audit Trail</span>
             <span className="font-bold bg-gradient-to-r from-[#7C5CE8] to-[#5B4CF5] bg-clip-text text-transparent">
               Connected to D1 Studio
@@ -870,12 +906,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </div>
 
         {/* Card 4B: Top Clients (From Projects & Database) */}
-        <div className="bg-white rounded-[20px] border border-brand-border p-5 sm:p-6 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] flex flex-col justify-between">
+        <div className="bg-white rounded-2xl border border-[#EDE9FE] p-6 shadow-[0_4px_24px_rgba(124,58,237,0.04)] hover:shadow-[0_12px_32px_rgba(124,58,237,0.07)] transition-all duration-300 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">
-                  <BriefcaseBusiness size={16} />
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shadow-2xs">
+                  <BriefcaseBusiness size={17} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-brand-heading tracking-tight">
@@ -891,7 +927,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
               <button
                 onClick={() => onNavigateTab('clients')}
-                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Clients Directory</span>
                 <ArrowUpRight size={13} />
@@ -899,7 +935,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
 
             {topClients.length === 0 ? (
-              <div className="p-8 text-center bg-brand-page rounded-control border border-brand-border text-xs text-brand-muted">
+              <div className="p-8 text-center bg-[#F5F3FF]/70 rounded-xl border border-[#EDE9FE] text-xs text-brand-muted">
                 <BriefcaseBusiness size={24} className="text-brand-muted mx-auto mb-2" />
                 <span className="block font-medium text-brand-heading">No active client accounts</span>
                 <span className="text-[11px] text-brand-muted">
@@ -907,7 +943,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="divide-y divide-brand-border">
+              <div className="divide-y divide-[#EDE9FE]">
                 {topClients.map((client) => {
                   const initials = client.name
                     .split(' ')
@@ -920,14 +956,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <div
                       key={client.name}
                       onClick={() => onNavigateTab('clients')}
-                      className="py-3 flex items-center justify-between gap-3 hover:bg-brand-page/50 transition-colors rounded-control px-2 -mx-2 cursor-pointer group"
+                      className="py-3 flex items-center justify-between gap-3 hover:bg-[#F5F3FF]/50 transition-colors rounded-xl px-2 -mx-2 cursor-pointer group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7C5CE8] to-[#5B4CF5] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                        <div className="w-9 h-9 rounded-full bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                           {initials || 'CL'}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-brand-heading group-hover:text-brand-primary transition-colors truncate">
+                          <div className="text-xs font-bold text-brand-heading group-hover:text-[#7C3AED] transition-colors truncate">
                             {client.name}
                           </div>
                           <div className="text-[11px] text-brand-muted">
@@ -953,7 +989,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-brand-border/60 flex items-center justify-between text-[11px] text-brand-muted">
+          <div className="mt-4 pt-3 border-t border-[#EDE9FE]/80 flex items-center justify-between text-[11px] text-brand-muted">
             <span>Client Retention</span>
             <span className="font-bold bg-gradient-to-r from-[#7C5CE8] to-[#5B4CF5] bg-clip-text text-transparent">
               {topClients.length} key partners
