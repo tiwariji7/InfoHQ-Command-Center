@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import type { AuthUser, HealthResponse } from '@infohq/shared';
 import { LeadsInbox } from '../leads/LeadsInbox.js';
 import { PipelineView } from '../pipeline/PipelineView.js';
@@ -8,20 +8,19 @@ import { PaymentsView } from '../payments/PaymentsView.js';
 import { OverviewDashboard } from '../dashboard/OverviewDashboard.js';
 import { ModulePlaceholderView } from './ModulePlaceholderView.js';
 import {
-  LayoutDashboard,
+  Compass,
   Inbox,
-  Kanban,
-  Building2,
-  Briefcase,
-  CheckSquare,
+  KanbanSquare,
+  BriefcaseBusiness,
+  FolderKanban,
+  ListTodo,
   Rocket,
-  CreditCard,
-  FileText,
-  BarChart3,
-  Users,
-  Mail,
-  Settings,
-  ShieldCheck,
+  Receipt,
+  FileSpreadsheet,
+  TrendingUp,
+  UserCheck,
+  MessagesSquare,
+  SlidersHorizontal,
   LogOut,
   Menu,
   X,
@@ -46,12 +45,21 @@ interface NavSection {
   items: NavItem[];
 }
 
-export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _apiError }) => {
+export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiError: _apiError }) => {
   const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  // Exact navigation sections specified by user
+  // User details for Top-Right Header Profile
+  const displayName =
+    clerkUser?.fullName ||
+    (clerkUser?.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : null) ||
+    'Shivam Tiwari';
+  const designation = 'Super Admin';
+  const avatarLetter = (displayName ? displayName[0] : 'S').toUpperCase();
+
+  // Premium Navigation Sections with Curated Executive Icons
   const navigationSections: NavSection[] = [
     {
       title: 'DASHBOARD',
@@ -60,7 +68,7 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
           id: 'dashboard',
           label: 'Dashboard',
           subtext: 'Executive pulse, KPIs, real-time command center',
-          icon: LayoutDashboard,
+          icon: Compass,
           badge: 'Live',
         },
       ],
@@ -79,14 +87,14 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
           id: 'pipeline',
           label: 'Sales Pipeline',
           subtext: 'New → Contacted → Proposal → Won/Lost',
-          icon: Kanban,
+          icon: KanbanSquare,
           badge: 'Active',
         },
         {
           id: 'clients',
           label: 'Clients',
           subtext: 'Client profiles, contacts, history',
-          icon: Building2,
+          icon: BriefcaseBusiness,
         },
       ],
     },
@@ -97,14 +105,14 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
           id: 'projects',
           label: 'Projects',
           subtext: 'Milestones, deadlines, deliverables',
-          icon: Briefcase,
+          icon: FolderKanban,
           badge: 'Active',
         },
         {
           id: 'tasks',
           label: 'Tasks & Sprints',
           subtext: 'Assignments, priorities, progress',
-          icon: CheckSquare,
+          icon: ListTodo,
         },
         {
           id: 'deployments',
@@ -121,20 +129,20 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
           id: 'billing',
           label: 'Billing & Invoices',
           subtext: 'Invoices, payments, pending dues',
-          icon: CreditCard,
+          icon: Receipt,
           badge: 'Active',
         },
         {
           id: 'proposals',
           label: 'Proposals & Contracts',
           subtext: 'Quotes, project estimates, agreements',
-          icon: FileText,
+          icon: FileSpreadsheet,
         },
         {
           id: 'analytics',
           label: 'Analytics & Reports',
           subtext: 'Revenue, conversion, client growth',
-          icon: BarChart3,
+          icon: TrendingUp,
         },
       ],
     },
@@ -145,19 +153,19 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
           id: 'team',
           label: 'Team & Roles',
           subtext: 'Employees, assignments, permissions',
-          icon: Users,
+          icon: UserCheck,
         },
         {
           id: 'communications',
           label: 'Communications',
           subtext: 'Email history, follow-ups, notifications',
-          icon: Mail,
+          icon: MessagesSquare,
         },
         {
           id: 'settings',
           label: 'Settings & Security',
           subtext: 'Roles, audit logs, integrations, configuration',
-          icon: Settings,
+          icon: SlidersHorizontal,
         },
       ],
     },
@@ -286,20 +294,22 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
   return (
     <div className="min-h-screen bg-brand-page flex flex-col md:flex-row font-sans">
       {/* ========================================================= */}
-      {/* DESKTOP SIDEBAR (260px) - Fixed and Styled with Subtitles */}
+      {/* DESKTOP SIDEBAR (264px)                                   */}
       {/* ========================================================= */}
-      <aside className="hidden md:flex flex-col w-[260px] xl:w-[276px] bg-white border-r border-brand-border h-screen sticky top-0 z-20 shrink-0">
-        {/* Brand Header */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-brand-border shrink-0">
-          <div className="flex items-center gap-2 select-none">
-            <span className="text-xl font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-              info
-            </span>
-            <span className="text-xl font-black tracking-tight text-brand-heading">
-              HQ
-            </span>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand-subtle text-[#5B4CF5] border border-purple-100 ml-1">
-              Command
+      <aside className="hidden md:flex flex-col w-[264px] xl:w-[280px] bg-white border-r border-brand-border h-screen sticky top-0 z-20 shrink-0">
+        {/* Brand Header: InfoHQ with Command Center in gradient */}
+        <div className="h-16 flex items-center px-5 border-b border-brand-border shrink-0">
+          <div className="flex flex-col select-none">
+            <div className="flex items-center">
+              <span className="text-[22px] font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
+                info
+              </span>
+              <span className="text-[22px] font-black tracking-tight text-brand-heading ml-0.5">
+                HQ
+              </span>
+            </div>
+            <span className="text-[10px] font-bold tracking-wider uppercase bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent -mt-1">
+              Command Center
             </span>
           </div>
         </div>
@@ -313,34 +323,40 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
                 {sec.title}
               </div>
 
-              {/* Section Items */}
+              {/* Section Items with Premium Micro-Tile Icons */}
               {sec.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeTab === item.id || (item.id === 'dashboard' && activeTab === 'overview');
+                const isActive =
+                  activeTab === item.id || (item.id === 'dashboard' && activeTab === 'overview');
 
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleSelectTab(item.id)}
-                    className={`w-full flex items-start gap-2.5 p-2.5 rounded-control text-left transition-all group cursor-pointer ${
+                    className={`w-full flex items-start gap-2.5 p-2 rounded-control text-left transition-all group cursor-pointer ${
                       isActive
                         ? 'bg-brand-subtle text-brand-primary shadow-xs'
                         : 'text-brand-body hover:bg-brand-section hover:text-brand-heading'
                     }`}
                   >
+                    {/* Premium Icon Micro-Tile */}
                     <div
-                      className={`mt-0.5 w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
                         isActive
-                          ? 'bg-white text-brand-primary shadow-xs'
-                          : 'text-brand-muted group-hover:text-brand-heading'
+                          ? 'bg-gradient-to-br from-[#7C5CE8] to-[#5B4CF5] text-white shadow-xs'
+                          : 'bg-brand-page border border-brand-border/70 text-brand-muted group-hover:text-brand-heading group-hover:bg-white group-hover:border-brand-primary/30'
                       }`}
                     >
-                      <Icon size={16} />
+                      <Icon size={15} className="stroke-[2.2]" />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className={`font-semibold text-xs truncate ${isActive ? 'text-brand-primary' : 'text-brand-heading'}`}>
+                        <span
+                          className={`font-semibold text-xs truncate ${
+                            isActive ? 'text-brand-primary font-bold' : 'text-brand-heading'
+                          }`}
+                        >
                           {item.label}
                         </span>
                         {item.badge && (
@@ -365,33 +381,6 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
             </div>
           ))}
         </nav>
-
-        {/* User Footer with Superadmin Profile & Logout */}
-        <div className="p-3 border-t border-brand-border bg-white shrink-0">
-          <div className="flex items-center justify-between gap-2 p-2 rounded-control bg-brand-page border border-brand-border">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7C5CE8] to-[#5B4CF5] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                SA
-              </div>
-              <div className="truncate">
-                <div className="text-xs font-bold text-brand-heading truncate">
-                  {user.email || 'Superadmin'}
-                </div>
-                <div className="text-[10px] text-brand-muted capitalize">
-                  {user.role} • Single Superadmin
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => signOut()}
-              title="Sign Out"
-              className="p-1.5 text-brand-muted hover:text-brand-destructive rounded-control hover:bg-white transition-colors cursor-pointer shrink-0"
-              aria-label="Sign out"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* ========================================================= */}
@@ -407,12 +396,17 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
 
           {/* Drawer Menu */}
           <div className="relative w-4/5 max-w-xs bg-white h-full flex flex-col z-10 shadow-2xl">
-            <div className="h-14 flex items-center justify-between px-4 border-b border-brand-border">
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg font-black bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-                  info
+            <div className="h-16 flex items-center justify-between px-4 border-b border-brand-border">
+              <div className="flex flex-col select-none">
+                <div className="flex items-center">
+                  <span className="text-lg font-black bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
+                    info
+                  </span>
+                  <span className="text-lg font-black text-brand-heading ml-0.5">HQ</span>
+                </div>
+                <span className="text-[9.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent -mt-1">
+                  Command Center
                 </span>
-                <span className="text-lg font-black text-brand-heading">HQ</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
@@ -431,7 +425,8 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
                   </div>
                   {sec.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeTab === item.id || (item.id === 'dashboard' && activeTab === 'overview');
+                    const isActive =
+                      activeTab === item.id || (item.id === 'dashboard' && activeTab === 'overview');
 
                     return (
                       <button
@@ -469,44 +464,68 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
       {/* MAIN CONTENT AREA                                         */}
       {/* ========================================================= */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header Bar */}
-        <header className="h-14 md:h-16 bg-white border-b border-brand-border flex items-center justify-between px-4 lg:px-8 sticky top-0 z-10">
+        {/* Top Header Bar: Clean, uncluttered with Profile in Top Right Corner */}
+        <header className="h-16 bg-white border-b border-brand-border flex items-center justify-between px-4 lg:px-8 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             {/* Mobile Hamburger Button */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-1.5 text-brand-muted hover:text-brand-heading rounded-control hover:bg-brand-section"
+              className="md:hidden p-1.5 text-brand-muted hover:text-brand-heading rounded-control hover:bg-brand-section cursor-pointer"
               aria-label="Open sidebar menu"
             >
               <Menu size={20} />
             </button>
 
-            <div className="md:hidden flex items-center gap-1.5">
+            {/* Mobile Brand (visible only on small screens) */}
+            <div className="md:hidden flex items-center gap-1 select-none">
               <span className="text-base font-black bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
                 info
               </span>
               <span className="text-base font-black text-brand-heading">HQ</span>
             </div>
 
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-subtle text-[#5B4CF5] text-xs font-semibold border border-purple-100">
-              <ShieldCheck size={14} />
-              <span>Superadmin Command Center</span>
+            {/* Clean Breadcrumb/Status Indicator on Desktop */}
+            <div className="hidden md:flex items-center gap-2 text-xs text-brand-muted">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-medium text-brand-heading">Command Center</span>
+              <span>/</span>
+              <span className="capitalize font-semibold text-brand-primary">
+                {activeTab === 'dashboard' ? 'Overview' : activeTab}
+              </span>
             </div>
           </div>
 
+          {/* RIGHT TOP CORNER: Super Admin Profile (Name + Designation + Avatar + Logout) */}
           <div className="flex items-center gap-3">
-            <div className="text-xs text-brand-muted hidden sm:flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>D1 Studio: Connected</span>
-            </div>
+            <div className="flex items-center gap-2.5 sm:gap-3 pl-3">
+              {/* Name and Designation */}
+              <div className="text-right hidden sm:block select-none">
+                <div className="text-xs sm:text-[13px] font-bold text-brand-heading leading-tight">
+                  {displayName}
+                </div>
+                <div className="text-[11px] font-medium text-brand-muted">
+                  {designation}
+                </div>
+              </div>
 
-            <button
-              onClick={() => signOut()}
-              className="md:hidden p-2 text-brand-muted hover:text-brand-destructive"
-              aria-label="Sign out"
-            >
-              <LogOut size={18} />
-            </button>
+              {/* Profile Avatar with First Letter */}
+              <div
+                className="w-9 h-9 rounded-full bg-gradient-to-br from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] text-white flex items-center justify-center font-bold text-sm shadow-[0_2px_8px_rgba(124,92,232,0.3)] shrink-0 ring-2 ring-white select-none"
+                title={`${displayName} (${designation})`}
+              >
+                {avatarLetter}
+              </div>
+
+              {/* Clean Logout Button */}
+              <button
+                onClick={() => signOut()}
+                title="Sign Out"
+                className="p-1.5 text-brand-muted hover:text-brand-destructive rounded-control hover:bg-brand-section transition-colors cursor-pointer shrink-0"
+                aria-label="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -528,7 +547,7 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
               : 'text-brand-muted font-medium'
           }`}
         >
-          <LayoutDashboard size={18} />
+          <Compass size={18} />
           <span className="text-[10px]">Dashboard</span>
         </button>
 
@@ -548,7 +567,7 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
             activeTab === 'pipeline' ? 'text-brand-primary font-bold' : 'text-brand-muted font-medium'
           }`}
         >
-          <Kanban size={18} />
+          <KanbanSquare size={18} />
           <span className="text-[10px]">Pipeline</span>
         </button>
 
@@ -558,7 +577,7 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
             activeTab === 'projects' ? 'text-brand-primary font-bold' : 'text-brand-muted font-medium'
           }`}
         >
-          <Briefcase size={18} />
+          <FolderKanban size={18} />
           <span className="text-[10px]">Projects</span>
         </button>
 
@@ -570,7 +589,7 @@ export const Shell: React.FC<ShellProps> = ({ user, health: _health, apiError: _
               : 'text-brand-muted font-medium'
           }`}
         >
-          <CreditCard size={18} />
+          <Receipt size={18} />
           <span className="text-[10px]">Billing</span>
         </button>
 
