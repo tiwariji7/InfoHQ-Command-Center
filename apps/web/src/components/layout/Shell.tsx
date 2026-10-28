@@ -35,7 +35,6 @@ interface ShellProps {
 interface NavItem {
   id: string;
   label: string;
-  subtext: string;
   icon: React.ElementType;
   badge?: string;
 }
@@ -59,7 +58,7 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
   const designation = 'Super Admin';
   const avatarLetter = (displayName ? displayName[0] : 'S').toUpperCase();
 
-  // Premium Navigation Sections with Curated Executive Icons
+  // Navigation sections without subheadings for clean visual hierarchy
   const navigationSections: NavSection[] = [
     {
       title: 'DASHBOARD',
@@ -67,7 +66,6 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
         {
           id: 'dashboard',
           label: 'Dashboard',
-          subtext: 'Executive pulse, KPIs, real-time command center',
           icon: Compass,
           badge: 'Live',
         },
@@ -79,21 +77,18 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
         {
           id: 'leads',
           label: 'Leads Inbox',
-          subtext: 'Website enquiries, consultation requests',
           icon: Inbox,
           badge: 'Active',
         },
         {
           id: 'pipeline',
           label: 'Sales Pipeline',
-          subtext: 'New → Contacted → Proposal → Won/Lost',
           icon: KanbanSquare,
           badge: 'Active',
         },
         {
           id: 'clients',
           label: 'Clients',
-          subtext: 'Client profiles, contacts, history',
           icon: BriefcaseBusiness,
         },
       ],
@@ -104,20 +99,17 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
         {
           id: 'projects',
           label: 'Projects',
-          subtext: 'Milestones, deadlines, deliverables',
           icon: FolderKanban,
           badge: 'Active',
         },
         {
           id: 'tasks',
           label: 'Tasks & Sprints',
-          subtext: 'Assignments, priorities, progress',
           icon: ListTodo,
         },
         {
           id: 'deployments',
           label: 'Deployments & Releases',
-          subtext: 'Release history, environments, status',
           icon: Rocket,
         },
       ],
@@ -128,20 +120,17 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
         {
           id: 'billing',
           label: 'Billing & Invoices',
-          subtext: 'Invoices, payments, pending dues',
           icon: Receipt,
           badge: 'Active',
         },
         {
           id: 'proposals',
           label: 'Proposals & Contracts',
-          subtext: 'Quotes, project estimates, agreements',
           icon: FileSpreadsheet,
         },
         {
           id: 'analytics',
           label: 'Analytics & Reports',
-          subtext: 'Revenue, conversion, client growth',
           icon: TrendingUp,
         },
       ],
@@ -152,19 +141,16 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
         {
           id: 'team',
           label: 'Team & Roles',
-          subtext: 'Employees, assignments, permissions',
           icon: UserCheck,
         },
         {
           id: 'communications',
           label: 'Communications',
-          subtext: 'Email history, follow-ups, notifications',
           icon: MessagesSquare,
         },
         {
           id: 'settings',
           label: 'Settings & Security',
-          subtext: 'Roles, audit logs, integrations, configuration',
           icon: SlidersHorizontal,
         },
       ],
@@ -292,17 +278,18 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
   };
 
   return (
-    <div className="min-h-screen bg-brand-page flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-brand-page flex flex-col lg:flex-row font-sans">
       {/* ========================================================= */}
-      {/* DESKTOP SIDEBAR (264px)                                   */}
+      {/* LAPTOP / DESKTOP SIDEBAR (>= 1024px)                      */}
+      {/* Fixed on side, independently scrollable with overscroll   */}
       {/* ========================================================= */}
-      <aside className="hidden md:flex flex-col w-[264px] xl:w-[280px] bg-white border-r border-brand-border h-screen sticky top-0 z-20 shrink-0">
-        {/* Brand Header: InfoHQ with Command Center in gradient */}
+      <aside className="hidden lg:flex flex-col w-[260px] xl:w-[276px] bg-white border-r border-brand-border h-screen sticky top-0 z-20 shrink-0 select-none">
+        {/* Brand Header: InfoHQ with Capital I and Command Center gradient */}
         <div className="h-16 flex items-center px-5 border-b border-brand-border shrink-0">
-          <div className="flex flex-col select-none">
+          <div className="flex flex-col">
             <div className="flex items-center">
               <span className="text-[22px] font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-                info
+                Info
               </span>
               <span className="text-[22px] font-black tracking-tight text-brand-heading ml-0.5">
                 HQ
@@ -314,16 +301,16 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
           </div>
         </div>
 
-        {/* Scrollable Navigation List */}
-        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4 text-xs">
+        {/* Scrollable Navigation List - Only scrolls when cursor is over sidebar */}
+        <nav className="flex-1 px-3 py-3.5 overflow-y-auto space-y-4 text-xs overscroll-contain">
           {navigationSections.map((sec) => (
             <div key={sec.title} className="space-y-1">
-              {/* Section Header */}
+              {/* Clean Section Header */}
               <div className="text-[10px] font-bold text-brand-muted uppercase tracking-wider px-3 py-1">
                 {sec.title}
               </div>
 
-              {/* Section Items with Premium Micro-Tile Icons */}
+              {/* Section Items - Clean without subheadings */}
               {sec.items.map((item) => {
                 const Icon = item.icon;
                 const isActive =
@@ -333,15 +320,15 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
                   <button
                     key={item.id}
                     onClick={() => handleSelectTab(item.id)}
-                    className={`w-full flex items-start gap-2.5 p-2 rounded-control text-left transition-all group cursor-pointer ${
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-control text-left transition-all group cursor-pointer ${
                       isActive
-                        ? 'bg-brand-subtle text-brand-primary shadow-xs'
-                        : 'text-brand-body hover:bg-brand-section hover:text-brand-heading'
+                        ? 'bg-brand-subtle text-brand-primary shadow-xs font-bold'
+                        : 'text-brand-body hover:bg-brand-section hover:text-brand-heading font-medium'
                     }`}
                   >
                     {/* Premium Icon Micro-Tile */}
                     <div
-                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
                         isActive
                           ? 'bg-gradient-to-br from-[#7C5CE8] to-[#5B4CF5] text-white shadow-xs'
                           : 'bg-brand-page border border-brand-border/70 text-brand-muted group-hover:text-brand-heading group-hover:bg-white group-hover:border-brand-primary/30'
@@ -350,31 +337,25 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
                       <Icon size={15} className="stroke-[2.2]" />
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`font-semibold text-xs truncate ${
-                            isActive ? 'text-brand-primary font-bold' : 'text-brand-heading'
-                          }`}
-                        >
-                          {item.label}
-                        </span>
-                        {item.badge && (
-                          <span
-                            className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded ${
-                              item.badge === 'Live'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                : 'bg-chips-purpleBg text-chips-purpleText border border-purple-100'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10.5px] text-brand-muted truncate leading-tight mt-0.5">
-                        {item.subtext}
-                      </p>
-                    </div>
+                    <span
+                      className={`text-xs truncate flex-1 ${
+                        isActive ? 'text-brand-primary font-bold' : 'text-brand-heading'
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+
+                    {item.badge && (
+                      <span
+                        className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                          item.badge === 'Live'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            : 'bg-chips-purpleBg text-chips-purpleText border border-purple-100'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -384,25 +365,27 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
       </aside>
 
       {/* ========================================================= */}
-      {/* MOBILE DRAWER NAVIGATION (Slide-out menu for phones)       */}
+      {/* MOBILE & TABLET SLIDE-OUT DRAWER (< 1024px)               */}
+      {/* Opens ONLY when clicking the 3-lines hamburger button     */}
       {/* ========================================================= */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 lg:hidden flex">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/45 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
           />
 
           {/* Drawer Menu */}
           <div className="relative w-4/5 max-w-xs bg-white h-full flex flex-col z-10 shadow-2xl">
-            <div className="h-16 flex items-center justify-between px-4 border-b border-brand-border">
+            {/* Drawer Header */}
+            <div className="h-16 flex items-center justify-between px-5 border-b border-brand-border shrink-0">
               <div className="flex flex-col select-none">
                 <div className="flex items-center">
-                  <span className="text-lg font-black bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-                    info
+                  <span className="text-xl font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
+                    Info
                   </span>
-                  <span className="text-lg font-black text-brand-heading ml-0.5">HQ</span>
+                  <span className="text-xl font-black tracking-tight text-brand-heading ml-0.5">HQ</span>
                 </div>
                 <span className="text-[9.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent -mt-1">
                   Command Center
@@ -410,17 +393,18 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 text-brand-muted hover:text-brand-heading"
+                className="p-1.5 text-brand-muted hover:text-brand-heading rounded-control hover:bg-brand-section cursor-pointer"
                 aria-label="Close menu"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4 text-xs">
+            {/* Drawer Navigation List */}
+            <nav className="flex-1 px-3 py-3.5 overflow-y-auto space-y-4 text-xs overscroll-contain">
               {navigationSections.map((sec) => (
                 <div key={sec.title} className="space-y-1">
-                  <div className="text-[10px] font-bold text-brand-muted uppercase tracking-wider px-2 py-1">
+                  <div className="text-[10px] font-bold text-brand-muted uppercase tracking-wider px-3 py-1">
                     {sec.title}
                   </div>
                   {sec.items.map((item) => {
@@ -432,14 +416,33 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
                       <button
                         key={item.id}
                         onClick={() => handleSelectTab(item.id)}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-control text-left ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-control text-left transition-all ${
                           isActive
-                            ? 'bg-brand-subtle text-brand-primary font-semibold'
-                            : 'text-brand-body hover:bg-brand-section'
+                            ? 'bg-brand-subtle text-brand-primary font-bold shadow-xs'
+                            : 'text-brand-body hover:bg-brand-section font-medium'
                         }`}
                       >
-                        <Icon size={16} className={isActive ? 'text-brand-primary' : 'text-brand-muted'} />
-                        <span className="truncate">{item.label}</span>
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            isActive
+                              ? 'bg-gradient-to-br from-[#7C5CE8] to-[#5B4CF5] text-white shadow-xs'
+                              : 'bg-brand-page border border-brand-border/70 text-brand-muted'
+                          }`}
+                        >
+                          <Icon size={15} className="stroke-[2.2]" />
+                        </div>
+                        <span className="truncate flex-1 text-xs">{item.label}</span>
+                        {item.badge && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              item.badge === 'Live'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-chips-purpleBg text-chips-purpleText border border-purple-100'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -447,12 +450,13 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
               ))}
             </nav>
 
-            <div className="p-3 border-t border-brand-border">
+            {/* Drawer Logout Footer */}
+            <div className="p-3 border-t border-brand-border bg-white shrink-0">
               <button
                 onClick={() => signOut()}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-control text-xs font-semibold text-rose-600 bg-rose-50"
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-control text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
               >
-                <LogOut size={16} />
+                <LogOut size={15} />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -465,27 +469,28 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
       {/* ========================================================= */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar: Clean, uncluttered with Profile in Top Right Corner */}
-        <header className="h-16 bg-white border-b border-brand-border flex items-center justify-between px-4 lg:px-8 sticky top-0 z-10">
+        <header className="h-16 bg-white border-b border-brand-border flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-3">
-            {/* Mobile Hamburger Button */}
+            {/* 3-Lines Hamburger Button: visible on Mobile & Tablet (< 1024px) */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-1.5 text-brand-muted hover:text-brand-heading rounded-control hover:bg-brand-section cursor-pointer"
-              aria-label="Open sidebar menu"
+              className="lg:hidden p-2 text-brand-muted hover:text-brand-heading rounded-control hover:bg-brand-section transition-colors cursor-pointer"
+              aria-label="Open navigation menu"
+              title="Open menu"
             >
-              <Menu size={20} />
+              <Menu size={22} className="stroke-[2.2]" />
             </button>
 
-            {/* Mobile Brand (visible only on small screens) */}
-            <div className="md:hidden flex items-center gap-1 select-none">
-              <span className="text-base font-black bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-                info
+            {/* Mobile & Tablet Brand Title */}
+            <div className="lg:hidden flex items-center gap-1 select-none">
+              <span className="text-lg font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
+                Info
               </span>
-              <span className="text-base font-black text-brand-heading">HQ</span>
+              <span className="text-lg font-black tracking-tight text-brand-heading">HQ</span>
             </div>
 
-            {/* Clean Breadcrumb/Status Indicator on Desktop */}
-            <div className="hidden md:flex items-center gap-2 text-xs text-brand-muted">
+            {/* Clean Breadcrumb Indicator on Desktop */}
+            <div className="hidden lg:flex items-center gap-2 text-xs text-brand-muted select-none">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-medium text-brand-heading">Command Center</span>
               <span>/</span>
@@ -496,111 +501,42 @@ export const Shell: React.FC<ShellProps> = ({ user: _user, health: _health, apiE
           </div>
 
           {/* RIGHT TOP CORNER: Super Admin Profile (Name + Designation + Avatar + Logout) */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5 sm:gap-3 pl-3">
-              {/* Name and Designation */}
-              <div className="text-right hidden sm:block select-none">
-                <div className="text-xs sm:text-[13px] font-bold text-brand-heading leading-tight">
-                  {displayName}
-                </div>
-                <div className="text-[11px] font-medium text-brand-muted">
-                  {designation}
-                </div>
+          <div className="flex items-center gap-2.5 sm:gap-3 pl-3">
+            {/* Name and Designation */}
+            <div className="text-right hidden sm:block select-none">
+              <div className="text-xs sm:text-[13px] font-bold text-brand-heading leading-tight">
+                {displayName}
               </div>
-
-              {/* Profile Avatar with First Letter */}
-              <div
-                className="w-9 h-9 rounded-full bg-gradient-to-br from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] text-white flex items-center justify-center font-bold text-sm shadow-[0_2px_8px_rgba(124,92,232,0.3)] shrink-0 ring-2 ring-white select-none"
-                title={`${displayName} (${designation})`}
-              >
-                {avatarLetter}
+              <div className="text-[10.5px] font-medium text-brand-muted">
+                {designation}
               </div>
-
-              {/* Clean Logout Button */}
-              <button
-                onClick={() => signOut()}
-                title="Sign Out"
-                className="p-1.5 text-brand-muted hover:text-brand-destructive rounded-control hover:bg-brand-section transition-colors cursor-pointer shrink-0"
-                aria-label="Sign out"
-              >
-                <LogOut size={16} />
-              </button>
             </div>
+
+            {/* Profile Avatar with First Letter */}
+            <div
+              className="w-9 h-9 rounded-full bg-gradient-to-br from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] text-white flex items-center justify-center font-bold text-sm shadow-[0_2px_8px_rgba(124,92,232,0.3)] shrink-0 ring-2 ring-white select-none"
+              title={`${displayName} (${designation})`}
+            >
+              {avatarLetter}
+            </div>
+
+            {/* Clean Logout Button */}
+            <button
+              onClick={() => signOut()}
+              title="Sign Out"
+              className="p-1.5 text-brand-muted hover:text-brand-destructive rounded-control hover:bg-brand-section transition-colors cursor-pointer shrink-0"
+              aria-label="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </header>
 
         {/* Dynamic Page Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-24 md:pb-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-12">
           {renderActiveView()}
         </main>
       </div>
-
-      {/* ========================================================= */}
-      {/* MOBILE BOTTOM NAVIGATION (Quick shortcuts for phone)      */}
-      {/* ========================================================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-t border-brand-border flex items-center justify-around z-20 px-2 shadow-lg">
-        <button
-          onClick={() => handleSelectTab('dashboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 ${
-            activeTab === 'dashboard' || activeTab === 'overview'
-              ? 'text-brand-primary font-bold'
-              : 'text-brand-muted font-medium'
-          }`}
-        >
-          <Compass size={18} />
-          <span className="text-[10px]">Dashboard</span>
-        </button>
-
-        <button
-          onClick={() => handleSelectTab('leads')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 ${
-            activeTab === 'leads' ? 'text-brand-primary font-bold' : 'text-brand-muted font-medium'
-          }`}
-        >
-          <Inbox size={18} />
-          <span className="text-[10px]">Leads</span>
-        </button>
-
-        <button
-          onClick={() => handleSelectTab('pipeline')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 ${
-            activeTab === 'pipeline' ? 'text-brand-primary font-bold' : 'text-brand-muted font-medium'
-          }`}
-        >
-          <KanbanSquare size={18} />
-          <span className="text-[10px]">Pipeline</span>
-        </button>
-
-        <button
-          onClick={() => handleSelectTab('projects')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 ${
-            activeTab === 'projects' ? 'text-brand-primary font-bold' : 'text-brand-muted font-medium'
-          }`}
-        >
-          <FolderKanban size={18} />
-          <span className="text-[10px]">Projects</span>
-        </button>
-
-        <button
-          onClick={() => handleSelectTab('billing')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 ${
-            activeTab === 'billing' || activeTab === 'payments'
-              ? 'text-brand-primary font-bold'
-              : 'text-brand-muted font-medium'
-          }`}
-        >
-          <Receipt size={18} />
-          <span className="text-[10px]">Billing</span>
-        </button>
-
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center gap-1 py-1 text-brand-muted font-medium"
-        >
-          <Menu size={18} />
-          <span className="text-[10px]">More</span>
-        </button>
-      </nav>
     </div>
   );
 };
