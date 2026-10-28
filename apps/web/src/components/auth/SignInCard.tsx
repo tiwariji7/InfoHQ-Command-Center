@@ -25,6 +25,17 @@ const SignInInner: React.FC = () => {
 
   // Listen to input, change, and submit events to capture email as user types
   useEffect(() => {
+    const updateEmailFromInput = () => {
+      const input = document.querySelector<HTMLInputElement>(
+        'input[name="identifier"], input[id="identifier-field"], input[type="email"]'
+      );
+      if (input && input.value && input.value.trim()) {
+        const val = input.value.trim();
+        typedEmailRef.current = val;
+        setTypedEmail(val);
+      }
+    };
+
     const handleInput = (e: Event) => {
       const target = e.target as HTMLInputElement;
       if (
@@ -43,27 +54,16 @@ const SignInInner: React.FC = () => {
       }
     };
 
-    const handleFormSubmit = () => {
-      const input = document.querySelector<HTMLInputElement>(
-        'input[name="identifier"], input[id="identifier-field"], input[type="email"]'
-      );
-      if (input && input.value.trim()) {
-        const val = input.value.trim();
-        typedEmailRef.current = val;
-        setTypedEmail(val);
-      }
-    };
-
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target && target.closest('.cl-formButtonPrimary, button[type="submit"]')) {
-        handleFormSubmit();
+        updateEmailFromInput();
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
-        handleFormSubmit();
+        updateEmailFromInput();
       }
     };
 
@@ -80,54 +80,46 @@ const SignInInner: React.FC = () => {
     };
   }, []);
 
-  // Screen detection: strictly check DOM elements for email vs password step
+  // Screen detection: accurately check hash and visible element height for email vs password step
   useEffect(() => {
     const checkScreen = () => {
       const emailInput = document.querySelector<HTMLInputElement>(
         'input[name="identifier"], input[id="identifier-field"], input[type="email"]'
       );
-      const passwordInput = document.querySelector<HTMLInputElement>(
+      const passInput = document.querySelector<HTMLInputElement>(
         'input[name="password"], input[id="password-field"], input[type="password"]'
       );
 
-      // Email field in DOM -> definitely on email screen
-      const hasEmailInput = Boolean(emailInput);
-      // Password field in DOM -> definitely on password screen
-      const hasPasswordInput = Boolean(passwordInput);
+      const hash = window.location.hash || '';
+      const isHashFactor = hash.includes('factor') || hash.includes('password');
 
-      // If email input is present, capture any value it currently holds
-      if (emailInput && emailInput.value.trim()) {
-        const val = emailInput.value.trim();
-        if (val !== typedEmailRef.current) {
-          typedEmailRef.current = val;
-          setTypedEmail(val);
-        }
-      }
+      // In Clerk, inactive rows are collapsed to height 0
+      const isEmailVisible = Boolean(emailInput && emailInput.offsetHeight > 0);
+      const isPassVisible = Boolean(passInput && passInput.offsetHeight > 0);
 
-      // Check Clerk's identity preview text if rendered
+      // Read email from any available source
       const domIdentityEmail =
         document.querySelector('.cl-identityPreviewText')?.textContent?.trim() ||
         document.querySelector('.cl-identityPreview')?.textContent?.trim();
 
-      if (domIdentityEmail) {
-        const cleanEmail = domIdentityEmail.replace(/Edit$/i, '').trim();
-        if (cleanEmail && cleanEmail !== typedEmailRef.current) {
+      const candidateEmail =
+        (emailInput && emailInput.value && emailInput.value.trim()) ||
+        domIdentityEmail ||
+        signIn?.identifier ||
+        '';
+
+      if (candidateEmail) {
+        const cleanEmail = candidateEmail.replace(/Edit$/i, '').trim();
+        if (cleanEmail && cleanEmail.includes('@') && cleanEmail !== typedEmailRef.current) {
           typedEmailRef.current = cleanEmail;
           setTypedEmail(cleanEmail);
         }
       }
 
-      if (hasEmailInput) {
-        setIsPasswordScreen(false);
-      } else if (hasPasswordInput) {
+      if (isHashFactor || (isPassVisible && !isEmailVisible)) {
         setIsPasswordScreen(true);
-      } else {
-        // Fallback during route transition
-        const isFactor =
-          window.location.hash.includes('factor') || window.location.hash.includes('password');
-        if (isFactor) {
-          setIsPasswordScreen(true);
-        }
+      } else if (!isHashFactor && isEmailVisible) {
+        setIsPasswordScreen(false);
       }
     };
 
@@ -137,7 +129,7 @@ const SignInInner: React.FC = () => {
 
     window.addEventListener('hashchange', checkScreen);
     window.addEventListener('popstate', checkScreen);
-    const interval = setInterval(checkScreen, 200);
+    const interval = setInterval(checkScreen, 150);
 
     return () => {
       observer.disconnect();
@@ -145,12 +137,17 @@ const SignInInner: React.FC = () => {
       window.removeEventListener('popstate', checkScreen);
       clearInterval(interval);
     };
-  }, []);
+  }, [signIn?.identifier]);
 
   const handleBackToEmail = () => {
     setIsPasswordScreen(false);
 
-    // Try finding Clerk native back/edit button
+    // 1. Clear hash to return Clerk to the identifier screen
+    if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
+      window.location.hash = '';
+    }
+
+    // 2. Click Clerk native back/edit button if available
     const backOrEditSelectors = [
       '.cl-identityPreviewEditButton',
       '.cl-headerBackLink',
@@ -161,37 +158,16 @@ const SignInInner: React.FC = () => {
       '[data-localization-key*="back" i]',
     ];
 
-    let clicked = false;
     for (const selector of backOrEditSelectors) {
       const btn = document.querySelector<HTMLElement>(selector);
       if (btn) {
         btn.click();
-        clicked = true;
         break;
       }
     }
-
-    // Reset hash if using hash routing
-    if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
-      window.location.hash = '';
-    }
-
-    // Safety timeout check: if still on password screen after 350ms, reload clean
-    setTimeout(() => {
-      const stillPassword = Boolean(
-        document.querySelector('input[type="password"], input[name="password"]')
-      );
-      if (stillPassword && !clicked) {
-        window.location.href = window.location.pathname;
-      }
-    }, 350);
   };
 
-  const displayEmail =
-    typedEmail ||
-    document.querySelector('.cl-identityPreviewText')?.textContent?.trim() ||
-    signIn?.identifier ||
-    '';
+  const displayEmail = typedEmail || typedEmailRef.current || signIn?.identifier || '';
 
   return (
     <div className="min-h-screen w-full bg-brand-page flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -217,7 +193,7 @@ const SignInInner: React.FC = () => {
           {isPasswordScreen ? (
             <div className="mt-2 inline-flex items-center justify-center gap-1.5 py-1 px-3 bg-brand-subtle rounded-full border border-brand-border animate-fadeIn">
               <span className="text-xs sm:text-[13px] font-medium text-brand-heading max-w-[210px] sm:max-w-[250px] truncate">
-                {displayEmail || 'your email'}
+                {displayEmail}
               </span>
               <button
                 type="button"
