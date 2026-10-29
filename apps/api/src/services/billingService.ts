@@ -413,17 +413,14 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   await db
     .prepare(`
       INSERT INTO projects (
-        id, lead_id, title, client_name, client_email, client_phone, company, status, budget, start_date, deadline, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
+        id, lead_id, title, client_name, status, budget, start_date, deadline, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
     `)
     .bind(
       projectId,
       leadId,
       projectTitle,
       clientName,
-      clientEmail,
-      clientPhone,
-      company,
       `₹${totalBudget.toLocaleString('en-IN')}`,
       now,
       deadline,
