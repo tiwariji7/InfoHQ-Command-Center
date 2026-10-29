@@ -5,7 +5,10 @@ import { App } from './App.js';
 import { SignInCard } from './components/auth/SignInCard.js';
 import './index.css';
 
-const buildTimeKey = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim();
+const buildTimeKey = (
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  'pk_live_Y2xlcmsuaW5mb2hxLmluJA'
+).trim();
 
 const Root: React.FC = () => {
   const [clerkKey, setClerkKey] = useState<string>(buildTimeKey);
