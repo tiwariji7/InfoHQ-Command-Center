@@ -24,9 +24,6 @@
       "custom_domain": true
     }
   ],
-  "vars": {
-    "VITE_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaW5mb2hxLmluJA"
-  },
   "d1_databases": [
     {
       "binding": "COMMAND_DB",
@@ -41,10 +38,7 @@
         "binding": "COMMAND_DB",
         "database_id": "65a48298-6c06-4494-af0b-71e020d68a68"
       }
-    ],
-    "vars": {
-      "VITE_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaW5mb2hxLmluJA"
-    }
+    ]
   },
   "observability": {
     "enabled": true
