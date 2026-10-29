@@ -314,6 +314,17 @@ export async function recordPaymentApi(
   });
 }
 
+export async function syncRazorpayPaymentApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<{ success: boolean; message: string; linkStatus?: string; payment?: Payment }> {
+  return fetchWithAuth<{ success: boolean; message: string; linkStatus?: string; payment?: Payment }>(
+    `/api/payments/${paymentId}/sync-razorpay`,
+    getToken,
+    { method: 'POST' }
+  );
+}
+
 export async function updatePaymentApi(
   getToken: () => Promise<string | null>,
   paymentId: string,

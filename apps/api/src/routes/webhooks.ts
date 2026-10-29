@@ -41,11 +41,13 @@ async function verifyWithRazorpayApi(
   paymentId: string,
   env: Bindings
 ): Promise<boolean> {
-  if (!paymentId || !env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+  const keyId = env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+  if (!paymentId || !keyId || !keySecret) {
     return false;
   }
   try {
-    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const authHeader = `Basic ${btoa(`${keyId}:${keySecret}`)}`;
     const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
       headers: { Authorization: authHeader },
     });
@@ -72,11 +74,13 @@ async function verifyPaymentLinkWithRazorpayApi(
   linkId: string,
   env: Bindings
 ): Promise<boolean> {
-  if (!linkId || !env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+  const keyId = env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+  if (!linkId || !keyId || !keySecret) {
     return false;
   }
   try {
-    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const authHeader = `Basic ${btoa(`${keyId}:${keySecret}`)}`;
     const res = await fetch(`https://api.razorpay.com/v1/payment_links/${linkId}`, {
       headers: { Authorization: authHeader },
     });
@@ -103,11 +107,13 @@ async function verifyOrderWithRazorpayApi(
   orderId: string,
   env: Bindings
 ): Promise<boolean> {
-  if (!orderId || !env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+  const keyId = env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+  if (!orderId || !keyId || !keySecret) {
     return false;
   }
   try {
-    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const authHeader = `Basic ${btoa(`${keyId}:${keySecret}`)}`;
     const res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
       headers: { Authorization: authHeader },
     });
@@ -126,6 +132,15 @@ async function verifyOrderWithRazorpayApi(
     return false;
   }
 }
+
+// GET /api/webhooks/razorpay - Public healthcheck / verification helper
+webhooksRouter.get('/razorpay', (c) => {
+  return c.json({
+    status: 'ok',
+    service: 'InfoHQ Command Center Razorpay Webhook',
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // POST /api/webhooks/razorpay - Public Razorpay webhook listener
 webhooksRouter.post('/razorpay', async (c) => {

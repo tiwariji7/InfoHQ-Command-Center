@@ -6,7 +6,12 @@ import {
   UpdatePaymentSchema,
   RecordPaymentSchema,
 } from '@infohq/shared';
-import { createRazorpayPaymentLink, sendTelegramPaymentLinkAlert, sendInvoiceEmailViaResend } from '../services/billingService.js';
+import {
+  createRazorpayPaymentLink,
+  sendTelegramPaymentLinkAlert,
+  sendInvoiceEmailViaResend,
+  handleRazorpayWebhookEvent,
+} from '../services/billingService.js';
 import {
   getPayments,
   getPaymentById,
@@ -274,5 +279,79 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
   }
 
   return c.json({ success: true, paymentLinkUrl: rzpResult.shortUrl });
+});
+
+// POST /api/payments/:id/sync-razorpay - Verify & sync payment status directly from Razorpay
+paymentsRouter.post('/:id/sync-razorpay', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const paymentId = c.req.param('id');
+  const payment = await getPaymentById(c.env.DB, paymentId);
+  if (!payment) {
+    return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
+  }
+
+  const linkId = payment.razorpayPaymentLinkId;
+  const keyId = c.env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = c.env.RAZORPAY_KEY_SECRET?.trim();
+
+  if (!linkId || !keyId || !keySecret) {
+    return c.json({
+      error: 'bad_request',
+      message: 'No Razorpay payment link or API credentials associated with this invoice.',
+    }, 400);
+  }
+
+  try {
+    const authHeader = `Basic ${btoa(`${keyId}:${keySecret}`)}`;
+    const res = await fetch(`https://api.razorpay.com/v1/payment_links/${linkId}`, {
+      headers: { Authorization: authHeader },
+    });
+
+    if (!res.ok) {
+      return c.json({
+        error: 'razorpay_error',
+        message: `Razorpay API returned HTTP ${res.status}`,
+      }, 502);
+    }
+
+    const linkData = (await res.json()) as Record<string, unknown>;
+    const linkStatus = String(linkData.status || '').toLowerCase();
+
+    if (linkStatus === 'paid') {
+      const mockEvent = {
+        event: 'payment_link.paid',
+        payload: {
+          payment_link: {
+            entity: linkData,
+          },
+        },
+      };
+
+      await handleRazorpayWebhookEvent(mockEvent, c.env);
+      const updatedPayment = await getPaymentById(c.env.DB, paymentId);
+      return c.json({
+        success: true,
+        message: 'Payment synchronized from Razorpay as PAID!',
+        linkStatus,
+        payment: updatedPayment,
+      });
+    }
+
+    return c.json({
+      success: true,
+      message: `Razorpay reports link status as: ${linkStatus}`,
+      linkStatus,
+      payment,
+    });
+  } catch (err) {
+    console.error('Error syncing Razorpay status:', err);
+    return c.json({
+      error: 'internal_error',
+      message: err instanceof Error ? err.message : 'Sync failed.',
+    }, 500);
+  }
 });
 

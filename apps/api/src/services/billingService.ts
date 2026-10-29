@@ -48,8 +48,6 @@ export async function createRazorpayPaymentLink(
       invoiceNumber,
       platform: 'InfoHQ Command Center',
     },
-    callback_url: 'https://commandcenter.infohq.in/billing',
-    callback_method: 'get',
   };
 
   const authHeader = `Basic ${btoa(`${keys.keyId}:${keys.keySecret}`)}`;

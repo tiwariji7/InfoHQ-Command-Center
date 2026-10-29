@@ -95,8 +95,9 @@ app.get('/api/me', requireSuperadmin, (c) => {
 // Public: Website and landing page inbound lead intake webhook
 app.route('/api/intake', intakeRouter);
 
-// Public: Razorpay & external payment webhooks
+// Public: Razorpay & external payment webhooks (supports both plural and singular)
 app.route('/api/webhooks', webhooksRouter);
+app.route('/api/webhook', webhooksRouter);
 
 // Protected: Leads core router
 app.route('/api/leads', leadsRouter);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Payment, PaymentSummary } from '@infohq/shared';
-import { fetchPayments, deletePaymentApi } from '../../lib/api.js';
+import { fetchPayments, deletePaymentApi, syncRazorpayPaymentApi } from '../../lib/api.js';
 import { CreatePaymentModal } from './CreatePaymentModal.js';
 import { RecordPaymentModal } from './RecordPaymentModal.js';
 import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
@@ -72,6 +72,21 @@ export const PaymentsView: React.FC = () => {
       prev.map((p) => (p.id === updatedPayment.id ? updatedPayment : p))
     );
     loadPayments();
+  };
+
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleSyncRazorpay = async (paymentId: string) => {
+    setSyncingId(paymentId);
+    try {
+      const res = await syncRazorpayPaymentApi(getToken, paymentId);
+      alert(res.message || 'Payment status updated.');
+      loadPayments();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to sync with Razorpay.');
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const handleDelete = async (paymentId: string) => {
@@ -413,6 +428,18 @@ export const PaymentsView: React.FC = () => {
                       {/* Actions */}
                       <td className="py-4 px-5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center gap-1.5 justify-end">
+                          {!isPaid && py.razorpayPaymentLinkId && (
+                            <button
+                              onClick={() => handleSyncRazorpay(py.id)}
+                              disabled={syncingId === py.id}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-colors disabled:opacity-50"
+                              title="Check & sync live status from Razorpay"
+                            >
+                              <RefreshCw size={11} className={syncingId === py.id ? 'animate-spin' : ''} />
+                              <span>Sync</span>
+                            </button>
+                          )}
+
                           {!isPaid && (
                             <button
                               onClick={() => setSelectedPaymentForRecord(py)}
