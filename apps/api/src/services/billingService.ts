@@ -104,63 +104,138 @@ export async function sendInvoiceEmailViaResend(
     dueDateFormatted,
   } = params;
 
+  const formattedAmount = '₹' + amount.toLocaleString('en-IN');
+  const formattedBudget = totalBudget > 0 ? '₹' + totalBudget.toLocaleString('en-IN') : formattedAmount;
+
   const html = `
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Invoice from InfoHQ Pvt Ltd</title>
+  <title>Invoice ${invoiceNumber} from InfoHQ Pvt Ltd</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #F8F7FC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1A085C; }
-    .container { max-width: 600px; margin: 30px auto; background: #FFFFFF; border-radius: 16px; border: 1px solid #EDE8F5; overflow: hidden; box-shadow: 0 10px 30px rgba(26,8,92,0.06); }
-    .header { background: #FFFFFF; padding: 32px 36px 20px; border-bottom: 1px solid #EDE8F5; }
-    .brand { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, #7C5CE8, #6366F1, #5B4CF5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #FAF5FF; color: #6B21A8; border: 1px solid #F3E8FF; }
-    .content { padding: 32px 36px; }
-    .title { font-size: 22px; font-weight: 800; margin: 0 0 8px; color: #1A085C; }
-    .meta-box { background: #FAF9FD; border-radius: 12px; border: 1px solid #EDE8F5; padding: 18px 22px; margin: 24px 0; }
-    .row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #EDE8F5; }
-    .row:last-child { border-bottom: none; font-weight: 800; font-size: 15px; color: #7C3AED; }
-    .btn { display: inline-block; width: 100%; box-sizing: border-box; text-align: center; padding: 15px 20px; border-radius: 12px; background: linear-gradient(90deg, #7C3AED, #8B5CF6); color: #FFFFFF !important; font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3); margin-top: 10px; }
-    .footer { background: #FAF9FD; padding: 24px 36px; text-align: center; font-size: 11px; color: #6B7280; border-top: 1px solid #EDE8F5; }
+    body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A; }
+    .wrapper { max-width: 620px; margin: 30px auto; background: #FFFFFF; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
+    .header { padding: 32px 36px 24px; border-bottom: 1px solid #F1F5F9; }
+    .brand-title { font-size: 26px; font-weight: 900; color: #0F172A; margin: 0; letter-spacing: -0.5px; }
+    .brand-blue { color: #2563EB; }
+    .brand-sub { font-size: 13px; font-weight: 600; color: #64748B; margin-top: 2px; }
+    .brand-desc { font-size: 11px; color: #94A3B8; margin-top: 6px; line-height: 1.4; }
+    .badge { display: inline-block; padding: 5px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; text-transform: uppercase; letter-spacing: 0.5px; }
+    .content { padding: 28px 36px; }
+    .cards-table { width: 100%; border-collapse: separate; border-spacing: 12px 0; margin-bottom: 24px; }
+    .card-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; vertical-align: top; }
+    .card-label { font-size: 10px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .card-value { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 2px; }
+    .card-detail { font-size: 12px; color: #64748B; }
+    .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
+    .items-table th { background: #F8FAFC; padding: 10px 14px; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid #E2E8F0; text-align: left; }
+    .items-table td { padding: 14px; font-size: 12px; border-bottom: 1px solid #F1F5F9; color: #1E293B; }
+    .summary-box { margin-top: 20px; padding: 16px; background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 12px; }
+    .summary-row { display: flex; justify-content: space-between; font-size: 13px; color: #1E293B; margin-bottom: 6px; }
+    .summary-total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: #1D4ED8; padding-top: 8px; border-top: 1px dashed #BFDBFE; }
+    .btn { display: block; box-sizing: border-box; text-align: center; padding: 14px 24px; border-radius: 12px; background: #2563EB; color: #FFFFFF !important; font-size: 14px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 14px rgba(37,99,235,0.3); margin: 24px 0 10px; }
+    .footer { background: #F8FAFC; padding: 22px 36px; text-align: center; font-size: 11px; color: #64748B; border-top: 1px solid #E2E8F0; line-height: 1.6; }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="wrapper">
     <div class="header">
-      <table width="100%">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="brand">InfoHQ</span></td>
-          <td align="right"><span class="badge">Milestone Invoice</span></td>
+          <td valign="top">
+            <h1 class="brand-title">Info<span class="brand-blue">HQ</span></h1>
+            <div class="brand-sub">Pvt Ltd</div>
+            <div class="brand-desc">
+              Engineering Studio for AI, SaaS &amp; Digital Systems<br>
+              Prayagraj, Uttar Pradesh, India • billing@infohq.in
+            </div>
+          </td>
+          <td align="right" valign="top">
+            <span class="badge">PAYMENT DUE</span>
+            <div style="font-size: 18px; font-weight: 900; color: #0F172A; margin-top: 8px; letter-spacing: 0.5px;">INVOICE</div>
+            <div style="font-size: 12px; font-family: monospace; font-weight: 700; color: #1D4ED8; margin-top: 4px;">${invoiceNumber}</div>
+            <div style="font-size: 11px; color: #64748B; margin-top: 4px;">Due Date: <strong>${dueDateFormatted}</strong></div>
+          </td>
         </tr>
       </table>
     </div>
-    <div class="content">
-      <h1 class="title">Advance Payment Invoice</h1>
-      <p style="font-size: 14px; color: #4B5563; line-height: 1.6; margin: 0;">
-        Hello <strong>${clientName}</strong>, thank you for choosing InfoHQ! Your milestone advance invoice has been generated for <strong>${projectTitle}</strong>.
-      </p>
 
-      <div class="meta-box">
-        <div class="row"><span>Invoice Number:</span><span><strong>${invoiceNumber}</strong></span></div>
-        <div class="row"><span>Due Date:</span><span>${dueDateFormatted}</span></div>
-        <div class="row"><span>Total Project Value:</span><span>₹${totalBudget.toLocaleString('en-IN')}</span></div>
-        <div class="row"><span>40% Advance Due:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
-      </div>
+    <div class="content">
+      <table class="cards-table" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="card-box" width="50%">
+            <div class="card-label">BILL TO</div>
+            <div class="card-value">${clientName}</div>
+            <div class="card-detail">${clientEmail}</div>
+          </td>
+          <td class="card-box" width="50%">
+            <div class="card-label">PROJECT DELIVERABLE</div>
+            <div class="card-value">${projectTitle}</div>
+            <div class="card-detail">Milestone Payment</div>
+          </td>
+        </tr>
+      </table>
+
+      <table class="items-table" cellpadding="0" cellspacing="0" border="0">
+        <thead>
+          <tr>
+            <th width="40">#</th>
+            <th>DESCRIPTION</th>
+            <th width="50" style="text-align: center;">QTY</th>
+            <th width="100" style="text-align: right;">AMOUNT</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color: #94A3B8; font-family: monospace;">1</td>
+            <td><strong>${projectTitle}</strong><br><span style="color: #64748B; font-size: 11px;">Milestone kickoff &amp; system architecture deliverables</span></td>
+            <td style="text-align: center; color: #64748B;">1</td>
+            <td style="text-align: right; font-weight: 800; color: #0F172A;">${formattedAmount}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table width="100%" style="margin-top: 20px;" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td valign="top" style="font-size: 11px; color: #64748B; line-height: 1.5; padding-right: 20px;">
+            <strong style="color: #475569; text-transform: uppercase; font-size: 10px;">Payment Terms &amp; Notes</strong><br>
+            Online settlement via UPI, Debit/Credit Card, or NetBanking powered by secure Razorpay checkout.
+          </td>
+          <td width="220" valign="top">
+            <div class="summary-box">
+              <table width="100%" style="font-size: 12px; color: #475569;" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>Subtotal:</td>
+                  <td align="right" style="font-weight: 600; color: #0F172A;">${formattedAmount}</td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 4px;">Tax / GST:</td>
+                  <td align="right" style="padding-top: 4px; font-weight: 600; color: #0F172A;">Nil / Exempt</td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding-top: 8px; border-top: 1px dashed #BFDBFE;"></td>
+                </tr>
+                <tr style="font-size: 14px; font-weight: 900; color: #1D4ED8;">
+                  <td>Balance Due:</td>
+                  <td align="right">${formattedAmount}</td>
+                </tr>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </table>
 
       ${
         paymentLinkUrl
-          ? `<a href="${paymentLinkUrl}" class="btn" target="_blank">Pay ₹${amount.toLocaleString('en-IN')} via UPI / Card (Razorpay)</a>`
+          ? `<a href="${paymentLinkUrl}" class="btn" target="_blank">Click Here to Pay ${formattedAmount} Online</a>`
           : ''
       }
-
-      <p style="font-size: 12px; color: #6B7280; margin-top: 24px; text-align: center;">
-        Direct Bank Transfer (NEFT/IMPS) or UPI available on the secure payment link above.
-      </p>
     </div>
+
     <div class="footer">
       <strong>InfoHQ Pvt Ltd</strong> • Prayagraj, India<br>
-      For any inquiries, contact <a href="mailto:billing@infohq.in" style="color: #7C3AED;">billing@infohq.in</a>
+      This is a computer-generated tax invoice. For queries, contact <a href="mailto:billing@infohq.in" style="color: #2563EB; text-decoration: none;">billing@infohq.in</a>.
     </div>
   </div>
 </body>

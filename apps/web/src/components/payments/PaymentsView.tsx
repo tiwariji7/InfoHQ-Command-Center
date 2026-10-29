@@ -5,6 +5,7 @@ import { fetchPayments, deletePaymentApi, syncRazorpayPaymentApi } from '../../l
 import { CreatePaymentModal } from './CreatePaymentModal.js';
 import { RecordPaymentModal } from './RecordPaymentModal.js';
 import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
+import { PrintableInvoiceModal } from './PrintableInvoiceModal.js';
 import {
   Plus,
   Search,
@@ -16,6 +17,7 @@ import {
   Clock,
   Building2,
   FileCheck2,
+  FileText,
 } from 'lucide-react';
 
 export const PaymentsView: React.FC = () => {
@@ -39,6 +41,7 @@ export const PaymentsView: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedPaymentForRecord, setSelectedPaymentForRecord] = useState<Payment | null>(null);
   const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<Payment | null>(null);
+  const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Payment | null>(null);
 
   const loadPayments = async () => {
     setIsLoading(true);
@@ -452,6 +455,15 @@ export const PaymentsView: React.FC = () => {
                           )}
 
                           <button
+                            onClick={() => setSelectedInvoiceForPrint(py)}
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            title="View & Download Invoice PDF"
+                          >
+                            <FileText size={11} />
+                            <span>Invoice</span>
+                          </button>
+
+                          <button
                             onClick={() => handleDelete(py.id)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             title="Delete Record"
@@ -494,6 +506,15 @@ export const PaymentsView: React.FC = () => {
         }}
         onDeletePayment={handleDelete}
       />
+
+      {/* Printable Invoice Modal (PDF & Print) */}
+      {selectedInvoiceForPrint && (
+        <PrintableInvoiceModal
+          isOpen={Boolean(selectedInvoiceForPrint)}
+          onClose={() => setSelectedInvoiceForPrint(null)}
+          payment={selectedInvoiceForPrint}
+        />
+      )}
     </div>
   );
 };
