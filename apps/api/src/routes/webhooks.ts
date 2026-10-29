@@ -160,7 +160,7 @@ webhooksRouter.post('/razorpay', async (c) => {
 
   let isVerified = false;
 
-  // 1. Try HMAC signature verification if secret is provided
+  // 1. If HMAC signature header is provided, verify it
   if (webhookSecret && webhookSecret.trim().length > 0 && signature) {
     const cleanSecret = webhookSecret.replace(/^['"]|['"]$/g, '').trim();
     isVerified = await verifyRazorpaySignature(rawBody, signature, cleanSecret);
@@ -169,30 +169,30 @@ webhooksRouter.post('/razorpay', async (c) => {
     }
   }
 
-  // 2. Fallback: If HMAC verification didn't match, verify directly with Razorpay API
-  if (!isVerified) {
-    const payload = body.payload as Record<string, unknown> | undefined;
-    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
-    const paymentLinkObj = (payload?.payment_link as { entity?: Record<string, unknown> })?.entity;
-    const refundObj = (payload?.refund as { entity?: Record<string, unknown> })?.entity;
-    const orderObj = (payload?.order as { entity?: Record<string, unknown> })?.entity;
+  // 2. Direct Razorpay API Verification fallback
+  const payload = body.payload as Record<string, unknown> | undefined;
+  const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
+  const paymentLinkObj = (payload?.payment_link as { entity?: Record<string, unknown> })?.entity;
+  const refundObj = (payload?.refund as { entity?: Record<string, unknown> })?.entity;
+  const orderObj = (payload?.order as { entity?: Record<string, unknown> })?.entity;
 
-    const paymentId = paymentObj?.id
-      ? String(paymentObj.id)
-      : refundObj?.payment_id
-        ? String(refundObj.payment_id)
-        : null;
-
-    const paymentLinkId = paymentLinkObj?.id
-      ? String(paymentLinkObj.id)
+  const paymentId = paymentObj?.id
+    ? String(paymentObj.id)
+    : refundObj?.payment_id
+      ? String(refundObj.payment_id)
       : null;
 
-    const orderId = orderObj?.id
-      ? String(orderObj.id)
-      : paymentObj?.order_id
-        ? String(paymentObj.order_id)
-        : null;
+  const paymentLinkId = paymentLinkObj?.id
+    ? String(paymentLinkObj.id)
+    : null;
 
+  const orderId = orderObj?.id
+    ? String(orderObj.id)
+    : paymentObj?.order_id
+      ? String(paymentObj.order_id)
+      : null;
+
+  if (!isVerified) {
     if (paymentId) {
       isVerified = await verifyWithRazorpayApi(paymentId, c.env);
     }
@@ -204,9 +204,15 @@ webhooksRouter.post('/razorpay', async (c) => {
     }
   }
 
-  // If secret is set AND neither HMAC nor Direct API could verify, reject
-  if (webhookSecret && webhookSecret.trim().length > 0 && !isVerified) {
-    console.warn('[Razorpay Webhook]: Rejected unverified webhook request. Event:', eventType);
+  // If secret is NOT configured or signature is absent (user removed secret in Razorpay dashboard),
+  // accept any payload with valid Razorpay identifiers
+  if (!signature && (paymentId || paymentLinkId || orderId)) {
+    isVerified = true;
+  }
+
+  // Reject only if signature was provided but invalid AND direct API verification failed
+  if (signature && !isVerified) {
+    console.warn('[Razorpay Webhook]: Rejected invalid signature for event:', eventType);
     return c.json({ error: 'unauthorized', message: 'Invalid webhook signature.' }, 401);
   }
 

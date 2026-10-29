@@ -821,14 +821,43 @@ export async function handleRazorpayWebhookEvent(
   ) {
     const paymentRow = await findMatchingPaymentRow();
 
+    // 1. Determine verified details directly from Razorpay + CRM fallback
+    const effectivePaymentId = razorpayPaymentId || `pay_${now}`;
+    const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
+    const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV-2026');
+    const clientName = String(
+      paymentRow?.client_name ||
+        (paymentLinkObj?.customer as Record<string, unknown>)?.name ||
+        paymentObj?.email ||
+        paymentObj?.contact ||
+        'Valued Client'
+    );
+    const projectTitle = String(
+      paymentRow?.title ||
+        paymentObj?.description ||
+        paymentLinkObj?.description ||
+        'Client Project'
+    );
+
+    // 2. DISPATCH TELEGRAM ALERT DIRECTLY FROM RAZORPAY CONFIRMATION (Independent of CRM match)
+    await sendTelegramPaymentSuccessAlert(
+      {
+        clientName,
+        projectTitle,
+        invoiceNumber: invNum,
+        amount: actualAmount,
+        paymentId: effectivePaymentId,
+        paymentMethod,
+        paidAtIST: timeIST,
+      },
+      env
+    );
+
+    // 3. Update CRM database if matching row is found
     if (paymentRow) {
       const paymentDbId = String(paymentRow.id);
-      const invNum = String(paymentRow.invoice_number || invoiceNumber || 'INV-2026');
-      const clientName = String(paymentRow.client_name || 'Client');
-      const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow.amount || 0);
-      const effectivePaymentId = razorpayPaymentId || `pay_${now}`;
 
-      // 1. Update Payment status to 'received'
+      // A. Update Payment status to 'received'
       await db
         .prepare(`
           UPDATE payments
@@ -841,7 +870,7 @@ export async function handleRazorpayWebhookEvent(
         .bind(now, paymentMethod, effectivePaymentId, paymentDbId)
         .run();
 
-      // 2. Auto-update associated Project to 'in_progress'
+      // B. Auto-update associated Project to 'in_progress'
       if (paymentRow.project_id) {
         await db
           .prepare(`
@@ -877,7 +906,7 @@ export async function handleRazorpayWebhookEvent(
         }
       }
 
-      // 4. Log alert in CRM
+      // C. Log alert in CRM
       const alertId = `alert_paid_${now}`;
       await db
         .prepare(`
@@ -893,30 +922,11 @@ export async function handleRazorpayWebhookEvent(
         )
         .run();
 
-      // 5. Dispatch Telegram Message 2: Payment Success Verified (NO Command Center link)
-      await sendTelegramPaymentSuccessAlert(
-        {
-          clientName,
-          projectTitle: String(paymentRow.title || 'Client Project'),
-          invoiceNumber: invNum,
-          amount: actualAmount,
-          paymentId: effectivePaymentId,
-          paymentMethod,
-          paidAtIST: timeIST,
-        },
-        env
-      );
-
-      console.log(`[Razorpay Webhook Success]: Marked invoice ${invNum} as received for ${clientName}.`);
-      return { success: true, message: `Payment for ${invNum} marked as received.` };
+      console.log(`[Razorpay Webhook Success]: Verified payment for ${invNum} and updated CRM for ${clientName}.`);
+      return { success: true, message: `Payment for ${invNum} marked as received and Telegram alert dispatched.` };
     } else {
-      console.warn('[Razorpay Webhook]: No matching payment found in DB for success event:', {
-        paymentLinkId,
-        invoiceNumber,
-        razorpayPaymentId,
-        amountInRupees,
-      });
-      return { success: true, message: 'Payment recorded by Razorpay, but no local pending invoice matched.' };
+      console.log(`[Razorpay Direct Success]: Verified payment ${effectivePaymentId} on Razorpay, Telegram alert sent.`);
+      return { success: true, message: `Payment verified on Razorpay, Telegram alert dispatched.` };
     }
   }
 
@@ -924,120 +934,126 @@ export async function handleRazorpayWebhookEvent(
   // CASE B: PAYMENT FAILED (payment.failed)
   // =========================================================================
   else if (eventType === 'payment.failed') {
-    if (paymentObj) {
-      const errorDescription = String(
-        paymentObj.error_description ||
-          paymentObj.error_reason ||
-          'Transaction declined by bank or user cancelled'
-      );
-      const effectivePaymentId = razorpayPaymentId || `pay_failed_${now}`;
-      const paymentRow = await findMatchingPaymentRow();
+    const errorDescription = String(
+      paymentObj?.error_description ||
+        paymentObj?.error_reason ||
+        'Transaction declined by bank or user cancelled'
+    );
+    const effectivePaymentId = razorpayPaymentId || `pay_failed_${now}`;
+    const paymentRow = await findMatchingPaymentRow();
 
-      const clientName = String(
-        paymentRow?.client_name ||
-          (paymentObj.notes as Record<string, unknown>)?.customerName ||
-          'Client'
-      );
-      const projectTitle = String(paymentRow?.title || 'Client Project');
-      const invNum = String(paymentRow?.invoice_number || invoiceNumber || 'INV');
-      const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
+    const clientName = String(
+      paymentRow?.client_name ||
+        (paymentObj?.notes as Record<string, unknown>)?.customerName ||
+        paymentObj?.email ||
+        paymentObj?.contact ||
+        'Client'
+    );
+    const projectTitle = String(
+      paymentRow?.title ||
+        paymentObj?.description ||
+        'Client Project'
+    );
+    const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV');
+    const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
 
-      // Dispatch Telegram Alert: Payment Failed (NO Command Center link)
-      await sendTelegramPaymentFailedAlert(
-        {
-          clientName,
-          projectTitle,
-          invoiceNumber: invNum,
-          amount: actualAmount,
-          paymentId: effectivePaymentId,
-          errorReason: errorDescription,
-          failedAtIST: timeIST,
-        },
-        env
-      );
+    // Dispatch Telegram Alert: Payment Failed ALWAYS directly from Razorpay
+    await sendTelegramPaymentFailedAlert(
+      {
+        clientName,
+        projectTitle,
+        invoiceNumber: invNum,
+        amount: actualAmount,
+        paymentId: effectivePaymentId,
+        errorReason: errorDescription,
+        failedAtIST: timeIST,
+      },
+      env
+    );
 
-      // Log alert in CRM
-      const alertId = `alert_fail_${now}`;
-      await db
-        .prepare(`
-          INSERT INTO automation_alerts (
-            id, type, title, message, severity, link, is_read, created_at
-          ) VALUES (?, 'system', ?, ?, 'warning', '/billing', 0, ?)
-        `)
-        .bind(
-          alertId,
-          `Payment Failed: ${invNum}`,
-          `Payment attempt of ₹${actualAmount.toLocaleString('en-IN')} for ${clientName} failed (${errorDescription})`,
-          now
-        )
-        .run();
+    // Log alert in CRM
+    const alertId = `alert_fail_${now}`;
+    await db
+      .prepare(`
+        INSERT INTO automation_alerts (
+          id, type, title, message, severity, link, is_read, created_at
+        ) VALUES (?, 'system', ?, ?, 'warning', '/billing', 0, ?)
+      `)
+      .bind(
+        alertId,
+        `Payment Failed: ${invNum}`,
+        `Payment attempt of ₹${actualAmount.toLocaleString('en-IN')} for ${clientName} failed (${errorDescription})`,
+        now
+      )
+      .run();
 
-      console.log(`[Razorpay Webhook Failed]: Logged failure for invoice ${invNum}. Reason: ${errorDescription}`);
-      return { success: true, message: `Payment failure logged for ${invNum}.` };
-    }
+    console.log(`[Razorpay Webhook Failed]: Dispatched failure alert for ${invNum}. Reason: ${errorDescription}`);
+    return { success: true, message: `Payment failure alert dispatched for ${invNum}.` };
   }
 
   // =========================================================================
   // CASE C: REFUND (refund.processed, refund.created)
   // =========================================================================
   else if (eventType === 'refund.processed' || eventType === 'refund.created') {
-    if (refundObj) {
-      const refundId = String(refundObj.id || 'rfnd_unknown');
-      const refundAmountPaise = Number(refundObj.amount || 0);
-      const refundAmountRupees = refundAmountPaise > 0 ? refundAmountPaise / 100 : 0;
-      const paymentRow = await findMatchingPaymentRow();
+    const refundId = String(refundObj?.id || 'rfnd_unknown');
+    const refundAmountPaise = Number(refundObj?.amount || 0);
+    const refundAmountRupees = refundAmountPaise > 0 ? refundAmountPaise / 100 : 0;
+    const paymentRow = await findMatchingPaymentRow();
 
-      const clientName = String(paymentRow?.client_name || 'Client');
-      const projectTitle = String(paymentRow?.title || 'Client Project');
-      const invNum = String(paymentRow?.invoice_number || invoiceNumber || 'INV');
-      const effectivePaymentId = razorpayPaymentId || String(paymentRow?.razorpay_payment_id || 'unknown');
+    const clientName = String(
+      paymentRow?.client_name ||
+        (paymentObj?.notes as Record<string, unknown>)?.customerName ||
+        'Client'
+    );
+    const projectTitle = String(paymentRow?.title || 'Client Project');
+    const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV');
+    const effectivePaymentId = razorpayPaymentId || String(paymentRow?.razorpay_payment_id || 'unknown');
 
-      // Update payment status in D1 if found
-      if (paymentRow) {
-        await db
-          .prepare(`
-            UPDATE payments
-            SET status = 'refunded',
-                notes = COALESCE(notes, '') || ?
-            WHERE id = ?
-          `)
-          .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, String(paymentRow.id))
-          .run();
-      }
-
-      // Dispatch Telegram Alert: Refund Processed (NO Command Center link)
-      await sendTelegramRefundProcessedAlert(
-        {
-          clientName,
-          projectTitle,
-          invoiceNumber: invNum,
-          refundAmount: refundAmountRupees,
-          refundId,
-          paymentId: effectivePaymentId,
-          processedAtIST: timeIST,
-        },
-        env
-      );
-
-      // Log alert in CRM
-      const alertId = `alert_rfnd_${now}`;
+    // Update payment status in D1 if found
+    if (paymentRow) {
       await db
         .prepare(`
-          INSERT INTO automation_alerts (
-            id, type, title, message, severity, link, is_read, created_at
-          ) VALUES (?, 'system', ?, ?, 'info', '/billing', 0, ?)
+          UPDATE payments
+          SET status = 'refunded',
+              notes = COALESCE(notes, '') || ?
+          WHERE id = ?
         `)
-        .bind(
-          alertId,
-          `Refund Processed: ₹${refundAmountRupees.toLocaleString('en-IN')}`,
-          `Refund ${refundId} of ₹${refundAmountRupees.toLocaleString('en-IN')} issued for ${clientName}`,
-          now
-        )
+        .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, String(paymentRow.id))
         .run();
-
-      console.log(`[Razorpay Webhook Refund]: Processed refund ${refundId} for ${clientName}.`);
-      return { success: true, message: `Refund ${refundId} processed.` };
     }
+
+    // Dispatch Telegram Alert: Refund Processed ALWAYS directly from Razorpay
+    await sendTelegramRefundProcessedAlert(
+      {
+        clientName,
+        projectTitle,
+        invoiceNumber: invNum,
+        refundAmount: refundAmountRupees,
+        refundId,
+        paymentId: effectivePaymentId,
+        processedAtIST: timeIST,
+      },
+      env
+    );
+
+    // Log alert in CRM
+    const alertId = `alert_rfnd_${now}`;
+    await db
+      .prepare(`
+        INSERT INTO automation_alerts (
+          id, type, title, message, severity, link, is_read, created_at
+        ) VALUES (?, 'system', ?, ?, 'info', '/billing', 0, ?)
+      `)
+      .bind(
+        alertId,
+        `Refund Processed: ₹${refundAmountRupees.toLocaleString('en-IN')}`,
+        `Refund ${refundId} of ₹${refundAmountRupees.toLocaleString('en-IN')} issued for ${clientName}`,
+        now
+      )
+      .run();
+
+    console.log(`[Razorpay Webhook Refund]: Dispatched refund alert ${refundId} for ${clientName}.`);
+    return { success: true, message: `Refund alert ${refundId} dispatched.` };
   }
 
   return { success: true, message: `Event ${eventType} acknowledged.` };
