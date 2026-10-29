@@ -694,15 +694,15 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 </form>
               </div>
 
-              {/* Convert to Project & 40% Advance Invoice Footer CTA */}
+              {/* Convert to Project & Advance Invoice Footer CTA */}
               <div className="p-3 rounded-xl bg-gradient-to-r from-[#EDE9FE] to-[#F5F3FF] border border-[#DDD6FE] flex items-center justify-between gap-2 shadow-2xs">
                 <div>
                   <div className="text-xs font-black text-[#1A085C] flex items-center gap-1">
                     <Trophy size={13} className="text-amber-500" />
-                    <span>Won Deal & 40% Advance</span>
+                    <span>Win Deal & Create Project</span>
                   </div>
                   <div className="text-[10px] text-brand-muted">
-                    Auto-create project, Razorpay link & Resend invoice
+                    Auto-generate advance invoice, Razorpay link & Resend email
                   </div>
                 </div>
                 <button

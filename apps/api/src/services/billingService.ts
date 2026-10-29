@@ -217,10 +217,9 @@ export async function sendTelegramPaymentLinkAlert(
     `👤 *Client:* ${params.clientName}\n` +
     `💼 *Project:* ${params.projectTitle}\n` +
     `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
-    `💰 *Advance Due (40%):* ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `💰 *Advance Milestone:* ₹${params.amount.toLocaleString('en-IN')}\n` +
     `📊 *Total Contract Value:* ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
-    `🔗 *Payment Link:* ${params.paymentLinkUrl || 'Direct settlement'}\n\n` +
-    `⚡️ [Open Billing in Command Center](https://commandcenter.infohq.in/billing)`;
+    `🔗 *Payment Link:* ${params.paymentLinkUrl || 'Direct settlement'}`;
 
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -263,8 +262,7 @@ export async function sendTelegramPaymentSuccessAlert(
     `💳 *Razorpay ID:* \`${params.paymentId}\`\n` +
     `🏦 *Method:* ${params.paymentMethod || 'UPI / Online'}\n` +
     `📅 *Settled At:* ${params.paidAtIST}\n\n` +
-    `🚀 *CRM Action:* Invoice marked as PAID & Receipt logged.\n` +
-    `⚡️ [View Receipt in Command Center](https://commandcenter.infohq.in/billing)`;
+    `🚀 *CRM Action:* Invoice marked as PAID & Receipt logged.`;
 
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -307,8 +305,7 @@ export async function sendTelegramPaymentFailedAlert(
     `❌ *Reason:* ${params.errorReason}\n` +
     `🆔 *Payment ID:* \`${params.paymentId}\`\n` +
     `⏱ *Failed At:* ${params.failedAtIST}\n\n` +
-    `ℹ️ Client se contact karein ya link dobara verify karein.\n` +
-    `⚡️ [Open Billing in Command Center](https://commandcenter.infohq.in/billing)`;
+    `ℹ️ Client se contact karein ya link dobara verify karein.`;
 
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -351,8 +348,7 @@ export async function sendTelegramRefundProcessedAlert(
     `🆔 *Refund ID:* \`${params.refundId}\`\n` +
     `💳 *Original Payment ID:* \`${params.paymentId}\`\n` +
     `⏱ *Processed At:* ${params.processedAtIST}\n\n` +
-    `ℹ️ Refund client ke original payment method par 5-7 din me settle hoga.\n` +
-    `⚡️ [Open Billing in Command Center](https://commandcenter.infohq.in/billing)`;
+    `ℹ️ Refund client ke original payment method par 5-7 din me settle hoga.`;
 
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -402,7 +398,13 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   const deadline = now + deadlineDays * 24 * 60 * 60 * 1000;
   const totalBudget = input.totalBudget;
   const advancePercent = input.advancePercentage || 40;
-  const advanceAmount = Math.round((totalBudget * advancePercent) / 100);
+  const advanceAmount = input.customAdvanceAmount && input.customAdvanceAmount > 0
+    ? Math.round(input.customAdvanceAmount)
+    : Math.max(1, Math.round((totalBudget * advancePercent) / 100));
+
+  const advanceLabel = input.customAdvanceAmount && input.customAdvanceAmount > 0
+    ? `Advance Milestone: ${serviceNeeded}`
+    : `${advancePercent}% Advance Milestone: ${serviceNeeded}`;
 
   // 2. Create Project in projects table
   const projectId = `proj_${crypto.randomUUID()}`;
@@ -411,14 +413,17 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   await db
     .prepare(`
       INSERT INTO projects (
-        id, lead_id, title, client_name, status, budget, start_date, deadline, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'in_progress', ?, ?, ?, ?, ?)
+        id, lead_id, title, client_name, client_email, client_phone, company, status, budget, start_date, deadline, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
     `)
     .bind(
       projectId,
       leadId,
       projectTitle,
       clientName,
+      clientEmail,
+      clientPhone,
+      company,
       `₹${totalBudget.toLocaleString('en-IN')}`,
       now,
       deadline,
@@ -445,7 +450,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   const lineItems = [
     {
       num: 1,
-      desc: `${advancePercent}% Advance Milestone: ${serviceNeeded} Initiation & Architecture`,
+      desc: `${advanceLabel} Initiation & Architecture`,
       qty: 1,
       rate: advanceAmount,
       amount: advanceAmount,
@@ -464,7 +469,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
       {
         amount: advanceAmount,
         invoiceNumber,
-        description: `${advancePercent}% Advance: ${serviceNeeded}`,
+        description: `${advanceLabel}`,
         customer: {
           name: clientName,
           email: clientEmail,
@@ -499,7 +504,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
       clientName,
       clientEmail,
       clientPhone,
-      `${advancePercent}% Advance Milestone - ${serviceNeeded}`,
+      advanceLabel,
       dueDate,
       `Advance milestone billing for ${projectTitle}.`,
       razorpayLinkId,
@@ -524,7 +529,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
     .bind(
       activityId,
       leadId,
-      `Deal won! Converted to project "${projectTitle}" with 40% advance invoice ${invoiceNumber} (₹${advanceAmount.toLocaleString('en-IN')}).`,
+      `Deal won! Converted to project "${projectTitle}" with advance invoice ${invoiceNumber} (₹${advanceAmount.toLocaleString('en-IN')}).`,
       now
     )
     .run();
@@ -625,7 +630,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   };
 }
 
-// 6. Handle Razorpay Webhook Event for Payment Success
+// 6. Handle Razorpay Webhook Events (Payment Success, Failed, Refund)
 export async function handleRazorpayWebhookEvent(
   eventBody: Record<string, unknown>,
   env: Bindings
@@ -636,47 +641,120 @@ export async function handleRazorpayWebhookEvent(
   }
 
   const eventType = String(eventBody.event || '');
-  console.log('[Razorpay Webhook Received]:', eventType);
+  console.log('[Razorpay Webhook Processing]: eventType =', eventType);
 
-  // We handle payment_link.paid, payment.captured, or order.paid
-  if (eventType === 'payment_link.paid' || eventType === 'payment.captured') {
-    const payload = eventBody.payload as Record<string, unknown>;
-    const paymentLinkObj = (payload?.payment_link as { entity?: Record<string, unknown> })?.entity;
-    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
+  const payload = (eventBody.payload as Record<string, unknown>) || {};
+  const paymentLinkObj = (payload.payment_link as { entity?: Record<string, unknown> })?.entity;
+  const paymentObj = (payload.payment as { entity?: Record<string, unknown> })?.entity;
+  const refundObj = (payload.refund as { entity?: Record<string, unknown> })?.entity;
 
-    const paymentLinkId = paymentLinkObj?.id ? String(paymentLinkObj.id) : null;
-    const razorpayPaymentId = paymentObj?.id ? String(paymentObj.id) : `pay_${Date.now()}`;
-    const paymentMethod = paymentObj?.method ? String(paymentObj.method).toUpperCase() : 'UPI / Online';
-    const amountInPaise = Number(paymentObj?.amount || paymentLinkObj?.amount || 0);
-    const amountInRupees = amountInPaise > 0 ? amountInPaise / 100 : 0;
-    const now = Date.now();
+  const now = Date.now();
+  const timeIST = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(now));
 
-    // Find payment record in D1
-    let paymentRow: Record<string, unknown> | null = null;
+  // Extract all possible identifiers
+  const paymentLinkId = paymentLinkObj?.id
+    ? String(paymentLinkObj.id)
+    : paymentObj?.payment_link_id
+      ? String(paymentObj.payment_link_id)
+      : (paymentObj?.notes as Record<string, unknown>)?.paymentLinkId
+        ? String((paymentObj?.notes as Record<string, unknown>).paymentLinkId)
+        : null;
+
+  const razorpayPaymentId = paymentObj?.id
+    ? String(paymentObj.id)
+    : refundObj?.payment_id
+      ? String(refundObj.payment_id)
+      : null;
+
+  const paymentMethod = paymentObj?.method
+    ? String(paymentObj.method).toUpperCase()
+    : 'UPI / Online';
+
+  const amountInPaise = Number(paymentObj?.amount || paymentLinkObj?.amount || 0);
+  const amountInRupees = amountInPaise > 0 ? amountInPaise / 100 : 0;
+
+  // Invoice Number Extraction (from notes or description regex)
+  let invoiceNumber: string | null = null;
+  if (paymentLinkObj?.notes && (paymentLinkObj.notes as Record<string, unknown>).invoiceNumber) {
+    invoiceNumber = String((paymentLinkObj.notes as Record<string, unknown>).invoiceNumber);
+  } else if (paymentObj?.notes && (paymentObj.notes as Record<string, unknown>).invoiceNumber) {
+    invoiceNumber = String((paymentObj.notes as Record<string, unknown>).invoiceNumber);
+  } else {
+    const rawDesc = String(paymentObj?.description || paymentLinkObj?.description || '');
+    const match = rawDesc.match(/INV-\d+-\d+/i);
+    if (match) {
+      invoiceNumber = match[0].toUpperCase();
+    }
+  }
+
+  // Helper to find payment row in D1 across multiple search strategies
+  async function findMatchingPaymentRow(): Promise<Record<string, unknown> | null> {
+    // 1. By razorpay_payment_link_id
     if (paymentLinkId) {
-      paymentRow = await db
+      const row = await db
         .prepare('SELECT * FROM payments WHERE razorpay_payment_link_id = ?')
         .bind(paymentLinkId)
         .first<Record<string, unknown>>();
+      if (row) return row;
     }
 
-    if (!paymentRow && paymentLinkObj?.notes) {
-      const invoiceNum = (paymentLinkObj.notes as Record<string, unknown>)?.invoiceNumber;
-      if (invoiceNum) {
-        paymentRow = await db
-          .prepare('SELECT * FROM payments WHERE invoice_number = ?')
-          .bind(String(invoiceNum))
-          .first<Record<string, unknown>>();
-      }
+    // 2. By invoice_number
+    if (invoiceNumber) {
+      const row = await db
+        .prepare('SELECT * FROM payments WHERE invoice_number = ?')
+        .bind(invoiceNumber)
+        .first<Record<string, unknown>>();
+      if (row) return row;
     }
+
+    // 3. By razorpay_payment_id if already saved
+    if (razorpayPaymentId) {
+      const row = await db
+        .prepare('SELECT * FROM payments WHERE razorpay_payment_id = ?')
+        .bind(razorpayPaymentId)
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
+    // 4. By amount match for pending invoices
+    if (amountInRupees > 0) {
+      const row = await db
+        .prepare("SELECT * FROM payments WHERE status = 'pending' AND amount = ? ORDER BY created_at DESC")
+        .bind(String(amountInRupees))
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
+    return null;
+  }
+
+  // =========================================================================
+  // CASE A: PAYMENT SUCCESS (payment_link.paid, payment.captured, payment.authorized, order.paid)
+  // =========================================================================
+  if (
+    eventType === 'payment_link.paid' ||
+    eventType === 'payment.captured' ||
+    eventType === 'payment.authorized' ||
+    eventType === 'order.paid'
+  ) {
+    const paymentRow = await findMatchingPaymentRow();
 
     if (paymentRow) {
       const paymentDbId = String(paymentRow.id);
-      const invoiceNumber = String(paymentRow.invoice_number || 'INV-2026');
+      const invNum = String(paymentRow.invoice_number || invoiceNumber || 'INV-2026');
       const clientName = String(paymentRow.client_name || 'Client');
-      const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow.amount);
+      const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow.amount || 0);
+      const effectivePaymentId = razorpayPaymentId || `pay_${now}`;
 
-      // Update payment to 'received'
+      // 1. Update Payment status to 'received'
       await db
         .prepare(`
           UPDATE payments
@@ -686,34 +764,41 @@ export async function handleRazorpayWebhookEvent(
               razorpay_payment_id = ?
           WHERE id = ?
         `)
-        .bind(now, paymentMethod, razorpayPaymentId, paymentDbId)
+        .bind(now, paymentMethod, effectivePaymentId, paymentDbId)
         .run();
 
-      const timeIST = new Intl.DateTimeFormat('en-IN', {
-        timeZone: 'Asia/Kolkata',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }).format(new Date(now));
+      // 2. Auto-update associated Project to 'in_progress'
+      if (paymentRow.project_id) {
+        await db
+          .prepare(`
+            UPDATE projects
+            SET status = CASE WHEN status = 'planning' THEN 'in_progress' ELSE status END,
+                updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(now, String(paymentRow.project_id))
+          .run();
+      }
 
-      // Dispatch Telegram Message 2: Payment Success Verified
-      await sendTelegramPaymentSuccessAlert(
-        {
-          clientName,
-          projectTitle: String(paymentRow.title || 'Client Project'),
-          invoiceNumber,
-          amount: actualAmount,
-          paymentId: razorpayPaymentId,
-          paymentMethod,
-          paidAtIST: timeIST,
-        },
-        env
-      );
+      // 3. Log lead activity if lead_id is present
+      if (paymentRow.lead_id) {
+        const actId = `act_${crypto.randomUUID()}`;
+        await db
+          .prepare(`
+            INSERT INTO lead_activities (
+              id, lead_id, actor_clerk_user_id, activity_type, summary, created_at
+            ) VALUES (?, ?, 'system_webhook', 'payment_received', ?, ?)
+          `)
+          .bind(
+            actId,
+            String(paymentRow.lead_id),
+            `Payment of ₹${actualAmount.toLocaleString('en-IN')} received via ${paymentMethod} (${effectivePaymentId}).`,
+            now
+          )
+          .run();
+      }
 
-      // Log alert in CRM
+      // 4. Log alert in CRM
       const alertId = `alert_paid_${now}`;
       await db
         .prepare(`
@@ -724,61 +809,68 @@ export async function handleRazorpayWebhookEvent(
         .bind(
           alertId,
           `Payment Received: ₹${actualAmount.toLocaleString('en-IN')}`,
-          `${clientName} paid invoice ${invoiceNumber} via ${paymentMethod}`,
+          `${clientName} paid invoice ${invNum} via ${paymentMethod}`,
           now
         )
         .run();
 
-      return { success: true, message: `Payment for ${invoiceNumber} marked as received.` };
+      // 5. Dispatch Telegram Message 2: Payment Success Verified (NO Command Center link)
+      await sendTelegramPaymentSuccessAlert(
+        {
+          clientName,
+          projectTitle: String(paymentRow.title || 'Client Project'),
+          invoiceNumber: invNum,
+          amount: actualAmount,
+          paymentId: effectivePaymentId,
+          paymentMethod,
+          paidAtIST: timeIST,
+        },
+        env
+      );
+
+      console.log(`[Razorpay Webhook Success]: Marked invoice ${invNum} as received for ${clientName}.`);
+      return { success: true, message: `Payment for ${invNum} marked as received.` };
+    } else {
+      console.warn('[Razorpay Webhook]: No matching payment found in DB for success event:', {
+        paymentLinkId,
+        invoiceNumber,
+        razorpayPaymentId,
+        amountInRupees,
+      });
+      return { success: true, message: 'Payment recorded by Razorpay, but no local pending invoice matched.' };
     }
   }
 
-  // B. Event: payment.failed (Payment Attempt Failed / Declined)
+  // =========================================================================
+  // CASE B: PAYMENT FAILED (payment.failed)
+  // =========================================================================
   else if (eventType === 'payment.failed') {
-    const payload = eventBody.payload as Record<string, unknown>;
-    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
-
     if (paymentObj) {
-      const razorpayPaymentId = String(paymentObj.id || 'pay_unknown');
-      const amountInPaise = Number(paymentObj.amount || 0);
-      const amountInRupees = amountInPaise > 0 ? amountInPaise / 100 : 0;
       const errorDescription = String(
-        paymentObj.error_description || paymentObj.error_reason || 'Transaction declined by bank or user cancelled'
+        paymentObj.error_description ||
+          paymentObj.error_reason ||
+          'Transaction declined by bank or user cancelled'
       );
-      const notes = (paymentObj.notes as Record<string, unknown>) || {};
-      const invoiceNumber = String(notes.invoiceNumber || 'INV');
+      const effectivePaymentId = razorpayPaymentId || `pay_failed_${now}`;
+      const paymentRow = await findMatchingPaymentRow();
 
-      // Find payment record in D1 if available
-      let paymentRow: Record<string, unknown> | null = null;
-      if (notes.invoiceNumber) {
-        paymentRow = await db
-          .prepare('SELECT * FROM payments WHERE invoice_number = ?')
-          .bind(String(notes.invoiceNumber))
-          .first<Record<string, unknown>>();
-      }
-
-      const clientName = String(paymentRow?.client_name || notes.customerName || 'Client');
+      const clientName = String(
+        paymentRow?.client_name ||
+          (paymentObj.notes as Record<string, unknown>)?.customerName ||
+          'Client'
+      );
       const projectTitle = String(paymentRow?.title || 'Client Project');
+      const invNum = String(paymentRow?.invoice_number || invoiceNumber || 'INV');
       const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
-      const now = Date.now();
-      const timeIST = new Intl.DateTimeFormat('en-IN', {
-        timeZone: 'Asia/Kolkata',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }).format(new Date(now));
 
-      // Dispatch Telegram Alert: Payment Failed
+      // Dispatch Telegram Alert: Payment Failed (NO Command Center link)
       await sendTelegramPaymentFailedAlert(
         {
           clientName,
           projectTitle,
-          invoiceNumber: paymentRow ? String(paymentRow.invoice_number) : invoiceNumber,
+          invoiceNumber: invNum,
           amount: actualAmount,
-          paymentId: razorpayPaymentId,
+          paymentId: effectivePaymentId,
           errorReason: errorDescription,
           failedAtIST: timeIST,
         },
@@ -795,50 +887,31 @@ export async function handleRazorpayWebhookEvent(
         `)
         .bind(
           alertId,
-          `Payment Failed: ${invoiceNumber}`,
+          `Payment Failed: ${invNum}`,
           `Payment attempt of ₹${actualAmount.toLocaleString('en-IN')} for ${clientName} failed (${errorDescription})`,
           now
         )
         .run();
 
-      return { success: true, message: `Payment failure logged for ${invoiceNumber}.` };
+      console.log(`[Razorpay Webhook Failed]: Logged failure for invoice ${invNum}. Reason: ${errorDescription}`);
+      return { success: true, message: `Payment failure logged for ${invNum}.` };
     }
   }
 
-  // C. Event: refund.processed / refund.created (Refund Processed)
+  // =========================================================================
+  // CASE C: REFUND (refund.processed, refund.created)
+  // =========================================================================
   else if (eventType === 'refund.processed' || eventType === 'refund.created') {
-    const payload = eventBody.payload as Record<string, unknown>;
-    const refundObj = (payload?.refund as { entity?: Record<string, unknown> })?.entity;
-    const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
-
     if (refundObj) {
       const refundId = String(refundObj.id || 'rfnd_unknown');
-      const razorpayPaymentId = String(refundObj.payment_id || paymentObj?.id || '');
       const refundAmountPaise = Number(refundObj.amount || 0);
       const refundAmountRupees = refundAmountPaise > 0 ? refundAmountPaise / 100 : 0;
-      const now = Date.now();
-      const timeIST = new Intl.DateTimeFormat('en-IN', {
-        timeZone: 'Asia/Kolkata',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }).format(new Date(now));
-
-      // Find payment in D1 by razorpay_payment_id
-      let paymentRow: Record<string, unknown> | null = null;
-      if (razorpayPaymentId) {
-        paymentRow = await db
-          .prepare('SELECT * FROM payments WHERE razorpay_payment_id = ?')
-          .bind(razorpayPaymentId)
-          .first<Record<string, unknown>>();
-      }
+      const paymentRow = await findMatchingPaymentRow();
 
       const clientName = String(paymentRow?.client_name || 'Client');
       const projectTitle = String(paymentRow?.title || 'Client Project');
-      const invoiceNumber = String(paymentRow?.invoice_number || 'INV');
+      const invNum = String(paymentRow?.invoice_number || invoiceNumber || 'INV');
+      const effectivePaymentId = razorpayPaymentId || String(paymentRow?.razorpay_payment_id || 'unknown');
 
       // Update payment status in D1 if found
       if (paymentRow) {
@@ -853,15 +926,15 @@ export async function handleRazorpayWebhookEvent(
           .run();
       }
 
-      // Dispatch Telegram Alert: Refund Processed
+      // Dispatch Telegram Alert: Refund Processed (NO Command Center link)
       await sendTelegramRefundProcessedAlert(
         {
           clientName,
           projectTitle,
-          invoiceNumber,
+          invoiceNumber: invNum,
           refundAmount: refundAmountRupees,
           refundId,
-          paymentId: razorpayPaymentId,
+          paymentId: effectivePaymentId,
           processedAtIST: timeIST,
         },
         env
@@ -883,9 +956,10 @@ export async function handleRazorpayWebhookEvent(
         )
         .run();
 
+      console.log(`[Razorpay Webhook Refund]: Processed refund ${refundId} for ${clientName}.`);
       return { success: true, message: `Refund ${refundId} processed.` };
     }
   }
 
-  return { success: true, message: 'Event acknowledged.' };
+  return { success: true, message: `Event ${eventType} acknowledged.` };
 }

@@ -36,6 +36,10 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
 
   const [totalBudget, setTotalBudget] = useState<number>(initialBudgetNum);
   const [advancePercent, setAdvancePercent] = useState<number>(40);
+  const [customAdvance, setCustomAdvance] = useState<number>(
+    Math.round((initialBudgetNum * 40) / 100)
+  );
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
   const deadlineDays = 30;
   const [sendEmail, setSendEmail] = useState<boolean>(true);
 
@@ -48,7 +52,7 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
 
   if (!isOpen) return null;
 
-  const advanceAmount = Math.round((totalBudget * advancePercent) / 100);
+  const currentAdvanceAmount = customAdvance > 0 ? customAdvance : Math.max(1, Math.round((totalBudget * advancePercent) / 100));
 
   const formatCurrency = (amt: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -56,6 +60,33 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(amt);
+  };
+
+  const handleTotalBudgetChange = (val: number) => {
+    setTotalBudget(val);
+    if (!isCustomMode) {
+      setCustomAdvance(Math.max(1, Math.round((val * advancePercent) / 100)));
+    }
+  };
+
+  const handlePercentSelect = (pct: number) => {
+    setAdvancePercent(pct);
+    setIsCustomMode(false);
+    setCustomAdvance(Math.max(1, Math.round((totalBudget * pct) / 100)));
+  };
+
+  const handleCustomPercentChange = (pct: number) => {
+    setAdvancePercent(pct);
+    setIsCustomMode(true);
+    setCustomAdvance(Math.max(1, Math.round((totalBudget * pct) / 100)));
+  };
+
+  const handleCustomAmountChange = (amt: number) => {
+    setCustomAdvance(amt);
+    setIsCustomMode(true);
+    if (totalBudget > 0) {
+      setAdvancePercent(Math.round((amt / totalBudget) * 100));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,6 +98,7 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
       const res = await autoConvertWonLeadApi(getToken, lead.id, {
         totalBudget,
         advancePercentage: advancePercent,
+        customAdvanceAmount: currentAdvanceAmount,
         deadlineDays,
         sendEmail,
       });
@@ -100,10 +132,10 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-black text-[#1A085C]">
-                Close Deal & Generate 40% Advance
+                Win Deal & Generate Advance Invoice
               </h2>
               <p className="text-[11px] text-brand-muted">
-                Convert {lead.name} into an active client project with Razorpay link.
+                Convert {lead.name} into an active client project with live Razorpay link.
               </p>
             </div>
           </div>
@@ -127,7 +159,7 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
                 Deal Converted & Invoice Generated!
               </h3>
               <p className="text-xs text-brand-muted mt-1 max-w-sm mx-auto">
-                40% Advance invoice ({formatCurrency(advanceAmount)}) created. Telegram notification dispatched.
+                Advance invoice ({formatCurrency(currentAdvanceAmount)}) created. Telegram notification dispatched.
               </p>
             </div>
 
@@ -168,10 +200,11 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
               </div>
             )}
 
-            {/* Total Contract Value Input */}
+            {/* Total Contract Value Input (NO MIN LOCK) */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#1A085C]">
-                Total Project Contract Value (INR)
+              <label className="text-xs font-bold text-[#1A085C] flex items-center justify-between">
+                <span>Total Project Contract Value (INR)</span>
+                <span className="text-[10px] text-brand-muted font-normal">No minimum lock</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
@@ -179,45 +212,84 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
                 </span>
                 <input
                   type="number"
-                  min="1000"
-                  step="500"
+                  min="1"
+                  step="any"
                   value={totalBudget}
-                  onChange={(e) => setTotalBudget(Number(e.target.value))}
+                  onChange={(e) => handleTotalBudgetChange(Number(e.target.value))}
                   required
                   className="w-full h-10 pl-7 pr-3 text-xs font-bold rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:bg-white focus:border-[#7C3AED] transition-all tabular-nums"
                 />
               </div>
             </div>
 
-            {/* 40% Calculation Highlight Card */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-[#EDE9FE] to-[#F5F3FF] border border-[#DDD6FE] space-y-2">
+            {/* Advance Percentage Selector & Direct Custom Input */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#1A085C] flex items-center justify-between">
+                <span>Advance Milestone Option</span>
+                <span className="text-[10px] text-brand-muted font-normal">Choose preset or enter custom</span>
+              </label>
+
+              {/* Preset Buttons */}
+              <div className="grid grid-cols-5 gap-1.5">
+                {[20, 30, 40, 50, 100].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => handlePercentSelect(pct)}
+                    className={`h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                      advancePercent === pct && !isCustomMode
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-2xs'
+                        : 'bg-white border-[#EDE8F5] text-brand-muted hover:border-slate-300'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Linked Custom Percent & Amount Fields */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="text-[10px] font-bold text-brand-muted block mb-1">
+                    Advance Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="any"
+                    value={advancePercent}
+                    onChange={(e) => handleCustomPercentChange(Number(e.target.value))}
+                    className="w-full h-9 px-3 text-xs font-bold rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:bg-white focus:border-[#7C3AED] transition-all tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-brand-muted block mb-1">
+                    Advance Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={customAdvance}
+                    onChange={(e) => handleCustomAmountChange(Number(e.target.value))}
+                    className="w-full h-9 px-3 text-xs font-bold rounded-xl border border-[#EDE8F5] bg-[#FAF9FD] outline-none focus:bg-white focus:border-[#7C3AED] transition-all tabular-nums"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Calculated Advance Highlight Card */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-[#EDE9FE] to-[#F5F3FF] border border-[#DDD6FE] space-y-1.5">
               <div className="flex items-center justify-between text-xs font-bold text-[#1A085C]">
-                <span>Calculated {advancePercent}% Advance Invoice</span>
-                <span className="text-sm font-black text-[#7C3AED] tabular-nums">
-                  {formatCurrency(advanceAmount)}
+                <span>Calculated Advance Invoice</span>
+                <span className="text-base font-black text-[#7C3AED] tabular-nums">
+                  {formatCurrency(currentAdvanceAmount)}
                 </span>
               </div>
               <p className="text-[11px] text-brand-muted leading-relaxed">
-                Initial milestone kickoff fee. Razorpay payment link will be created automatically for this exact amount.
+                Initial milestone fee ({advancePercent}% of {formatCurrency(totalBudget)}). Live Razorpay link will be created for this exact amount.
               </p>
-            </div>
-
-            {/* Advance Percentage Selector */}
-            <div className="grid grid-cols-3 gap-2">
-              {[30, 40, 50].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  onClick={() => setAdvancePercent(pct)}
-                  className={`h-8 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                    advancePercent === pct
-                      ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-2xs'
-                      : 'bg-white border-[#EDE8F5] text-brand-muted hover:border-slate-300'
-                  }`}
-                >
-                  {pct}% Advance
-                </button>
-              ))}
             </div>
 
             {/* Automation Options Checkboxes */}
@@ -236,7 +308,7 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
 
               <div className="flex items-start gap-2.5 text-xs font-medium text-slate-500 pl-6">
                 <span>
-                  ✓ Auto-dispatches <strong>Telegram Message 1</strong> to InfoHQ Command Centre channel with direct payment link.
+                  ✓ Auto-dispatches <strong>Telegram Notification</strong> to InfoHQ Command Centre channel with direct payment link.
                 </span>
               </div>
             </div>
@@ -258,13 +330,13 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 size={13} className="animate-spin" />
-                    <span>Generating & Sending...</span>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Generating...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={13} />
-                    <span>Confirm & Generate Invoice</span>
+                    <Sparkles size={14} />
+                    <span>Win Deal & Create Invoice ({formatCurrency(currentAdvanceAmount)})</span>
                   </>
                 )}
               </button>

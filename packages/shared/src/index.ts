@@ -348,8 +348,9 @@ export const PaymentSchema = z.object({
 });
 
 export const AutoConvertWonLeadSchema = z.object({
-  totalBudget: z.coerce.number().positive('Total budget must be positive'),
-  advancePercentage: z.coerce.number().min(5).max(100).default(40),
+  totalBudget: z.coerce.number().min(1, 'Total budget must be at least ₹1'),
+  advancePercentage: z.coerce.number().min(1).max(100).default(40),
+  customAdvanceAmount: z.coerce.number().min(1).optional(),
   deadlineDays: z.coerce.number().min(1).default(30),
   sendEmail: z.boolean().default(true),
 });
