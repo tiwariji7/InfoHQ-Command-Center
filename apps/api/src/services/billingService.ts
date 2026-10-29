@@ -197,6 +197,15 @@ export async function sendInvoiceEmailViaResend(
 }
 
 // 3. Telegram Alert: Payment Link Generated
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// 3. Telegram Alert: Advance Payment Link Generated (Message 1)
 export async function sendTelegramPaymentLinkAlert(
   params: {
     clientName: string;
@@ -213,24 +222,27 @@ export async function sendTelegramPaymentLinkAlert(
   if (!token || !chatId) return;
 
   const msg =
-    `💳 *New Invoice & Razorpay Payment Link Generated!*\n\n` +
-    `👤 *Client:* ${params.clientName}\n` +
-    `💼 *Project:* ${params.projectTitle}\n` +
-    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
-    `💰 *Advance Milestone:* ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `📊 *Total Contract Value:* ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
-    `🔗 *Payment Link:* ${params.paymentLinkUrl || 'Direct settlement'}`;
+    `💳 <b>New Invoice & Razorpay Payment Link Generated!</b>\n\n` +
+    `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
+    `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
+    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💰 <b>Advance Milestone:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `📊 <b>Total Contract Value:</b> ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
+    `🔗 <b>Payment Link:</b> ${params.paymentLinkUrl || 'Direct settlement'}`;
 
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
         text: msg,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      console.warn('[Telegram Link Alert Warning]: HTTP', res.status, await res.text());
+    }
   } catch (err) {
     console.error('[Telegram Link Alert Failed]:', err);
   }
@@ -254,26 +266,29 @@ export async function sendTelegramPaymentSuccessAlert(
   if (!token || !chatId) return;
 
   const msg =
-    `✅ *Payment Received & Verified!*\n\n` +
-    `👤 *Client:* ${params.clientName}\n` +
-    `💼 *Project:* ${params.projectTitle}\n` +
-    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
-    `💰 *Amount Paid:* ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `💳 *Razorpay ID:* \`${params.paymentId}\`\n` +
-    `🏦 *Method:* ${params.paymentMethod || 'UPI / Online'}\n` +
-    `📅 *Settled At:* ${params.paidAtIST}\n\n` +
-    `🚀 *CRM Action:* Invoice marked as PAID & Receipt logged.`;
+    `✅ <b>Payment Received &amp; Verified!</b>\n\n` +
+    `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
+    `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
+    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💰 <b>Amount Paid:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `💳 <b>Razorpay ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
+    `🏦 <b>Method:</b> ${escapeHtml(params.paymentMethod || 'UPI / Online')}\n` +
+    `📅 <b>Settled At:</b> ${escapeHtml(params.paidAtIST)}\n\n` +
+    `🚀 <b>CRM Action:</b> Invoice marked as PAID &amp; Receipt logged.`;
 
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
         text: msg,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      console.warn('[Telegram Success Alert Warning]: HTTP', res.status, await res.text());
+    }
   } catch (err) {
     console.error('[Telegram Success Alert Failed]:', err);
   }
@@ -297,26 +312,29 @@ export async function sendTelegramPaymentFailedAlert(
   if (!token || !chatId) return;
 
   const msg =
-    `⚠️ *Payment Attempt Failed Alert!*\n\n` +
-    `👤 *Client:* ${params.clientName}\n` +
-    `💼 *Project:* ${params.projectTitle}\n` +
-    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
-    `💰 *Amount:* ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `❌ *Reason:* ${params.errorReason}\n` +
-    `🆔 *Payment ID:* \`${params.paymentId}\`\n` +
-    `⏱ *Failed At:* ${params.failedAtIST}\n\n` +
+    `⚠️ <b>Payment Attempt Failed Alert!</b>\n\n` +
+    `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
+    `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
+    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💰 <b>Amount:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `❌ <b>Reason:</b> ${escapeHtml(params.errorReason)}\n` +
+    `🆔 <b>Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
+    `⏱ <b>Failed At:</b> ${escapeHtml(params.failedAtIST)}\n\n` +
     `ℹ️ Client se contact karein ya link dobara verify karein.`;
 
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
         text: msg,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      console.warn('[Telegram Payment Failed Alert Warning]: HTTP', res.status, await res.text());
+    }
   } catch (err) {
     console.error('[Telegram Payment Failed Alert Exception]:', err);
   }
@@ -340,26 +358,29 @@ export async function sendTelegramRefundProcessedAlert(
   if (!token || !chatId) return;
 
   const msg =
-    `🔄 *Refund Processed Alert*\n\n` +
-    `👤 *Client:* ${params.clientName}\n` +
-    `💼 *Project:* ${params.projectTitle}\n` +
-    `🧾 *Invoice #:* \`${params.invoiceNumber}\`\n` +
-    `💸 *Refunded Amount:* ₹${params.refundAmount.toLocaleString('en-IN')}\n` +
-    `🆔 *Refund ID:* \`${params.refundId}\`\n` +
-    `💳 *Original Payment ID:* \`${params.paymentId}\`\n` +
-    `⏱ *Processed At:* ${params.processedAtIST}\n\n` +
+    `🔄 <b>Refund Processed Alert</b>\n\n` +
+    `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
+    `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
+    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💸 <b>Refunded Amount:</b> ₹${params.refundAmount.toLocaleString('en-IN')}\n` +
+    `🆔 <b>Refund ID:</b> <code>${escapeHtml(params.refundId)}</code>\n` +
+    `💳 <b>Original Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
+    `⏱ <b>Processed At:</b> ${escapeHtml(params.processedAtIST)}\n\n` +
     `ℹ️ Refund client ke original payment method par 5-7 din me settle hoga.`;
 
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
         text: msg,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      console.warn('[Telegram Refund Alert Warning]: HTTP', res.status, await res.text());
+    }
   } catch (err) {
     console.error('[Telegram Refund Alert Exception]:', err);
   }
@@ -692,6 +713,46 @@ export async function handleRazorpayWebhookEvent(
     }
   }
 
+  // Deep API lookup if identifiers are missing
+  if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
+    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    if (razorpayPaymentId && (!invoiceNumber || !paymentLinkId)) {
+      try {
+        const res = await fetch(`https://api.razorpay.com/v1/payments/${razorpayPaymentId}`, {
+          headers: { Authorization: authHeader },
+        });
+        if (res.ok) {
+          const pData = (await res.json()) as Record<string, unknown>;
+          if (pData.notes && (pData.notes as Record<string, unknown>).invoiceNumber) {
+            invoiceNumber = String((pData.notes as Record<string, unknown>).invoiceNumber);
+          }
+          if (!invoiceNumber && pData.description) {
+            const m = String(pData.description).match(/INV-\d+-\d+/i);
+            if (m) invoiceNumber = m[0].toUpperCase();
+          }
+        }
+      } catch (err) {
+        console.warn('[Razorpay API Fetch Payment Notes Exception]:', err);
+      }
+    }
+
+    if (paymentLinkId && !invoiceNumber) {
+      try {
+        const res = await fetch(`https://api.razorpay.com/v1/payment_links/${paymentLinkId}`, {
+          headers: { Authorization: authHeader },
+        });
+        if (res.ok) {
+          const lData = (await res.json()) as Record<string, unknown>;
+          if (lData.notes && (lData.notes as Record<string, unknown>).invoiceNumber) {
+            invoiceNumber = String((lData.notes as Record<string, unknown>).invoiceNumber);
+          }
+        }
+      } catch (err) {
+        console.warn('[Razorpay API Fetch Link Notes Exception]:', err);
+      }
+    }
+  }
+
   // Helper to find payment row in D1 across multiple search strategies
   async function findMatchingPaymentRow(): Promise<Record<string, unknown> | null> {
     // 1. By razorpay_payment_link_id
@@ -724,8 +785,26 @@ export async function handleRazorpayWebhookEvent(
     // 4. By amount match for pending invoices
     if (amountInRupees > 0) {
       const row = await db
-        .prepare("SELECT * FROM payments WHERE status = 'pending' AND amount = ? ORDER BY created_at DESC")
-        .bind(String(amountInRupees))
+        .prepare("SELECT * FROM payments WHERE status = 'pending' AND (amount = ? OR amount = ?) ORDER BY created_at DESC")
+        .bind(String(amountInRupees), String(Math.round(amountInRupees)))
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
+    // 5. By invoice number inside notes or title
+    if (invoiceNumber) {
+      const row = await db
+        .prepare("SELECT * FROM payments WHERE notes LIKE '%' || ? || '%' OR title LIKE '%' || ? || '%' ORDER BY created_at DESC")
+        .bind(invoiceNumber, invoiceNumber)
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
+    // 6. Fallback: by amount for recent invoices (created within 48h)
+    if (amountInRupees > 0) {
+      const row = await db
+        .prepare("SELECT * FROM payments WHERE (amount = ? OR amount = ?) ORDER BY created_at DESC")
+        .bind(String(amountInRupees), String(Math.round(amountInRupees)))
         .first<Record<string, unknown>>();
       if (row) return row;
     }
@@ -775,24 +854,29 @@ export async function handleRazorpayWebhookEvent(
           `)
           .bind(now, String(paymentRow.project_id))
           .run();
-      }
 
-      // 3. Log lead activity if lead_id is present
-      if (paymentRow.lead_id) {
-        const actId = `act_${crypto.randomUUID()}`;
-        await db
-          .prepare(`
-            INSERT INTO lead_activities (
-              id, lead_id, actor_clerk_user_id, activity_type, summary, created_at
-            ) VALUES (?, ?, 'system_webhook', 'payment_received', ?, ?)
-          `)
-          .bind(
-            actId,
-            String(paymentRow.lead_id),
-            `Payment of ₹${actualAmount.toLocaleString('en-IN')} received via ${paymentMethod} (${effectivePaymentId}).`,
-            now
-          )
-          .run();
+        // Fetch lead_id from projects table to log activity
+        const projRow = await db
+          .prepare('SELECT lead_id FROM projects WHERE id = ?')
+          .bind(String(paymentRow.project_id))
+          .first<{ lead_id: string }>();
+
+        if (projRow?.lead_id) {
+          const actId = `act_${crypto.randomUUID()}`;
+          await db
+            .prepare(`
+              INSERT INTO lead_activities (
+                id, lead_id, actor_clerk_user_id, activity_type, summary, created_at
+              ) VALUES (?, ?, 'system_webhook', 'payment_received', ?, ?)
+            `)
+            .bind(
+              actId,
+              projRow.lead_id,
+              `Payment of ₹${actualAmount.toLocaleString('en-IN')} received via ${paymentMethod} (${effectivePaymentId}).`,
+              now
+            )
+            .run();
+        }
       }
 
       // 4. Log alert in CRM

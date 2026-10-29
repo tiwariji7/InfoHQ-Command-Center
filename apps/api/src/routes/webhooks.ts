@@ -1,3 +1,4 @@
+
 import { Hono } from 'hono';
 import type { AppContext, Bindings } from '../types/env.js';
 import { handleRazorpayWebhookEvent } from '../services/billingService.js';
@@ -64,6 +65,68 @@ async function verifyWithRazorpayApi(
   }
 }
 
+/**
+ * Verify Payment Link directly with Razorpay Official API
+ */
+async function verifyPaymentLinkWithRazorpayApi(
+  linkId: string,
+  env: Bindings
+): Promise<boolean> {
+  if (!linkId || !env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+    return false;
+  }
+  try {
+    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const res = await fetch(`https://api.razorpay.com/v1/payment_links/${linkId}`, {
+      headers: { Authorization: authHeader },
+    });
+    if (!res.ok) {
+      console.warn('[Razorpay Link Verification Failed]: HTTP', res.status);
+      return false;
+    }
+    const data = (await res.json()) as { id?: string; status?: string };
+    const isValid = data.id === linkId;
+    if (isValid) {
+      console.log('[Razorpay Link Direct Verification]: Validated link', linkId, 'status:', data.status);
+    }
+    return isValid;
+  } catch (err) {
+    console.error('[Razorpay Link Verification Exception]:', err);
+    return false;
+  }
+}
+
+/**
+ * Verify Order directly with Razorpay Official API
+ */
+async function verifyOrderWithRazorpayApi(
+  orderId: string,
+  env: Bindings
+): Promise<boolean> {
+  if (!orderId || !env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET) {
+    return false;
+  }
+  try {
+    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
+      headers: { Authorization: authHeader },
+    });
+    if (!res.ok) {
+      console.warn('[Razorpay Order Verification Failed]: HTTP', res.status);
+      return false;
+    }
+    const data = (await res.json()) as { id?: string; status?: string };
+    const isValid = data.id === orderId;
+    if (isValid) {
+      console.log('[Razorpay Order Direct Verification]: Validated order', orderId, 'status:', data.status);
+    }
+    return isValid;
+  } catch (err) {
+    console.error('[Razorpay Order Verification Exception]:', err);
+    return false;
+  }
+}
+
 // POST /api/webhooks/razorpay - Public Razorpay webhook listener
 webhooksRouter.post('/razorpay', async (c) => {
   const rawBody = await c.req.text();
@@ -84,8 +147,9 @@ webhooksRouter.post('/razorpay', async (c) => {
 
   // 1. Try HMAC signature verification if secret is provided
   if (webhookSecret && webhookSecret.trim().length > 0 && signature) {
-    isVerified = await verifyRazorpaySignature(rawBody, signature, webhookSecret.trim());
-    if (!isVerified) {
+    const cleanSecret = webhookSecret.replace(/^['"]|['"]$/g, '').trim();
+    isVerified = await verifyRazorpaySignature(rawBody, signature, cleanSecret);
+    if (!isVerified && cleanSecret !== webhookSecret) {
       isVerified = await verifyRazorpaySignature(rawBody, signature, webhookSecret);
     }
   }
@@ -94,15 +158,34 @@ webhooksRouter.post('/razorpay', async (c) => {
   if (!isVerified) {
     const payload = body.payload as Record<string, unknown> | undefined;
     const paymentObj = (payload?.payment as { entity?: Record<string, unknown> })?.entity;
+    const paymentLinkObj = (payload?.payment_link as { entity?: Record<string, unknown> })?.entity;
     const refundObj = (payload?.refund as { entity?: Record<string, unknown> })?.entity;
+    const orderObj = (payload?.order as { entity?: Record<string, unknown> })?.entity;
+
     const paymentId = paymentObj?.id
       ? String(paymentObj.id)
       : refundObj?.payment_id
         ? String(refundObj.payment_id)
         : null;
 
+    const paymentLinkId = paymentLinkObj?.id
+      ? String(paymentLinkObj.id)
+      : null;
+
+    const orderId = orderObj?.id
+      ? String(orderObj.id)
+      : paymentObj?.order_id
+        ? String(paymentObj.order_id)
+        : null;
+
     if (paymentId) {
       isVerified = await verifyWithRazorpayApi(paymentId, c.env);
+    }
+    if (!isVerified && paymentLinkId) {
+      isVerified = await verifyPaymentLinkWithRazorpayApi(paymentLinkId, c.env);
+    }
+    if (!isVerified && orderId) {
+      isVerified = await verifyOrderWithRazorpayApi(orderId, c.env);
     }
   }
 
