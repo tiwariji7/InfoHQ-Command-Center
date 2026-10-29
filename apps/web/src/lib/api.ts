@@ -29,8 +29,22 @@ import type {
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
-  const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
-  if (!base) return endpoint;
+  let base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+
+  // Safety guard: If running in browser on a production domain, NEVER use localhost or local URLs
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    if (base.includes('localhost') || base.includes('127.0.0.1')) {
+      base = '';
+    }
+  }
+
+  if (!base) {
+    return endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  }
   if (base.endsWith('/api') && endpoint.startsWith('/api')) {
     return `${base}${endpoint.slice(4)}`;
   }

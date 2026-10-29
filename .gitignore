@@ -10,14 +10,12 @@ build/
 *.tsbuildinfo
 
 # Environment files and secrets - NEVER COMMIT
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 .dev.vars
 .dev.vars.*
 *.pem
 *.key
-.env.example
 
 # Logs
 logs/
