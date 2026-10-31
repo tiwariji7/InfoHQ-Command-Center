@@ -14,26 +14,23 @@ import {
   BriefcaseBusiness,
   FolderKanban,
   ListTodo,
-  Rocket,
   Receipt,
   FileSpreadsheet,
   TrendingUp,
   UserCheck,
-  MessagesSquare,
   SlidersHorizontal,
   LogOut,
   Menu,
   X,
   Search,
   Bell,
-  Sun,
-  HelpCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
   Mail,
   User,
+  Calendar,
 } from 'lucide-react';
 
 interface ShellProps {
@@ -87,7 +84,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
   const avatarLetter = (displayName ? displayName[0] : 'S').toUpperCase();
   const userCreatedAt = clerkUser?.createdAt ? new Date(clerkUser.createdAt).toLocaleDateString('en-IN') : 'Active';
 
-  // Navigation sections without subheadings
+  // Navigation sections matching reference images & CRM_design.md
   const navigationSections: NavSection[] = [
     {
       title: 'DASHBOARD',
@@ -96,7 +93,6 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           id: 'dashboard',
           label: 'Dashboard',
           icon: Compass,
-          badge: 'Live',
         },
       ],
     },
@@ -107,13 +103,11 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           id: 'leads',
           label: 'Leads Inbox',
           icon: Inbox,
-          badge: 'Active',
         },
         {
           id: 'pipeline',
           label: 'Sales Pipeline',
           icon: KanbanSquare,
-          badge: 'Active',
         },
         {
           id: 'clients',
@@ -129,53 +123,41 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           id: 'projects',
           label: 'Projects',
           icon: FolderKanban,
-          badge: 'Active',
         },
         {
           id: 'tasks',
           label: 'Tasks & Sprints',
           icon: ListTodo,
         },
-        {
-          id: 'deployments',
-          label: 'Deployments & Releases',
-          icon: Rocket,
-        },
       ],
     },
     {
-      title: 'FINANCE & GROWTH',
+      title: 'FINANCE',
       items: [
         {
           id: 'billing',
-          label: 'Billing & Invoices',
+          label: 'Payments & Invoices',
           icon: Receipt,
-          badge: 'Active',
         },
         {
           id: 'proposals',
           label: 'Proposals & Contracts',
           icon: FileSpreadsheet,
         },
-        {
-          id: 'analytics',
-          label: 'Analytics & Reports',
-          icon: TrendingUp,
-        },
       ],
     },
     {
-      title: 'OPERATIONS',
+      title: 'MANAGEMENT',
       items: [
+        {
+          id: 'analytics',
+          label: 'Analytics & Report',
+          icon: TrendingUp,
+        },
         {
           id: 'team',
           label: 'Team & Roles',
           icon: UserCheck,
-        },
-        {
-          id: 'communications',
-          label: 'Communications',
-          icon: MessagesSquare,
         },
         {
           id: 'settings',
@@ -318,28 +300,24 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           sidebarCollapsed ? 'w-[76px]' : 'w-[260px] xl:w-[276px]'
         }`}
       >
-        {/* Brand Header: InfoHQ with Capital I and Command Center gradient */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE8F5] shrink-0 bg-[#FAF9FD]">
+        {/* Brand Header: InfoHQ text only as requested */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#FAF9FD]">
           {!sidebarCollapsed ? (
-            <div className="flex flex-col">
+            <div className="flex flex-col select-none">
               <div className="flex items-center">
-                <span className="text-[22px] font-black tracking-tight bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
-                  Info
-                </span>
-                <span className="text-[22px] font-black tracking-tight text-[#1A085C] ml-0.5">
-                  HQ
+                <span className="text-[22px] font-black tracking-tight text-[#1A085C]">
+                  info<span className="text-[#5B4CF5]">HQ</span>
                 </span>
               </div>
-              <span className="text-[10px] font-bold tracking-wider uppercase bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#7C3AED] bg-clip-text text-transparent -mt-1">
+              <span className="text-[11px] font-bold text-[#6B7280] tracking-wide -mt-0.5">
                 Command Center
               </span>
             </div>
           ) : (
-            <div className="mx-auto">
-              <span className="text-xl font-black bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] bg-clip-text text-transparent">
-                I
+            <div className="mx-auto flex flex-col items-center select-none">
+              <span className="text-xl font-black text-[#1A085C]">
+                i<span className="text-[#5B4CF5]">HQ</span>
               </span>
-              <span className="text-xl font-black text-[#1A085C]">HQ</span>
             </div>
           )}
         </div>
@@ -369,45 +347,34 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                     key={item.id}
                     onClick={() => handleSelectTab(item.id)}
                     title={sidebarCollapsed ? item.label : undefined}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-control text-left transition-all group cursor-pointer ${
+                    style={
                       isActive
-                        ? 'bg-[#EDE9FE] text-[#7C3AED] font-bold shadow-xs'
-                        : 'text-brand-body hover:bg-white hover:text-brand-heading font-medium'
+                        ? {
+                            background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                            boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+                            color: '#FFFFFF',
+                          }
+                        : undefined
+                    }
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-left transition-all group cursor-pointer ${
+                      isActive
+                        ? 'text-white font-bold'
+                        : 'text-[#4B5563] hover:bg-white hover:text-[#1A085C] font-semibold'
                     } ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
                   >
-                    {/* Premium Icon Micro-Tile */}
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                    <Icon
+                      size={18}
+                      className={
                         isActive
-                          ? 'bg-[#7C3AED] text-white shadow-xs'
-                          : 'bg-white border border-[#EDE8F5] text-brand-muted group-hover:text-brand-heading group-hover:border-[#7C3AED]/40'
-                      }`}
-                    >
-                      <Icon size={15} className="stroke-[2.2]" />
-                    </div>
+                          ? 'text-white stroke-[2.2]'
+                          : 'text-[#6B7280] group-hover:text-[#1A085C] stroke-[2]'
+                      }
+                    />
 
                     {!sidebarCollapsed && (
-                      <>
-                        <span
-                          className={`text-xs truncate flex-1 ${
-                            isActive ? 'text-[#7C3AED] font-bold' : 'text-brand-heading'
-                          }`}
-                        >
-                          {item.label}
-                        </span>
-
-                        {item.badge && (
-                          <span
-                            className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
-                              item.badge === 'Live'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                : 'bg-purple-50 text-[#7C3AED] border border-purple-100'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
+                      <span className="text-xs truncate flex-1">
+                        {item.label}
+                      </span>
                     )}
                   </button>
                 );
@@ -435,15 +402,14 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             className="relative w-4/5 max-w-xs bg-[#FAF9FD] h-[100dvh] max-h-screen flex flex-col z-10 shadow-2xl"
           >
             {/* Drawer Header */}
-            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EDE8F5] shrink-0 bg-[#FAF9FD]">
+            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#FAF9FD]">
               <div className="flex flex-col select-none">
                 <div className="flex items-center">
-                  <span className="text-xl font-black tracking-tight bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
-                    Info
+                  <span className="text-xl font-black tracking-tight text-[#1A085C]">
+                    info<span className="text-[#5B4CF5]">HQ</span>
                   </span>
-                  <span className="text-xl font-black tracking-tight text-[#1A085C] ml-0.5">HQ</span>
                 </div>
-                <span className="text-[9.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#7C3AED] bg-clip-text text-transparent -mt-1">
+                <span className="text-[10px] font-bold text-[#6B7280] tracking-wide -mt-0.5">
                   Command Center
                 </span>
               </div>
@@ -475,33 +441,30 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                       <button
                         key={item.id}
                         onClick={() => handleSelectTab(item.id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-control text-left transition-all ${
+                        style={
                           isActive
-                            ? 'bg-[#EDE9FE] text-[#7C3AED] font-bold shadow-xs'
-                            : 'text-brand-body hover:bg-white font-medium'
+                            ? {
+                                background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                                boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+                                color: '#FFFFFF',
+                              }
+                            : undefined
+                        }
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-left transition-all ${
+                          isActive
+                            ? 'text-white font-bold'
+                            : 'text-[#4B5563] hover:bg-white hover:text-[#1A085C] font-semibold'
                         }`}
                       >
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        <Icon
+                          size={18}
+                          className={
                             isActive
-                              ? 'bg-[#7C3AED] text-white shadow-xs'
-                              : 'bg-white border border-[#EDE8F5] text-brand-muted'
-                          }`}
-                        >
-                          <Icon size={15} className="stroke-[2.2]" />
-                        </div>
+                              ? 'text-white stroke-[2.2]'
+                              : 'text-[#6B7280] stroke-[2]'
+                          }
+                        />
                         <span className="truncate flex-1 text-xs">{item.label}</span>
-                        {item.badge && (
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                              item.badge === 'Live'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                : 'bg-purple-50 text-[#7C3AED] border border-purple-100'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -589,7 +552,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search leads, clients, projects, invoices..."
+                placeholder="Search anything... (Leads, Clients, Projects, Invoices, Tasks...)"
                 className="w-full h-10 pl-9 pr-14 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] text-xs sm:text-sm text-brand-heading placeholder:text-brand-muted/70 focus:bg-white focus:border-[#7C3AED] focus:ring-3 focus:ring-[#7C3AED]/15 transition-all outline-none"
               />
               <div className="absolute right-2.5 px-1.5 py-0.5 rounded bg-white border border-[#EDE8F5] text-[10px] font-mono text-brand-muted pointer-events-none">
@@ -600,67 +563,68 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
 
           {/* Right Section: Theme Toggle + Notifications + Help + Profile Dropdown */}
           <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Theme Toggle Pill */}
-            <button
-              className="w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer shadow-2xs"
-              title="Theme mode"
-              aria-label="Theme mode"
-            >
-              <Sun size={17} />
-            </button>
+            {/* Date Pill Card (Matching Reference Image 1) */}
+            <div className="hidden xl:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white border border-[#EAE6F7] shadow-2xs">
+              <div className="w-7 h-7 rounded-full bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+                <Calendar size={14} className="stroke-[2.2]" />
+              </div>
+              <div className="text-left leading-tight">
+                <div className="text-[11px] font-bold text-[#1A085C]">
+                  {new Intl.DateTimeFormat('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  }).format(new Date())}
+                </div>
+                <div className="text-[9.5px] font-medium text-[#6B7280]">Have a productive day!</div>
+              </div>
+            </div>
 
             {/* Notifications Pill with Red Badge Dot */}
             <button
-              className="w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all flex items-center justify-center cursor-pointer relative shadow-2xs"
+              className="w-9 h-9 rounded-full bg-white border border-[#EAE6F7] hover:border-[#5B4CF5]/40 text-[#6B7280] hover:text-[#5B4CF5] transition-all flex items-center justify-center cursor-pointer relative shadow-2xs"
               title="Notifications"
               aria-label="Notifications"
             >
-              <Bell size={17} />
+              <Bell size={16} />
               <span className="w-2 h-2 rounded-full bg-[#EF4444] absolute top-2 right-2 ring-1.5 ring-white" />
             </button>
 
-            {/* Help / Support Pill */}
-            <button
-              className="hidden sm:flex w-9 h-9 rounded-full bg-[#F8F7FC] border border-[#EDE8F5] hover:bg-white hover:border-[#7C3AED]/40 text-brand-muted hover:text-[#7C3AED] transition-all items-center justify-center cursor-pointer shadow-2xs"
-              title="Help and documentation"
-              aria-label="Help and documentation"
-            >
-              <HelpCircle size={17} />
-            </button>
-
-            {/* Super Admin Profile Pill (Clickable Dropdown Trigger) */}
-            <div className="relative pl-1 sm:pl-2" ref={dropdownRef}>
+            {/* User Profile Pill (Matching Reference Images) */}
+            <div className="relative pl-1" ref={dropdownRef}>
               <div
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2.5 py-1 px-1.5 sm:px-2 rounded-full hover:bg-[#F8F7FC] border border-transparent hover:border-[#EDE8F5] transition-all cursor-pointer select-none"
+                className="flex items-center gap-2.5 py-1 px-2.5 rounded-full bg-white border border-[#EAE6F7] hover:border-[#5B4CF5]/40 transition-all cursor-pointer select-none shadow-2xs"
                 role="button"
                 tabIndex={0}
                 aria-label="User profile menu"
                 aria-expanded={profileDropdownOpen}
               >
-                {/* Profile Avatar: Soft Purple #8B5CF6 with First Letter S */}
+                {/* Profile Avatar: 2-Stop Gradient Pill */}
                 <div
-                  className="w-9 h-9 rounded-full bg-[#8B5CF6] text-white flex items-center justify-center font-bold text-sm shadow-[0_2px_8px_rgba(139,92,246,0.35)] shrink-0 ring-2 ring-white select-none"
+                  className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5B4CF5] to-[#E85AA0] text-white flex items-center justify-center font-bold text-xs shadow-xs ring-2 ring-white shrink-0"
                   title={`${displayName} (${designation})`}
                 >
                   {avatarLetter}
                 </div>
 
-                {/* Name and Designation */}
-                <div className="text-left hidden md:block">
-                  <div className="text-xs sm:text-[13px] font-bold text-brand-heading leading-tight truncate max-w-[130px]">
+                {/* Name and Email */}
+                <div className="text-left hidden sm:block leading-tight">
+                  <div className="text-xs font-bold text-[#1A085C] truncate max-w-[130px]">
                     {displayName}
                   </div>
-                  <div className="text-[10.5px] font-medium text-brand-muted">
-                    {designation}
+                  <div className="text-[10px] font-medium text-[#6B7280] truncate max-w-[130px]">
+                    {userEmail}
                   </div>
                 </div>
 
                 {/* Dropdown Chevron */}
                 <ChevronDown
                   size={14}
-                  className={`text-brand-muted transition-transform duration-200 hidden sm:block ${
-                    profileDropdownOpen ? 'rotate-180 text-[#7C3AED]' : ''
+                  className={`text-[#6B7280] transition-transform duration-200 hidden sm:block ${
+                    profileDropdownOpen ? 'rotate-180 text-[#5B4CF5]' : ''
                   }`}
                 />
               </div>
