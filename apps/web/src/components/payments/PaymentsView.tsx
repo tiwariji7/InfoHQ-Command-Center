@@ -6,22 +6,20 @@ import { CreatePaymentModal } from './CreatePaymentModal.js';
 import { RecordPaymentModal } from './RecordPaymentModal.js';
 import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal.js';
+import { ClientDetailDrawer } from './ClientDetailDrawer.js';
 import {
   Plus,
   Search,
-  CheckCircle2,
   AlertCircle,
   Trash2,
   Receipt,
   RefreshCw,
-  Clock,
-  FileCheck2,
-  FileText,
   IndianRupee,
   AlertTriangle,
   TrendingUp,
-  Calendar,
-  FolderKanban,
+  Eye,
+  Download,
+  Clock,
 } from 'lucide-react';
 
 export const PaymentsView: React.FC = () => {
@@ -49,6 +47,7 @@ export const PaymentsView: React.FC = () => {
   const [selectedPaymentForRecord, setSelectedPaymentForRecord] = useState<Payment | null>(null);
   const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<Payment | null>(null);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Payment | null>(null);
+  const [selectedClientForDetail, setSelectedClientForDetail] = useState<Payment | null>(null);
 
   const loadPayments = async () => {
     setIsLoading(true);
@@ -128,13 +127,6 @@ export const PaymentsView: React.FC = () => {
       month: 'short',
       year: 'numeric',
     }).format(new Date(epoch));
-  };
-
-  const getMonogram = (name?: string) => {
-    if (!name) return 'HQ';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
   const STATUS_TABS: Array<{ key: string; label: string }> = [
@@ -270,24 +262,22 @@ export const PaymentsView: React.FC = () => {
               style={
                 isHovered
                   ? {
-                      background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
-                      boxShadow: '0 8px 24px rgba(221, 73, 133, 0.35)',
-                    }
+                    background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
+                    boxShadow: '0 8px 24px rgba(221, 73, 133, 0.35)',
+                  }
                   : {}
               }
-              className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
-                isHovered
+              className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${isHovered
                   ? 'text-white -translate-y-1'
                   : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center transition-colors ${
-                    isHovered
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center transition-colors ${isHovered
                       ? 'bg-white/20 backdrop-blur-xs text-white'
                       : `${card.iconBg} ${card.iconColor} border border-[#EAE6F7]/60 shadow-2xs`
-                  }`}
+                    }`}
                 >
                   <CardIcon size={14} className="sm:hidden" />
                   <CardIcon size={15} className="hidden sm:block" />
@@ -296,23 +286,20 @@ export const PaymentsView: React.FC = () => {
 
               <div className="mt-2 sm:mt-2.5">
                 <span
-                  className={`text-[10px] sm:text-[10.5px] font-semibold block truncate ${
-                    isHovered ? 'text-white/90' : 'text-[#6B7280]'
-                  }`}
+                  className={`text-[10px] sm:text-[10.5px] font-semibold block truncate ${isHovered ? 'text-white/90' : 'text-[#6B7280]'
+                    }`}
                 >
                   {card.title}
                 </span>
                 <div
-                  className={`text-lg sm:text-xl font-black tabular-nums tracking-tight mt-0.5 truncate ${
-                    isHovered ? 'text-white' : 'text-[#1A085C]'
-                  }`}
+                  className={`text-lg sm:text-xl font-black tabular-nums tracking-tight mt-0.5 truncate ${isHovered ? 'text-white' : 'text-[#1A085C]'
+                    }`}
                 >
                   {card.value}
                 </div>
                 <span
-                  className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
-                    isHovered ? 'text-white/90 font-medium' : 'text-[#10B981] font-bold'
-                  }`}
+                  className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${isHovered ? 'text-white/90 font-medium' : 'text-[#10B981] font-bold'
+                    }`}
                 >
                   {card.subtext}
                 </span>
@@ -368,16 +355,15 @@ export const PaymentsView: React.FC = () => {
                 style={
                   isActive
                     ? {
-                        background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                        boxShadow: '0 2px 8px rgba(91,76,245,0.25)',
-                      }
+                      background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                      boxShadow: '0 2px 8px rgba(91,76,245,0.25)',
+                    }
                     : {}
                 }
-                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${isActive
                     ? 'text-white'
                     : 'bg-[#F8F8FF] text-[#6B7280] border border-[#EAE6F7] hover:border-[#5B4CF5]/40 hover:text-[#5B4CF5]'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -443,12 +429,12 @@ export const PaymentsView: React.FC = () => {
             <table className="w-full text-left border-collapse text-xs table-auto">
               <thead>
                 <tr className="border-b border-[#EAE6F7] bg-[#F8F8FF]/60 text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-3 px-4">Invoice &amp; Milestone</th>
-                  <th className="py-3 px-4">Project &amp; Client</th>
+                  <th className="py-3 px-4">Invoice</th>
+                  <th className="py-3 px-4">Clients</th>
+                  <th className="py-3 px-4">Project</th>
                   <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4">Payment Due / Settled</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EAE6F7]/60">
@@ -456,154 +442,116 @@ export const PaymentsView: React.FC = () => {
                   const isPaid = py.status === 'received';
                   const isOverdue =
                     py.status === 'pending' && py.dueDate && py.dueDate < now;
-                  const clientInitials = getMonogram(py.clientName);
 
                   return (
                     <tr
                       key={py.id}
-                      onClick={() => setSelectedInvoiceForDetail(py)}
+                      onClick={() => setSelectedClientForDetail(py)}
                       className="hover:bg-white/60 transition-colors group cursor-pointer"
                     >
-                      {/* Milestone Title & Invoice # */}
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-[#1A085C] text-xs group-hover:text-[#5B4CF5] transition-colors">
-                          {py.title}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {py.invoiceNumber ? (
-                            <span className="font-mono text-[9.5px] font-bold text-[#5B4CF5] bg-[#F3F0FF] px-1.5 py-0.2 rounded border border-purple-100">
-                              {py.invoiceNumber}
-                            </span>
-                          ) : (
-                            <span className="font-mono text-[9.5px] text-[#9CA3AF]">
-                              NO-INV#
-                            </span>
-                          )}
-                          {py.notes && (
-                            <span className="text-[10px] text-[#6B7280] truncate max-w-[140px]">
-                              {py.notes}
-                            </span>
-                          )}
-                        </div>
+                      {/* 1. Invoice Number (Simple text, no pills) */}
+                      <td className="py-3.5 px-4 font-mono text-xs font-semibold text-[#1A085C]" title={`Created: ${formatISTDate(py.createdAt)}`}>
+                        {py.invoiceNumber || `INV-${py.id.slice(-6).toUpperCase()}`}
                       </td>
 
-                      {/* Project & Client */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0 border border-purple-100">
-                            {clientInitials}
+                      {/* 2. Clients (Client name + small company name beneath, simple text) */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-xs text-[#1A085C] leading-snug group-hover:text-[#5B4CF5] transition-colors">
+                          {py.clientName || 'Direct Client'}
+                        </div>
+                        {py.company && (
+                          <div className="text-[10px] text-[#6B7280] leading-snug mt-0.5">
+                            {py.company}
                           </div>
-                          <div className="min-w-0">
-                            <div className="font-bold text-[#1A085C] text-xs truncate max-w-[170px] group-hover:text-[#5B4CF5] transition-colors">
-                              {py.clientName || 'Direct Client'}
-                            </div>
-                            <div className="text-[10px] text-[#6B7280] font-medium flex items-center gap-1 mt-0.5 truncate max-w-[170px]">
-                              <FolderKanban size={10} className="shrink-0 text-[#5B4CF5]" />
-                              <span className="truncate">{py.projectTitle || 'Project Milestone'}</span>
-                              {py.company && <span className="text-[#9CA3AF]">({py.company})</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Amount */}
-                      <td className="py-3 px-4 font-black text-xs sm:text-sm text-[#1A085C] tabular-nums">
-                        {formatCurrency(py.amount, py.currency)}
-                      </td>
-
-                      {/* Important Dates (Issued & Due/Settled) */}
-                      <td className="py-3 px-4 text-xs">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-[10px] text-[#6B7280] font-medium">
-                            <Calendar size={10} className="text-[#9CA3AF]" />
-                            <span>Issued: {formatISTDate(py.createdAt)}</span>
-                          </div>
-                          {isPaid && py.paidAt ? (
-                            <div className="inline-flex items-center gap-1 text-[#15803D] bg-[#F0FDF4] px-1.5 py-0.5 rounded border border-green-200 font-bold text-[9.5px]">
-                              <CheckCircle2 size={10} />
-                              <span>Settled: {formatISTDate(py.paidAt)}</span>
-                            </div>
-                          ) : isOverdue ? (
-                            <div className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[9.5px] font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                              <span>Overdue: {formatISTDate(py.dueDate)}</span>
-                            </div>
-                          ) : py.dueDate ? (
-                            <div className="inline-flex items-center gap-1 text-[#C2410C] bg-[#FFF7ED] px-1.5 py-0.5 rounded border border-orange-200 text-[9.5px] font-bold">
-                              <Clock size={10} />
-                              <span>Due: {formatISTDate(py.dueDate)}</span>
-                            </div>
-                          ) : (
-                            <span className="text-[#9CA3AF] text-[10px]">No due date</span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Status Badge */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {isPaid ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                            <span>Received</span>
-                          </span>
-                        ) : py.status === 'failed' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                            <span>Failed</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
-                            <span>Pending</span>
-                          </span>
                         )}
                       </td>
 
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center gap-1.5 justify-end">
+                      {/* 3. Project (Only project name, truncated if long) */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className="text-xs text-[#4B5563] font-medium truncate max-w-[170px] block"
+                          title={py.projectTitle || py.title || 'Client Deliverable'}
+                        >
+                          {py.projectTitle || py.title || 'Client Deliverable'}
+                        </span>
+                      </td>
+
+                      {/* 4. Amount (Collected: green, Pending: yellow, Overdue: red) */}
+                      <td className="py-3.5 px-4 font-bold text-xs sm:text-sm tabular-nums whitespace-nowrap">
+                        <span
+                          className={
+                            isPaid
+                              ? 'text-[#15803D]'
+                              : isOverdue
+                                ? 'text-rose-600'
+                                : 'text-amber-500'
+                          }
+                        >
+                          {formatCurrency(py.amount, py.currency)}
+                        </span>
+                      </td>
+
+                      {/* 5. Status (Proper color, simple text without pills/cylinders) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-xs font-semibold">
+                        {isPaid ? (
+                          <div className="flex items-center gap-1.5 text-[#15803D]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                            <span>Received</span>
+                          </div>
+                        ) : isOverdue ? (
+                          <div className="flex items-center gap-1.5 text-rose-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span>Overdue</span>
+                          </div>
+                        ) : py.status === 'failed' ? (
+                          <div className="flex items-center gap-1.5 text-rose-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            <span>Failed</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-amber-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>Pending</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 6. Action (Eye to view invoice, Download icon for PDF) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => setSelectedInvoiceForPrint(py)}
+                            className="p-1.5 rounded-lg text-[#6B7280] hover:text-[#5B4CF5] hover:bg-[#F3F0FF] transition-colors cursor-pointer"
+                            title="View Invoice"
+                          >
+                            <Eye size={15} />
+                          </button>
+
+                          <button
+                            onClick={() => setSelectedInvoiceForPrint(py)}
+                            className="p-1.5 rounded-lg text-[#6B7280] hover:text-[#10B981] hover:bg-[#F0FDF4] transition-colors cursor-pointer"
+                            title="Download Invoice PDF"
+                          >
+                            <Download size={15} />
+                          </button>
+
                           {!isPaid && py.razorpayPaymentLinkId && (
                             <button
                               onClick={() => handleSyncRazorpay(py.id)}
                               disabled={syncingId === py.id}
-                              className="px-2.5 py-1.5 rounded-xl bg-[#F0FDF4] text-[#15803D] hover:bg-green-100 font-bold text-[10.5px] flex items-center gap-1 border border-green-200 shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
-                              title="Check & sync live status from Razorpay"
+                              className="p-1.5 rounded-lg text-[#6B7280] hover:text-[#15803D] hover:bg-green-50 transition-colors disabled:opacity-50 cursor-pointer"
+                              title="Sync live status from Razorpay"
                             >
-                              <RefreshCw size={10} className={syncingId === py.id ? 'animate-spin' : ''} />
-                              <span>Sync</span>
+                              <RefreshCw size={13} className={syncingId === py.id ? 'animate-spin' : ''} />
                             </button>
                           )}
-
-                          {!isPaid && (
-                            <button
-                              onClick={() => setSelectedPaymentForRecord(py)}
-                              style={{
-                                background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
-                                boxShadow: '0 2px 8px rgba(91, 76, 245, 0.25)',
-                              }}
-                              className="px-3 py-1.5 rounded-xl text-white font-extrabold text-[10.5px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Record received funds"
-                            >
-                              <FileCheck2 size={11} className="stroke-[2.5]" />
-                              <span>Record Paid</span>
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => setSelectedInvoiceForPrint(py)}
-                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] font-bold text-[10.5px] flex items-center gap-1 border border-[#E5E1F0] shadow-2xs transition-all cursor-pointer"
-                            title="View & Download Invoice PDF"
-                          >
-                            <FileText size={11} />
-                            <span>Invoice</span>
-                          </button>
 
                           <button
                             onClick={() => handleDelete(py.id)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-[#9CA3AF] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Delete Record"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>
@@ -650,6 +598,17 @@ export const PaymentsView: React.FC = () => {
           payment={selectedInvoiceForPrint}
         />
       )}
+
+      {/* Client Detail Drawer (Side Card matching theme and 4 tabs) */}
+      <ClientDetailDrawer
+        payment={selectedClientForDetail}
+        allPayments={payments}
+        onClose={() => setSelectedClientForDetail(null)}
+        onOpenInvoice={(inv) => {
+          setSelectedInvoiceForPrint(inv);
+        }}
+        onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+      />
     </div>
   );
 };
