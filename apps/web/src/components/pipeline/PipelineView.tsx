@@ -573,7 +573,15 @@ export const PipelineView: React.FC = () => {
             return (
               <div
                 key={col.id}
-                className="w-[265px] shrink-0 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md border border-white/80 p-3 shadow-[0_4px_20px_rgba(26,8,92,0.03)]"
+                onDragOver={handleDragOver}
+                onDragEnter={() => handleDragEnter(col.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, col.id)}
+                className={`w-[265px] shrink-0 flex flex-col rounded-2xl p-3 transition-all duration-200 ${
+                  dragOverStage === col.id
+                    ? 'bg-[#F5F3FF] border-2 border-[#5B4CF5] shadow-[0_8px_24px_rgba(91,76,245,0.18)] scale-[1.01]'
+                    : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)]'
+                }`}
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7]/80 mb-2.5">
@@ -601,6 +609,11 @@ export const PipelineView: React.FC = () => {
 
                 {/* Cards Container */}
                 <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100vh-340px)] min-h-[300px] pr-0.5">
+                  {dragOverStage === col.id && (
+                    <div className="h-11 mb-2 rounded-xl border-2 border-dashed border-[#5B4CF5] bg-[#EDE9FE]/60 flex items-center justify-center text-xs font-bold text-[#5B4CF5] animate-pulse">
+                      Drop deal here
+                    </div>
+                  )}
                   {isLoading ? (
                     <div className="p-8 text-center text-xs text-[#6B7280] font-medium">
                       Loading opportunities...
@@ -626,11 +639,19 @@ export const PipelineView: React.FC = () => {
                       return (
                         <div
                           key={lead.id}
-                          className="bg-white rounded-xl p-3 border border-[#EAE6F7] shadow-[0_2px_10px_rgba(26,8,92,0.02)] hover:border-[#5B4CF5]/50 hover:shadow-[0_8px_24px_rgba(91,76,245,0.08)] transition-all space-y-2.5 group"
+                          draggable={true}
+                          onDragStart={(e) => handleDragStart(e, lead.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`bg-white rounded-xl p-3 border shadow-[0_2px_10px_rgba(26,8,92,0.02)] transition-all space-y-2.5 group cursor-grab active:cursor-grabbing ${
+                            draggedLeadId === lead.id
+                              ? 'opacity-40 scale-95 border-2 border-dashed border-[#5B4CF5]'
+                              : 'border-[#EAE6F7] hover:border-[#5B4CF5]/50 hover:shadow-[0_8px_24px_rgba(91,76,245,0.08)]'
+                          }`}
                         >
                           {/* Deal Header */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
+                              <GripVertical size={13} className="text-[#9CA3AF] group-hover:text-[#5B4CF5] shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                               <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0 border border-purple-100">
                                 {initials}
                               </div>
