@@ -19,20 +19,17 @@ import {
   ChevronRight,
   RefreshCw,
   Building2,
-  Calendar,
-  Filter,
   X,
   AlertCircle,
-  LayoutList,
-  LayoutGrid,
   Zap,
   CheckCircle2,
-  MoreHorizontal,
-  ChevronDown,
   Globe,
   Share2,
   Send,
   PieChart,
+  ArrowUpRight,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 
 export const LeadsInbox: React.FC = () => {
@@ -46,19 +43,26 @@ export const LeadsInbox: React.FC = () => {
   // Dynamic hover for top metric cards
   const [hoveredMetricIndex, setHoveredMetricIndex] = useState<number | null>(null);
 
-  // Filters
+  // Filters & Search
   const [activeStageTab, setActiveStageTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 8;
-
-  // View mode
-  const [viewLayout, setViewLayout] = useState<'table' | 'grid'>('table');
+  const pageSize = 10;
 
   // Modals & Selection
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+
+  // Close profile drawer on Esc key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedLead(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Load KPI overview metrics
   const loadOverview = useCallback(async () => {
@@ -70,7 +74,7 @@ export const LeadsInbox: React.FC = () => {
     }
   }, [getToken]);
 
-  // Load leads with filters & pagination
+  // Load leads with filters & pagination (DO NOT auto-select lead)
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -87,16 +91,13 @@ export const LeadsInbox: React.FC = () => {
         search: searchQuery.trim() || undefined,
       });
       setLeadsData(res);
-
-      if (res.data.length > 0 && !selectedLead) {
-        setSelectedLead(res.data[0]);
-      }
+      // NOTE: selectedLead is intentionally NOT set here so client profile does NOT auto-open
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to load inbound leads.');
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, page, pageSize, activeStageTab, searchQuery, selectedLead]);
+  }, [getToken, page, pageSize, activeStageTab, searchQuery]);
 
   useEffect(() => {
     loadOverview();
@@ -140,52 +141,86 @@ export const LeadsInbox: React.FC = () => {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  // Concise status badges that never wrap
+  // Status badges matching modern infohq.in palette
   const getStatusBadge = (stage: string) => {
     switch (stage) {
       case 'new':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FAF5FF] text-[#5B4CF5] border border-purple-200 shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF5FF] text-[#5B4CF5] border border-purple-200 shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5]" />
             <span>New</span>
           </span>
         );
       case 'contacted':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
             <span>Contacted</span>
           </span>
         );
       case 'proposal_sent':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
             <span>Proposal</span>
           </span>
         );
       case 'won':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200 shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200 shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
             <span>Qualified</span>
           </span>
         );
       case 'lost':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F8F8FF] text-[#6B7280] border border-[#EAE6F7] shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#F8F8FF] text-[#6B7280] border border-[#EAE6F7] shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />
             <span>Closed</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
             <span>{stage}</span>
           </span>
         );
     }
+  };
+
+  const getSourceBadge = (source?: string) => {
+    const src = (source || 'website_contact').toLowerCase();
+    if (src.includes('website')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#F3F0FF] text-[#5B4CF5] border border-purple-100">
+          <Globe size={11} />
+          <span>Website</span>
+        </span>
+      );
+    }
+    if (src.includes('linkedin')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-100">
+          <Share2 size={11} />
+          <span>LinkedIn</span>
+        </span>
+      );
+    }
+    if (src.includes('google') || src.includes('ads')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#FFF7ED] text-[#C2410C] border border-orange-100">
+          <Zap size={11} />
+          <span>Google Ads</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-[#F8F8FF] text-[#6B7280] border border-[#EAE6F7]">
+        <Send size={11} />
+        <span>{source || 'Direct'}</span>
+      </span>
+    );
   };
 
   const leadsList = leadsData?.data || [];
@@ -233,12 +268,12 @@ export const LeadsInbox: React.FC = () => {
   return (
     <div className="relative space-y-4 sm:space-y-5">
       {/* Ambient Glassmorphic Soft Glow Orbs */}
-      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.06] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.04] rounded-full blur-3xl pointer-events-none -z-10" />
 
       {errorMessage && (
-        <div className="p-3.5 bg-red-50/90 backdrop-blur-xs border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
+        <div className="p-3.5 bg-red-50 border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
           <AlertCircle size={15} />
           <span>{errorMessage}</span>
         </div>
@@ -249,8 +284,8 @@ export const LeadsInbox: React.FC = () => {
       {/* ========================================================= */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shadow-2xs shrink-0">
-            <Users size={16} className="stroke-[2.2]" />
+          <div className="w-10 h-10 rounded-xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shadow-2xs shrink-0 border border-purple-100">
+            <Users size={19} className="stroke-[2.2]" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#1A085C] tracking-tight">
@@ -266,23 +301,26 @@ export const LeadsInbox: React.FC = () => {
               </span>
             </h1>
             <p className="text-xs text-[#6B7280] font-medium mt-0.5">
-              All incoming leads from website, forms, ads and direct inquiries.
+              Inbound inquiries and customer communications for InfoHQ.
             </p>
           </div>
         </div>
 
-        {/* 2-Stop CTA Gradient Pill Button */}
+        {/* Executive Premium CTA Button */}
         <button
+          type="button"
           onClick={() => setIsAddModalOpen(true)}
           style={{
-            background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-            boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+            background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+            boxShadow: '0 8px 24px -2px rgba(91, 76, 245, 0.42), 0 2px 8px rgba(232, 90, 160, 0.28)',
             color: '#FFFFFF',
           }}
-          className="h-8 px-4 rounded-full text-xs font-bold inline-flex items-center gap-1.5 hover:brightness-105 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
+          className="h-10 sm:h-11 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 cursor-pointer shadow-lg shrink-0 self-start sm:self-auto"
         >
-          <Plus size={14} className="stroke-[2.5]" />
-          <span>Add Lead</span>
+          <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <Plus size={14} className="stroke-[3] text-white" />
+          </div>
+          <span>Add New Lead</span>
         </button>
       </div>
 
@@ -310,7 +348,7 @@ export const LeadsInbox: React.FC = () => {
               className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                 isHovered
                   ? 'text-white -translate-y-1'
-                  : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+                  : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -355,9 +393,9 @@ export const LeadsInbox: React.FC = () => {
       </div>
 
       {/* ========================================================= */}
-      {/* 2.1 LEAD ACQUISITION CHANNELS STRIP (Visual Data Deck)    */}
+      {/* 2.1 LEAD ACQUISITION CHANNELS STRIP                       */}
       {/* ========================================================= */}
-      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-3.5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-[#E5E1F0] p-3.5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
             <PieChart size={13} />
@@ -366,31 +404,31 @@ export const LeadsInbox: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-[#F8F8FF]/80 px-3 py-1.5 rounded-xl border border-[#EAE6F7]/70">
+          <div className="flex items-center gap-2 bg-[#FAF9FD] px-3 py-1.5 rounded-xl border border-[#E5E1F0]">
             <Globe size={13} className="text-[#5B4CF5]" />
             <div>
               <div className="text-[10px] text-[#6B7280] font-medium">Website</div>
               <div className="text-xs font-black text-[#1A085C]">48% (71)</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-[#F8F8FF]/80 px-3 py-1.5 rounded-xl border border-[#EAE6F7]/70">
+          <div className="flex items-center gap-2 bg-[#FAF9FD] px-3 py-1.5 rounded-xl border border-[#E5E1F0]">
             <Share2 size={13} className="text-[#3B82F6]" />
             <div>
               <div className="text-[10px] text-[#6B7280] font-medium">LinkedIn</div>
               <div className="text-xs font-black text-[#1A085C]">26% (38)</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-[#F8F8FF]/80 px-3 py-1.5 rounded-xl border border-[#EAE6F7]/70">
+          <div className="flex items-center gap-2 bg-[#FAF9FD] px-3 py-1.5 rounded-xl border border-[#E5E1F0]">
             <Zap size={13} className="text-[#F97316]" />
             <div>
               <div className="text-[10px] text-[#6B7280] font-medium">Google Ads</div>
               <div className="text-xs font-black text-[#1A085C]">16% (24)</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-[#F8F8FF]/80 px-3 py-1.5 rounded-xl border border-[#EAE6F7]/70">
+          <div className="flex items-center gap-2 bg-[#FAF9FD] px-3 py-1.5 rounded-xl border border-[#E5E1F0]">
             <Send size={13} className="text-[#E85AA0]" />
             <div>
-              <div className="text-[10px] text-[#6B7280] font-medium">Instagram &amp; Ref</div>
+              <div className="text-[10px] text-[#6B7280] font-medium">Instagram & Direct</div>
               <div className="text-xs font-black text-[#1A085C]">10% (15)</div>
             </div>
           </div>
@@ -398,404 +436,416 @@ export const LeadsInbox: React.FC = () => {
       </div>
 
       {/* ========================================================= */}
-      {/* 3. FILTER TABS PILL ROW                                   */}
+      {/* 3. STAGE TABS & SEARCH (Clean unified bar, no filter card)*/}
       {/* ========================================================= */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {stageTabs.map((tab) => {
-          const isActive = activeStageTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveStageTab(tab.id);
-                setPage(1);
-              }}
-              style={
-                isActive
-                  ? {
-                      background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                      boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
-                      color: '#FFFFFF',
-                    }
-                  : undefined
-              }
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                isActive
-                  ? 'text-white font-bold'
-                  : 'bg-white/85 backdrop-blur-md text-[#4B5563] border border-white/80 hover:bg-white hover:text-[#5B4CF5]'
-              }`}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ========================================================= */}
-      {/* 4. FILTER CONTROLS TOOLBAR                                */}
-      {/* ========================================================= */}
-      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-2.5 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F8F8FF] border border-[#EAE6F7] text-xs font-bold text-[#1A085C]">
-            <Filter size={13} className="text-[#5B4CF5]" />
-            <span>Filter</span>
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-white border border-[#EAE6F7] text-xs font-semibold text-[#6B7280] flex items-center gap-1">
-            <span>All Sources</span>
-            <ChevronDown size={12} />
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-white border border-[#EAE6F7] text-xs font-semibold text-[#6B7280] flex items-center gap-1">
-            <span>All Services</span>
-            <ChevronDown size={12} />
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-white border border-[#EAE6F7] text-xs font-semibold text-[#6B7280] flex items-center gap-1">
-            <span>All Status</span>
-            <ChevronDown size={12} />
-          </div>
-
-          <div className="px-3 py-1.5 rounded-full bg-white border border-[#EAE6F7] text-xs font-semibold text-[#6B7280] flex items-center gap-1">
-            <Calendar size={12} className="text-[#5B4CF5]" />
-            <span>This Month</span>
-            <ChevronDown size={12} />
-          </div>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          {stageTabs.map((tab) => {
+            const isActive = activeStageTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveStageTab(tab.id);
+                  setPage(1);
+                }}
+                style={
+                  isActive
+                    ? {
+                        background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                        boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+                        color: '#FFFFFF',
+                      }
+                    : undefined
+                }
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'text-white font-bold'
+                    : 'bg-white text-[#4B5563] border border-[#E5E1F0] hover:bg-[#FAF9FD] hover:text-[#5B4CF5] shadow-[0_2px_8px_rgba(26,8,92,0.03)]'
+                }`}
+              >
+                {tab.label} <span className="opacity-80">({tab.count})</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-2 self-end md:self-auto">
-          {/* Search Input */}
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search leads..."
-              className="h-8 pl-8 pr-3 rounded-full bg-white border border-[#EAE6F7] text-xs text-[#1A085C] focus:border-[#5B4CF5] outline-none transition-all w-40 sm:w-52 placeholder:text-[#9CA3AF]"
-            />
-          </div>
-
-          {/* View Mode Buttons */}
-          <div className="flex items-center p-0.5 rounded-full bg-[#F8F8FF] border border-[#EAE6F7]">
+        {/* Clean Pill Search Bar */}
+        <div className="relative shrink-0 self-end sm:self-auto w-full sm:w-64">
+          <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search leads by name, email..."
+            className="w-full h-8.5 pl-9 pr-7 rounded-full bg-white border border-[#E5E1F0] text-xs text-[#1A085C] placeholder:text-[#9CA3AF] shadow-[0_2px_8px_rgba(26,8,92,0.03)] focus:border-[#5B4CF5] focus:outline-none transition-all"
+          />
+          {searchQuery && (
             <button
-              onClick={() => setViewLayout('table')}
-              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                viewLayout === 'table' ? 'bg-[#5B4CF5] text-white shadow-2xs' : 'text-[#6B7280]'
-              }`}
-              title="Table view"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#1A085C] cursor-pointer"
             >
-              <LayoutList size={13} />
+              <X size={12} />
             </button>
-            <button
-              onClick={() => setViewLayout('grid')}
-              className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                viewLayout === 'grid' ? 'bg-[#5B4CF5] text-white shadow-2xs' : 'text-[#6B7280]'
-              }`}
-              title="Grid view"
-            >
-              <LayoutGrid size={13} />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 5. MASTER-DETAIL SECTION (Table on Left, Inspector Right) */}
+      {/* 4. LEADS TABLE (Strict 4 Columns: Lead, Service Needed,   */}
+      {/*    Status, Source. No Checkbox, No Assigned, No Received)  */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Side: Leads Table */}
-        <div className={`${selectedLead ? 'lg:col-span-8' : 'lg:col-span-12'} bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 shadow-[0_4px_24px_rgba(26,8,92,0.03)] overflow-hidden flex flex-col justify-between`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse table-auto">
-              <thead>
-                <tr className="border-b border-[#EAE6F7] bg-[#F8F8FF]/60 text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-8">
-                    <input type="checkbox" className="rounded text-[#5B4CF5] focus:ring-0 cursor-pointer" />
-                  </th>
-                  <th className="py-2.5 px-3">Lead</th>
-                  <th className="py-2.5 px-3">Service Needed</th>
-                  <th className="py-2.5 px-3">Source</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Assigned To</th>
-                  <th className="py-2.5 px-3 text-right">Received</th>
-                  <th className="py-2.5 px-3 w-8"></th>
+      <div className="bg-white rounded-2xl border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse table-auto">
+            <thead>
+              <tr className="border-b border-[#E5E1F0] bg-[#FAF9FD] text-[10.5px] font-bold text-[#6B7280] uppercase tracking-wider">
+                <th className="py-3 px-4 w-[38%]">Lead</th>
+                <th className="py-3 px-4 w-[28%]">Service Needed</th>
+                <th className="py-3 px-4 w-[17%]">Status</th>
+                <th className="py-3 px-4 w-[17%]">Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E5E1F0]">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className="py-14 text-center text-[#6B7280]">
+                    <RefreshCw size={22} className="animate-spin mx-auto text-[#5B4CF5] mb-2.5" />
+                    <span className="font-medium text-xs">Fetching inbound leads...</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EAE6F7]/60">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-[#6B7280]">
-                      <RefreshCw size={20} className="animate-spin mx-auto text-[#5B4CF5] mb-2" />
-                      <span>Fetching inbound leads...</span>
-                    </td>
-                  </tr>
-                ) : leadsList.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-[#6B7280]">
-                      No leads found matching your criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  leadsList.map((lead) => {
-                    const isRowSelected = selectedLead?.id === lead.id;
-                    const monogram = getMonogram(lead.name);
-                    const assignedStaff = ['Ankit', 'Neha', 'Rohit'][Math.abs(lead.id.charCodeAt(0) || 0) % 3];
+              ) : leadsList.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-14 text-center text-[#6B7280]">
+                    <Users size={24} className="mx-auto text-[#9CA3AF] mb-2 opacity-50" />
+                    <span className="font-semibold text-xs text-[#1A085C] block">No leads found</span>
+                    <span className="text-[11px] text-[#9CA3AF] block mt-0.5">Try switching stage tabs or change search keywords.</span>
+                  </td>
+                </tr>
+              ) : (
+                leadsList.map((lead) => {
+                  const isRowSelected = selectedLead?.id === lead.id;
+                  const monogram = getMonogram(lead.name);
 
-                    return (
-                      <tr
-                        key={lead.id}
-                        onClick={() => setSelectedLead(lead)}
-                        className={`transition-colors cursor-pointer ${
-                          isRowSelected ? 'bg-[#F3F0FF]/70 border-l-3 border-[#5B4CF5]' : 'hover:bg-white/60'
-                        }`}
-                      >
-                        <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedLeadIds.has(lead.id)}
-                            onChange={() => {
-                              const s = new Set(selectedLeadIds);
-                              if (s.has(lead.id)) s.delete(lead.id);
-                              else s.add(lead.id);
-                              setSelectedLeadIds(s);
-                            }}
-                            className="rounded text-[#5B4CF5] focus:ring-0 cursor-pointer"
-                          />
-                        </td>
-
-                        {/* Lead Monogram + Name + Email */}
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0 border border-purple-100">
-                              {monogram}
+                  return (
+                    <tr
+                      key={lead.id}
+                      onClick={() => setSelectedLead(lead)}
+                      className={`group transition-all duration-150 cursor-pointer ${
+                        isRowSelected
+                          ? 'bg-[#F3F0FF] border-l-4 border-l-[#5B4CF5]'
+                          : 'hover:bg-[#FAF9FD]'
+                      }`}
+                    >
+                      {/* Column 1: Lead (Monogram Avatar + Full Name + Email) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10.5px] flex items-center justify-center shrink-0 border border-purple-100 shadow-2xs group-hover:scale-105 transition-transform">
+                            {monogram}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-xs flex items-center gap-1.5">
+                              <span>{lead.name}</span>
+                              <ArrowUpRight size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-[#5B4CF5]" />
                             </div>
-                            <div className="truncate max-w-[130px]">
-                              <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-xs">{lead.name}</div>
-                              <div className="text-[9.5px] text-[#9CA3AF] truncate">{lead.email || 'no-email'}</div>
+                            <div className="text-[10px] text-[#6B7280] truncate mt-0.5">
+                              {lead.email || 'No email provided'}
                             </div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Service Needed */}
-                        <td className="py-3 px-3">
-                          <span className="font-semibold text-[#4B5563] truncate max-w-[140px] block text-[11px]">
-                            {lead.serviceNeeded || 'Website Development'}
+                      {/* Column 2: Service Needed */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-[#1A085C] text-xs block truncate max-w-xs">
+                          {lead.serviceNeeded || 'Website Development'}
+                        </span>
+                        {lead.company && (
+                          <span className="text-[10px] text-[#9CA3AF] block truncate mt-0.5">
+                            {lead.company}
                           </span>
-                        </td>
+                        )}
+                      </td>
 
-                        {/* Source */}
-                        <td className="py-3 px-3">
-                          <span className="text-[10.5px] font-medium text-[#6B7280]">
-                            {lead.source === 'website_contact' ? 'Website' : lead.source}
-                          </span>
-                        </td>
+                      {/* Column 3: Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {getStatusBadge(lead.stage)}
+                      </td>
 
-                        {/* Status with single-line guarantee */}
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          {getStatusBadge(lead.stage)}
-                        </td>
-
-                        {/* Assigned To */}
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#5B4CF5] to-[#E85AA0] text-white flex items-center justify-center text-[9px] font-bold">
-                              {assignedStaff[0]}
-                            </div>
-                            <span className="text-[11px] font-medium text-[#4B5563]">{assignedStaff}</span>
-                          </div>
-                        </td>
-
-                        {/* Received */}
-                        <td className="py-3 px-3 text-right text-[10.5px] text-[#9CA3AF] whitespace-nowrap">
-                          {new Date(lead.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                        </td>
-
-                        {/* 3-Dots Action */}
-                        <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button className="p-1 rounded-lg text-[#9CA3AF] hover:text-[#1A085C] transition-colors cursor-pointer">
-                            <MoreHorizontal size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Footer */}
-          <div className="p-3.5 border-t border-[#EAE6F7]/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
-            <div>
-              Showing <strong className="text-[#1A085C]">{leadsList.length > 0 ? `1 - ${leadsList.length}` : '0'}</strong> of <strong className="text-[#1A085C]">{totalLeadsCount}</strong> leads
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="w-7 h-7 rounded-lg border border-[#EAE6F7] flex items-center justify-center disabled:opacity-40 hover:bg-[#F8F8FF] cursor-pointer"
-              >
-                <ChevronLeft size={13} />
-              </button>
-
-              <button className="w-7 h-7 rounded-lg bg-[#5B4CF5] text-white font-bold text-xs flex items-center justify-center shadow-2xs">
-                {page}
-              </button>
-
-              <button
-                disabled={leadsList.length < pageSize}
-                onClick={() => setPage(page + 1)}
-                className="w-7 h-7 rounded-lg border border-[#EAE6F7] flex items-center justify-center disabled:opacity-40 hover:bg-[#F8F8FF] cursor-pointer"
-              >
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
+                      {/* Column 4: Source */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {getSourceBadge(lead.source)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Right Side: Lead Details Inspector Card */}
-        {selectedLead && (
-          <div className="lg:col-span-4 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] space-y-4 sticky top-20">
-            {/* Inspector Header */}
-            <div className="flex items-start justify-between pb-3.5 border-b border-[#EAE6F7]/80">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-[#F3F0FF] text-[#5B4CF5] font-black text-xs flex items-center justify-center border border-purple-100 shadow-2xs shrink-0">
-                  {getMonogram(selectedLead.name)}
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-[#1A085C] tracking-tight">
-                    {selectedLead.name}
-                  </h3>
-                  <div className="text-[10.5px] text-[#6B7280] truncate max-w-[140px]">
-                    {selectedLead.email || 'contact@client.in'}
-                  </div>
-                </div>
-              </div>
+        {/* Pagination Footer */}
+        <div className="p-3.5 border-t border-[#E5E1F0] bg-[#FAF9FD] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+          <div>
+            Showing <strong className="text-[#1A085C]">{leadsList.length > 0 ? `1 - ${leadsList.length}` : '0'}</strong> of{' '}
+            <strong className="text-[#1A085C]">{totalLeadsCount}</strong> leads
+          </div>
 
-              <div className="flex items-center gap-1.5">
-                {getStatusBadge(selectedLead.stage)}
-                <button
-                  onClick={() => setSelectedLead(null)}
-                  className="p-1 text-[#9CA3AF] hover:text-[#1A085C] rounded-lg transition-colors cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center gap-1">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              className="w-7 h-7 rounded-lg border border-[#E5E1F0] bg-white text-[#1A085C] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#F3F0FF] hover:border-[#5B4CF5]/40 transition-colors cursor-pointer shadow-2xs"
+            >
+              <ChevronLeft size={13} />
+            </button>
 
-            {/* Lead Details */}
-            <div className="space-y-2 text-xs">
-              <span className="text-[10px] font-bold text-[#1A085C] uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar size={12} className="text-[#5B4CF5]" />
-                <span>Lead Details</span>
-              </span>
+            <span className="h-7 px-3 rounded-lg bg-[#5B4CF5] text-white font-bold text-xs flex items-center justify-center shadow-2xs">
+              {page}
+            </span>
 
-              <div className="space-y-1.5 text-xs">
-                {selectedLead.phone && (
-                  <div className="flex items-center justify-between text-[#4B5563]">
-                    <span className="flex items-center gap-1 text-[#6B7280]">
-                      <Phone size={11} className="text-[#5B4CF5]" />
-                      <span>Phone:</span>
-                    </span>
-                    <span className="font-semibold text-[#1A085C]">{selectedLead.phone}</span>
-                  </div>
-                )}
-                {selectedLead.company && (
-                  <div className="flex items-center justify-between text-[#4B5563]">
-                    <span className="flex items-center gap-1 text-[#6B7280]">
-                      <Building2 size={11} className="text-[#5B4CF5]" />
-                      <span>Company:</span>
-                    </span>
-                    <span className="font-semibold text-[#1A085C]">{selectedLead.company}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-[#4B5563]">
-                  <span className="text-[#6B7280]">Service:</span>
-                  <span className="font-semibold text-[#1A085C] truncate max-w-[150px]">
-                    {selectedLead.serviceNeeded || 'Website Development'}
+            <button
+              disabled={leadsList.length < pageSize}
+              onClick={() => setPage(page + 1)}
+              className="w-7 h-7 rounded-lg border border-[#E5E1F0] bg-white text-[#1A085C] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#F3F0FF] hover:border-[#5B4CF5]/40 transition-colors cursor-pointer shadow-2xs"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 5. CLIENT PROFILE SIDE DRAWER OVERLAY                     */}
+      {/*    (Opens ONLY when a lead is clicked, side overlay       */}
+      {/*     with Cut 'X' button & complete premium profile)       */}
+      {/* ========================================================= */}
+      {selectedLead && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-[#1A085C]/25 backdrop-blur-[2px] z-40 transition-opacity animate-in fade-in duration-200"
+            onClick={() => setSelectedLead(null)}
+          />
+
+          {/* Side Drawer Panel */}
+          <div className="fixed top-0 right-0 bottom-0 w-full sm:w-[460px] bg-white z-50 shadow-[-12px_0_40px_rgba(26,8,92,0.18)] border-l border-[#E5E1F0] flex flex-col animate-in slide-in-from-right duration-200">
+            {/* Top Brand Strip Header */}
+            <div className="relative p-5 pb-4 border-b border-[#E5E1F0] bg-gradient-to-b from-[#FAF9FD] to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#5B4CF5] animate-ping" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#5B4CF5]">
+                    Client Profile
                   </span>
                 </div>
+
+                {/* CUT / CLOSE BUTTON */}
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  className="w-8 h-8 rounded-full bg-[#FAF5FF] hover:bg-[#F3F0FF] text-[#1A085C] hover:text-rose-600 border border-purple-100 flex items-center justify-center transition-all cursor-pointer shadow-2xs group"
+                  title="Cut / Close profile (Esc)"
+                >
+                  <X size={15} className="group-hover:rotate-90 transition-transform duration-200" />
+                </button>
+              </div>
+
+              {/* Lead Monogram & Primary Identity */}
+              <div className="flex items-start gap-3.5 mt-4">
+                <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-[#5B4CF5] to-[#E85AA0] text-white font-black text-lg flex items-center justify-center shadow-[0_6px_20px_rgba(91,76,245,0.30)] ring-4 ring-purple-50 shrink-0">
+                  {getMonogram(selectedLead.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-black text-[#1A085C] tracking-tight leading-snug truncate">
+                    {selectedLead.name}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    {getStatusBadge(selectedLead.stage)}
+                    {selectedLead.company && (
+                      <span className="text-[11px] font-semibold text-[#6B7280] flex items-center gap-1 truncate">
+                        <Building2 size={12} className="text-[#5B4CF5] shrink-0" />
+                        <span className="truncate">{selectedLead.company}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Inbound Message */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-[#1A085C] uppercase tracking-wider flex items-center gap-1.5">
-                <Mail size={12} className="text-[#5B4CF5]" />
-                <span>Message</span>
-              </span>
-              <div className="p-3 rounded-xl bg-[#F8F8FF]/80 border border-[#EAE6F7]/80 text-xs text-[#4B5563] leading-relaxed">
-                {selectedLead.message || 'Hi InfoHQ Team, I want to discuss a new software & CRM development project with your development team.'}
-              </div>
-            </div>
-
-            {/* Quick Actions Bar */}
-            <div className="space-y-2 pt-2 border-t border-[#EAE6F7]/80">
-              <span className="text-[10px] font-bold text-[#1A085C] uppercase tracking-wider block">
-                Quick Actions
-              </span>
-              <div className="grid grid-cols-3 gap-1.5">
+            {/* Scrollable Drawer Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+              {/* Quick Communication Actions Bar */}
+              <div className="grid grid-cols-3 gap-2">
                 {selectedLead.phone ? (
                   <a
                     href={`tel:${selectedLead.phone}`}
                     style={{
                       background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                      boxShadow: '0 4px 12px rgba(99, 88, 240, 0.25)',
                     }}
-                    className="p-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 shadow-2xs hover:brightness-105 transition-all"
+                    className="p-2.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-95 transition-all"
                   >
-                    <Phone size={12} />
-                    <span>Call</span>
+                    <Phone size={13} className="stroke-[2.5]" />
+                    <span>Call Now</span>
                   </a>
                 ) : (
-                  <button disabled className="p-2 rounded-xl bg-[#F8F8FF] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#EAE6F7]">
-                    <Phone size={12} />
-                    <span>Call</span>
-                  </button>
+                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                    <Phone size={13} />
+                    <span>No Phone</span>
+                  </div>
                 )}
-
-                {selectedLead.email ? (
-                  <a
-                    href={`mailto:${selectedLead.email}`}
-                    className="p-2 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1 border border-[#EAE6F7] transition-colors"
-                  >
-                    <Mail size={12} />
-                    <span>Email</span>
-                  </a>
-                ) : null}
 
                 {selectedLead.phone ? (
                   <a
                     href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2 rounded-xl bg-white hover:bg-[#F0FDF4] text-[#15803D] text-xs font-bold flex items-center justify-center gap-1 border border-green-200 transition-colors"
+                    className="p-2.5 rounded-xl bg-[#F0FDF4] hover:bg-[#DCFCE7] text-[#15803D] text-xs font-bold flex items-center justify-center gap-1.5 border border-green-200 transition-colors shadow-2xs"
                   >
-                    <MessageCircle size={12} />
+                    <MessageCircle size={13} className="stroke-[2.2]" />
                     <span>WhatsApp</span>
                   </a>
-                ) : null}
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                    <MessageCircle size={13} />
+                    <span>WhatsApp</span>
+                  </div>
+                )}
+
+                {selectedLead.email ? (
+                  <a
+                    href={`mailto:${selectedLead.email}`}
+                    className="p-2.5 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#E5E1F0] transition-colors shadow-2xs"
+                  >
+                    <Mail size={13} className="stroke-[2.2]" />
+                    <span>Email</span>
+                  </a>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                    <Mail size={13} />
+                    <span>No Email</span>
+                  </div>
+                )}
               </div>
 
-              {/* Status Stepper */}
-              <div className="pt-2">
+              {/* Lead Stage Changer Card */}
+              <div className="bg-[#FAF9FD] rounded-xl p-3.5 border border-[#E5E1F0] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10.5px] font-bold text-[#1A085C] uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-[#5B4CF5]" />
+                    <span>Update Pipeline Stage</span>
+                  </span>
+                  <span className="text-[10px] text-[#6B7280]">Auto-saves</span>
+                </div>
                 <select
                   value={selectedLead.stage}
                   onChange={(e) => handleStageChange(selectedLead.id, e.target.value as LeadStage)}
-                  className="w-full h-8 px-2.5 rounded-xl border border-[#EAE6F7] bg-white text-xs font-bold text-[#1A085C] focus:border-[#5B4CF5] outline-none cursor-pointer"
+                  className="w-full h-9 px-3 rounded-lg border border-[#E5E1F0] bg-white text-xs font-bold text-[#1A085C] focus:border-[#5B4CF5] focus:outline-none cursor-pointer shadow-2xs"
                 >
-                  <option value="new">Status: New Inbound</option>
-                  <option value="contacted">Status: Contacted</option>
-                  <option value="proposal_sent">Status: Proposal Sent</option>
-                  <option value="won">Status: Qualified Won</option>
-                  <option value="lost">Status: Closed Lost</option>
+                  <option value="new">Stage: New Inbound</option>
+                  <option value="contacted">Stage: Contacted</option>
+                  <option value="proposal_sent">Stage: Proposal Sent</option>
+                  <option value="won">Stage: Qualified Won</option>
+                  <option value="lost">Stage: Closed Lost</option>
                 </select>
               </div>
+
+              {/* Contact Information Details Card */}
+              <div className="bg-white rounded-xl p-4 border border-[#E5E1F0] shadow-2xs space-y-3">
+                <span className="text-[10.5px] font-bold text-[#1A085C] uppercase tracking-wider block">
+                  Contact Information
+                </span>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between py-1 border-b border-[#FAF9FD]">
+                    <span className="text-[#6B7280] flex items-center gap-1.5">
+                      <Mail size={12} className="text-[#5B4CF5]" />
+                      <span>Email Address</span>
+                    </span>
+                    <span className="font-semibold text-[#1A085C] truncate max-w-[220px]">
+                      {selectedLead.email || 'None'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-[#FAF9FD]">
+                    <span className="text-[#6B7280] flex items-center gap-1.5">
+                      <Phone size={12} className="text-[#5B4CF5]" />
+                      <span>Phone Number</span>
+                    </span>
+                    <span className="font-semibold text-[#1A085C]">
+                      {selectedLead.phone || 'None'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-[#FAF9FD]">
+                    <span className="text-[#6B7280] flex items-center gap-1.5">
+                      <Globe size={12} className="text-[#5B4CF5]" />
+                      <span>Acquisition Channel</span>
+                    </span>
+                    <div>{getSourceBadge(selectedLead.source)}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-[#6B7280] flex items-center gap-1.5">
+                      <Clock size={12} className="text-[#5B4CF5]" />
+                      <span>Received On</span>
+                    </span>
+                    <span className="font-semibold text-[#1A085C]">
+                      {new Date(selectedLead.createdAt).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Needed Card */}
+              <div className="bg-white rounded-xl p-4 border border-[#E5E1F0] shadow-2xs space-y-2">
+                <span className="text-[10.5px] font-bold text-[#1A085C] uppercase tracking-wider block">
+                  Service Requirement
+                </span>
+                <div className="p-3 rounded-lg bg-[#FAF5FF] border border-purple-100 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-xs text-[#1A085C]">
+                      {selectedLead.serviceNeeded || 'Full Stack Modern Engineering'}
+                    </div>
+                    <div className="text-[10px] text-[#6B7280] mt-0.5">
+                      InfoHQ Core Service Layer
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#5B4CF5] text-white">
+                    Primary
+                  </span>
+                </div>
+              </div>
+
+              {/* Inbound Message Card */}
+              <div className="bg-white rounded-xl p-4 border border-[#E5E1F0] shadow-2xs space-y-2">
+                <span className="text-[10.5px] font-bold text-[#1A085C] uppercase tracking-wider block">
+                  Inbound Client Message
+                </span>
+                <div className="p-3.5 rounded-xl bg-[#FAF9FD] border border-[#E5E1F0] text-xs text-[#374151] leading-relaxed italic">
+                  "{selectedLead.message || 'No direct message provided in the submission form.'}"
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Drawer Footer */}
+            <div className="p-4 border-t border-[#E5E1F0] bg-[#FAF9FD] flex items-center justify-between">
+              <span className="text-[11px] text-[#6B7280]">
+                Lead ID: <strong className="text-[#1A085C] font-mono">{selectedLead.id.slice(0, 10)}...</strong>
+              </span>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="px-4 py-1.5 rounded-full bg-white border border-[#E5E1F0] hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              >
+                Close Profile
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Add Lead Modal */}
       <AddLeadModal

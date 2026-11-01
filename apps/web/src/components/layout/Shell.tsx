@@ -561,12 +561,12 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </div>
           </div>
 
-          {/* Right Section: Theme Toggle + Notifications + Help + Profile Dropdown */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Date Pill Card (Matching Reference Image 1) */}
-            <div className="hidden xl:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white border border-[#EAE6F7] shadow-2xs">
-              <div className="w-7 h-7 rounded-full bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
-                <Calendar size={14} className="stroke-[2.2]" />
+          {/* Right Section: Date + Notifications + Profile Dropdown (Clean, Simple, Without Boxy Pill Backgrounds) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Simple Clean Date Display (Without Boxy Pill Background) */}
+            <div className="hidden xl:flex items-center gap-2 px-1 text-left leading-tight">
+              <div className="w-7 h-7 rounded-full bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shrink-0">
+                <Calendar size={13} className="stroke-[2.2]" />
               </div>
               <div className="text-left leading-tight">
                 <div className="text-[11px] font-bold text-[#1A085C]">
@@ -582,29 +582,29 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
               </div>
             </div>
 
-            {/* Notifications Pill with Red Badge Dot */}
+            {/* Clean Notifications Button (Without Boxy Pill Background) */}
             <button
-              className="w-9 h-9 rounded-full bg-white border border-[#EAE6F7] hover:border-[#5B4CF5]/40 text-[#6B7280] hover:text-[#5B4CF5] transition-all flex items-center justify-center cursor-pointer relative shadow-2xs"
+              className="w-8 h-8 rounded-xl hover:bg-white/80 text-[#6B7280] hover:text-[#5B4CF5] transition-all flex items-center justify-center cursor-pointer relative"
               title="Notifications"
               aria-label="Notifications"
             >
-              <Bell size={16} />
-              <span className="w-2 h-2 rounded-full bg-[#EF4444] absolute top-2 right-2 ring-1.5 ring-white" />
+              <Bell size={17} />
+              <span className="w-2 h-2 rounded-full bg-[#EF4444] absolute top-1.5 right-1.5 ring-1.5 ring-[#F3F0FA]" />
             </button>
 
-            {/* User Profile Pill (Matching Reference Images) */}
+            {/* Clean User Profile (Without Boxy Pill Background) */}
             <div className="relative pl-1" ref={dropdownRef}>
               <div
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2.5 py-1 px-2.5 rounded-full bg-white border border-[#EAE6F7] hover:border-[#5B4CF5]/40 transition-all cursor-pointer select-none shadow-2xs"
+                className="flex items-center gap-2 py-1 px-1.5 rounded-xl hover:bg-white/80 transition-all cursor-pointer select-none"
                 role="button"
                 tabIndex={0}
                 aria-label="User profile menu"
                 aria-expanded={profileDropdownOpen}
               >
-                {/* Profile Avatar: 2-Stop Gradient Pill */}
+                {/* Profile Avatar: 2-Stop Gradient */}
                 <div
-                  className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5B4CF5] to-[#E85AA0] text-white flex items-center justify-center font-bold text-xs shadow-xs ring-2 ring-white shrink-0"
+                  className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#5B4CF5] to-[#E85AA0] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0"
                   title={`${displayName} (${designation})`}
                 >
                   {avatarLetter}
@@ -622,7 +622,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
 
                 {/* Dropdown Chevron */}
                 <ChevronDown
-                  size={14}
+                  size={13}
                   className={`text-[#6B7280] transition-transform duration-200 hidden sm:block ${
                     profileDropdownOpen ? 'rotate-180 text-[#5B4CF5]' : ''
                   }`}
@@ -704,7 +704,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
         </header>
 
         {/* Dynamic Page Container: Whisper Slate-Lavender #F8F7FC */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto pb-12">
+        <main className="flex-1 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3.5 max-w-[1440px] w-full mx-auto">
           {renderActiveView()}
         </main>
       </div>

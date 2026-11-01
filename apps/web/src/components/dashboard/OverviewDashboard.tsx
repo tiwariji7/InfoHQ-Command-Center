@@ -303,25 +303,25 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   ];
 
   return (
-    <div className="relative space-y-4 sm:space-y-5">
-      {/* Subtle Ambient Glassmorphic Background Orbs */}
-      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+    <div className="relative space-y-3.5 sm:space-y-4">
+      {/* Subtle Ambient Background Orbs */}
+      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.04] rounded-full blur-3xl pointer-events-none -z-10" />
 
       {error && (
-        <div className="p-3.5 bg-red-50/90 backdrop-blur-xs border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle size={15} />
+        <div className="p-3 bg-red-50 border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2 shrink-0">
+          <AlertCircle size={14} />
           <span>{error}</span>
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* 1. GREETING BANNER (Clean, Authoritative, Glass Touch)     */}
+      {/* 1. GREETING BANNER (Simple Live Data & Telegram, No Pills) */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0 pt-0.5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1A085C]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1A085C] leading-tight">
             {greeting},{' '}
             <span
               style={{
@@ -338,55 +338,49 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </p>
         </div>
 
-        {/* Pro Live Data Indicator & Sync Action Button */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          {/* Glass Live System Status Pill */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_2px_10px_rgba(26,8,92,0.03)]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
-            </span>
-            <span className="text-[11px] font-black text-[#1A085C] tracking-tight">Live Data</span>
-            <span className="w-1 h-1 rounded-full bg-[#EAE6F7] hidden sm:inline" />
-            <span className="text-[10px] text-[#10B981] font-bold hidden sm:inline">Active</span>
-          </div>
-
-          {/* Sync Button */}
+        {/* Live Data Clickable Sync + Telegram Briefing (Clean, No Pill Background) */}
+        <div className="flex items-center gap-3.5 sm:gap-4 self-start sm:self-auto select-none">
+          {/* Clickable Live Data without pill background */}
           <button
             onClick={loadDashboard}
             disabled={isLoading}
-            className="h-8 px-3 rounded-full bg-white/85 backdrop-blur-md hover:bg-white border border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-[0_2px_10px_rgba(26,8,92,0.03)] transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-            title="Sync live dashboard metrics"
+            className="text-xs font-bold text-[#1A085C] hover:text-[#5B4CF5] inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 group py-1"
+            title="Live Data Active • Click to sync latest metrics"
           >
-            <RefreshCw size={11} className={isLoading ? 'animate-spin text-[#5B4CF5]' : 'text-[#5B4CF5]'} />
-            <span>Sync</span>
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLoading ? 'bg-indigo-400' : 'bg-emerald-400'} opacity-75`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isLoading ? 'bg-[#5B4CF5]' : 'bg-[#10B981]'}`}></span>
+            </span>
+            <span className="text-xs font-bold">Live Data</span>
+            <RefreshCw
+              size={11}
+              className={`text-[#5B4CF5] transition-transform group-hover:rotate-180 duration-500 ${isLoading ? 'animate-spin' : ''}`}
+            />
           </button>
 
-          {/* Telegram Briefing Trigger Button */}
+          <span className="w-1 h-1 rounded-full bg-[#D1D5DB]" />
+
+          {/* Telegram Briefing without pill background */}
           <button
             onClick={handleSendTelegramBriefing}
             disabled={isSendingTelegram}
-            className={`h-8 px-3 rounded-full border text-xs font-bold inline-flex items-center gap-1.5 shadow-[0_2px_10px_rgba(26,8,92,0.03)] transition-all cursor-pointer active:scale-95 disabled:opacity-50 backdrop-blur-md ${
-              telegramSent
-                ? 'bg-[#F0FDF4]/90 border-green-200 text-[#15803D]'
-                : 'bg-white/85 hover:bg-white border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5]'
-            }`}
+            className="text-xs font-bold text-[#5B4CF5] hover:text-[#4338CA] inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 py-1"
             title="Send live daily briefing to Telegram"
           >
             {isSendingTelegram ? (
               <>
                 <RefreshCw size={11} className="animate-spin text-[#5B4CF5]" />
-                <span>Sending...</span>
+                <span className="text-xs">Sending...</span>
               </>
             ) : telegramSent ? (
               <>
-                <Check size={11} className="text-[#15803D]" />
-                <span>Sent to Telegram</span>
+                <Check size={12} className="text-[#15803D]" />
+                <span className="text-xs text-[#15803D]">Sent to Telegram</span>
               </>
             ) : (
               <>
-                <Send size={11} className="text-[#5B4CF5]" />
-                <span>Telegram Briefing</span>
+                <Send size={12} className="text-[#5B4CF5]" />
+                <span className="text-xs">Telegram Briefing</span>
               </>
             )}
           </button>
@@ -394,34 +388,34 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       </div>
 
       {/* ========================================================= */}
-      {/* 2. THREE-COLUMN BALANCED TOP GRID (Glassmorphic & Rich)    */}
+      {/* 2. THREE-COLUMN BALANCED TOP GRID (Solid Crisp White Cards)*/}
       {/* Col 1: Total Revenue | Col 2: 2x2 Square Cards | Col 3: Trends */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
         {/* ========================================================= */}
         {/* COLUMN 1: Total Revenue Card with Interactive Sub-Tiles   */}
         {/* ========================================================= */}
         <div
           onClick={() => onNavigateTab('billing')}
-          className="lg:col-span-4 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 sm:p-6 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+          className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
         >
           {/* Ambient inner background glow */}
           <div
-            className="absolute -right-8 -bottom-8 w-44 h-44 rounded-full pointer-events-none opacity-20 blur-3xl"
+            className="absolute -right-8 -bottom-8 w-40 h-40 rounded-full pointer-events-none opacity-20 blur-3xl"
             style={{ background: 'linear-gradient(135deg, #5B4CF5 0%, #E85AA0 100%)' }}
           />
 
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-bold text-[#1A085C]">Total Revenue</span>
-              <span className="text-[10.5px] font-semibold text-[#6B7280] bg-[#F8F8FF]/80 px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1">
-                <Calendar size={11} className="text-[#5B4CF5]" />
+              <span className="text-[10px] font-semibold text-[#6B7280] bg-[#F8F7FD] px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1">
+                <Calendar size={10} className="text-[#5B4CF5]" />
                 <span>This Month</span>
-                <ChevronRight size={10} className="rotate-90" />
+                <ChevronRight size={9} className="rotate-90" />
               </span>
             </div>
 
-            <div className="my-3.5">
+            <div className="my-2.5 sm:my-3">
               <div className="text-3xl sm:text-4xl font-black text-[#1A085C] tabular-nums tracking-tight">
                 {formatCurrency(totalInvoiced)}
               </div>
@@ -433,7 +427,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
 
           {/* Sub-metrics 3 tiles row with Dynamic Colorful Hover! */}
-          <div className="grid grid-cols-3 gap-2 pt-3.5 border-t border-[#EAE6F7]/80 relative z-10">
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#EAE6F7] relative z-10">
             {revenueSubTiles.map((tile, idx) => {
               const isTileHovered = hoveredRevenueTile === idx;
               const TileIcon = tile.icon;
@@ -455,7 +449,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   className={`p-2.5 rounded-xl transition-all duration-300 cursor-pointer ${
                     isTileHovered
                       ? 'text-white -translate-y-0.5'
-                      : 'bg-[#F8F8FF]/80 border border-[#EAE6F7]/70 hover:border-[#5B4CF5]/40 text-[#1A085C]'
+                      : 'bg-[#F8F7FD] border border-[#EAE6F7] hover:border-[#5B4CF5]/40 text-[#1A085C]'
                   }`}
                 >
                   <div className="flex items-center gap-1 text-[10px] font-medium">
@@ -468,7 +462,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     </span>
                   </div>
 
-                  <div className={`text-sm font-black mt-1 truncate ${isTileHovered ? 'text-white' : 'text-[#1A085C]'}`}>
+                  <div className={`text-sm sm:text-base font-black mt-1 truncate ${isTileHovered ? 'text-white' : 'text-[#1A085C]'}`}>
                     {tile.value}
                   </div>
 
@@ -489,7 +483,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         {/* COLUMN 2: 2x2 Square Cards with Dynamic Colorful Hover    */}
         {/* Whichever card the cursor enters becomes colorful!         */}
         {/* ========================================================= */}
-        <div className="lg:col-span-4 grid grid-cols-2 gap-2.5 sm:gap-3.5">
+        <div className="lg:col-span-4 grid grid-cols-2 gap-2.5 sm:gap-3">
           {squareCards.map((card, idx) => {
             const isHovered = hoveredCardIndex === idx;
             const Icon = card.icon;
@@ -508,10 +502,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       }
                     : {}
                 }
-                className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+                className={`rounded-2xl p-3 sm:p-3.5 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                   isHovered
                     ? 'text-white -translate-y-1'
-                    : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+                    : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -527,7 +521,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-2 sm:mt-2.5">
+                <div className="mt-2">
                   <span
                     className={`text-[10px] sm:text-[10.5px] font-semibold block truncate ${
                       isHovered ? 'text-white/90' : 'text-[#6B7280]'
@@ -556,35 +550,54 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* COLUMN 3: Revenue & Lead Trends (Monthly Report, 2 Pillars)*/}
+        {/* COLUMN 3: Revenue & Lead Trends (Proper Dual Graph)       */}
+        {/* Clear Amounts & Leads on Each Pillar                      */}
         {/* ========================================================= */}
-        <div className="lg:col-span-4 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white/95 transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7]/80">
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
-                <TrendingUp size={13} />
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-[#EAE6F7]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+                  <TrendingUp size={13} />
+                </div>
+                <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
+                  Monthly Trends (October 2026)
+                </h3>
               </div>
-              <h3 className="text-xs font-bold text-[#1A085C]">
-                Monthly Trends (October 2026)
-              </h3>
+
+              {/* Legend with Amount & Count indicators */}
+              <div className="flex items-center gap-2.5 text-[9.5px] font-bold text-[#6B7280]">
+                <span className="flex items-center gap-1 text-[#5B4CF5]">
+                  <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                  <span>Revenue</span>
+                </span>
+                <span className="flex items-center gap-1 text-[#E85AA0]">
+                  <span className="w-2 h-2 rounded-full bg-[#E85AA0]" />
+                  <span>Leads</span>
+                </span>
+              </div>
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-2.5 text-[9.5px] font-semibold text-[#6B7280]">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
-                <span>Revenue</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#E85AA0]" />
-                <span>Leads</span>
-              </span>
+            {/* Quick Metrics Header Strip */}
+            <div className="grid grid-cols-3 gap-1 py-1.5 px-2 my-2 bg-[#FAF9FD] rounded-xl border border-[#EAE6F7] text-center">
+              <div>
+                <span className="text-[9px] text-[#6B7280] block">Total MTD Rev</span>
+                <span className="text-xs font-black text-[#5B4CF5]">₹71,90,000</span>
+              </div>
+              <div className="border-x border-[#EAE6F7]">
+                <span className="text-[9px] text-[#6B7280] block">Total Leads</span>
+                <span className="text-xs font-black text-[#E85AA0]">101 Leads</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-[#6B7280] block">Conversion</span>
+                <span className="text-xs font-black text-[#10B981]">28.5% Won</span>
+              </div>
             </div>
           </div>
 
-          {/* SVG Grouped Dual Pillar Chart (Week 1 to Week 4) */}
-          <div className="py-2.5 flex-1 flex flex-col justify-center">
-            <svg viewBox="0 0 380 155" className="w-full h-auto overflow-visible">
+          {/* SVG Grouped Dual Pillar Chart with Exact Amounts & Lead Counts */}
+          <div className="py-1 flex-1 flex flex-col justify-center">
+            <svg viewBox="0 0 380 145" className="w-full h-auto overflow-visible">
               <defs>
                 <linearGradient id="monthRevGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" stopColor="#7C5CE8" />
@@ -597,42 +610,50 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </defs>
 
               {/* Grid Lines */}
-              <line x1="35" y1="18" x2="365" y2="18" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="35" y1="46" x2="365" y2="46" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="35" y1="74" x2="365" y2="74" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="35" y1="102" x2="365" y2="102" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="35" y1="130" x2="365" y2="130" stroke="#EAE6F7" />
+              <line x1="38" y1="18" x2="365" y2="18" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="38" y1="46" x2="365" y2="46" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="38" y1="74" x2="365" y2="74" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="38" y1="102" x2="365" y2="102" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="38" y1="126" x2="365" y2="126" stroke="#EAE6F7" />
 
               {/* Y-Axis Left (Revenue in Lakh) */}
-              <text x="4" y="22" fontSize="8" fill="#9CA3AF" fontWeight="600">₹25L</text>
-              <text x="4" y="50" fontSize="8" fill="#9CA3AF" fontWeight="600">₹20L</text>
-              <text x="4" y="78" fontSize="8" fill="#9CA3AF" fontWeight="600">₹15L</text>
-              <text x="4" y="106" fontSize="8" fill="#9CA3AF" fontWeight="600">₹10L</text>
-              <text x="14" y="133" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
+              <text x="4" y="21" fontSize="8" fill="#9CA3AF" fontWeight="600">₹25L</text>
+              <text x="4" y="49" fontSize="8" fill="#9CA3AF" fontWeight="600">₹20L</text>
+              <text x="4" y="77" fontSize="8" fill="#9CA3AF" fontWeight="600">₹15L</text>
+              <text x="4" y="105" fontSize="8" fill="#9CA3AF" fontWeight="600">₹10L</text>
+              <text x="14" y="129" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
 
               {/* WEEK 1 (Oct 1-7): Revenue ₹12.5L, Leads 18 */}
-              <rect x="68" y="72" width="15" height="58" rx="3.5" fill="url(#monthRevGrad)" />
-              <rect x="86" y="86" width="15" height="44" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="84" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 1</text>
+              <text x="74" y="65" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹12.5L</text>
+              <rect x="66" y="70" width="16" height="56" rx="3.5" fill="url(#monthRevGrad)" />
+              <text x="94" y="79" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">18</text>
+              <rect x="86" y="84" width="16" height="42" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="84" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 1</text>
 
               {/* WEEK 2 (Oct 8-14): Revenue ₹15.8L, Leads 22 */}
-              <rect x="146" y="56" width="15" height="74" rx="3.5" fill="url(#monthRevGrad)" />
-              <rect x="164" y="76" width="15" height="54" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="162" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 2</text>
+              <text x="152" y="49" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹15.8L</text>
+              <rect x="144" y="54" width="16" height="72" rx="3.5" fill="url(#monthRevGrad)" />
+              <text x="172" y="69" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">22</text>
+              <rect x="164" y="74" width="16" height="52" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="162" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 2</text>
 
               {/* WEEK 3 (Oct 15-21): Revenue ₹19.4L, Leads 27 */}
-              <rect x="224" y="42" width="15" height="88" rx="3.5" fill="url(#monthRevGrad)" />
-              <rect x="242" y="62" width="15" height="68" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="240" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 3</text>
+              <text x="230" y="35" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹19.4L</text>
+              <rect x="222" y="40" width="16" height="86" rx="3.5" fill="url(#monthRevGrad)" />
+              <text x="250" y="55" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">27</text>
+              <rect x="242" y="60" width="16" height="66" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="240" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 3</text>
 
               {/* WEEK 4 (Oct 22-31): Revenue ₹24.2L, Leads 34 */}
-              <rect x="302" y="24" width="15" height="106" rx="3.5" fill="url(#monthRevGrad)" />
-              <rect x="320" y="46" width="15" height="84" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="318" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 4</text>
+              <text x="308" y="19" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹24.2L</text>
+              <rect x="300" y="24" width="16" height="102" rx="3.5" fill="url(#monthRevGrad)" />
+              <text x="328" y="41" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">34</text>
+              <rect x="320" y="46" width="16" height="80" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="318" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 4</text>
             </svg>
           </div>
 
-          <div className="pt-2 border-t border-[#EAE6F7]/80 flex items-center justify-between text-[10px] text-[#6B7280]">
+          <div className="pt-2 border-t border-[#EAE6F7] flex items-center justify-between text-[10px] text-[#6B7280]">
             <span>MTD Realization: <strong className="text-[#1A085C]">91.4%</strong></span>
             <span className="text-[#10B981] font-bold">↗ +28% MTD Growth</span>
           </div>
@@ -640,144 +661,148 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       </div>
 
       {/* ========================================================= */}
-      {/* 3. LOWER SECTION: TWO MASTER TABLES                        */}
-      {/* Table 1: Project Health & Deliverables (Tight, Zero Gaps)   */}
-      {/* Table 2: Recent Leads (Spacious & Clean, Zero Wrap)        */}
+      {/* 3. LOWER SECTION: TWO MASTER TABLES (Solid White, Clean)   */}
+      {/* Table 1: Project Health & Deliverables                     */}
+      {/* Table 2: Recent Leads                                      */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
         {/* Table 1: Project Health & Deliverables */}
-        <div className="lg:col-span-6 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col">
-          <div className="flex items-center justify-between pb-3 border-b border-[#EAE6F7]/80 mb-1">
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
-                <Layers size={13} />
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7] mb-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+                  <Layers size={13} />
+                </div>
+                <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
+                  Project Health &amp; Deliverables
+                </h3>
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
-                Project Health &amp; Deliverables
-              </h3>
+
+              <button
+                onClick={() => onNavigateTab('projects')}
+                className="text-[10px] font-semibold text-[#6B7280] bg-[#F8F7FD] hover:bg-[#F3F0FF] px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>Active Projects</span>
+                <ChevronRight size={8} className="rotate-90" />
+              </button>
             </div>
 
-            <button
-              onClick={() => onNavigateTab('projects')}
-              className="text-[10.5px] font-semibold text-[#6B7280] bg-[#F8F8FF]/80 hover:bg-[#F3F0FF] px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <span>Active Projects</span>
-              <ChevronRight size={9} className="rotate-90" />
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse table-auto">
-              <thead>
-                <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-[28%]">Client</th>
-                  <th className="py-2.5 px-3 w-[36%]">Project Name</th>
-                  <th className="py-2.5 px-3 w-[20%]">Status</th>
-                  <th className="py-2.5 px-3 w-[16%] text-right">Due Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EAE6F7]/60">
-                {displayProjects.map((p: any, idx) => {
-                  return (
-                    <tr
-                      key={p.id || idx}
-                      onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
-                      className="hover:bg-white/60 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3 px-3 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs">
-                        {p.clientName}
-                      </td>
-                      <td className="py-3 px-3 font-medium text-[#4B5563] text-xs">
-                        {p.title || p.name}
-                      </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        {getStatusBadge(p.status)}
-                      </td>
-                      <td className="py-3 px-3 text-right text-[10.5px] text-[#6B7280] font-medium whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 justify-end">
-                          <Calendar size={10} className="text-[#9CA3AF]" />
-                          <span>{formatISTDate(p.dueDate || Date.now())}</span>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse table-auto">
+                <thead>
+                  <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
+                    <th className="py-2 px-2.5 w-[28%]">Client</th>
+                    <th className="py-2 px-2.5 w-[36%]">Project Name</th>
+                    <th className="py-2 px-2.5 w-[20%]">Status</th>
+                    <th className="py-2 px-2.5 w-[16%] text-right">Due Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EAE6F7]/60">
+                  {displayProjects.map((p: any, idx) => {
+                    return (
+                      <tr
+                        key={p.id || idx}
+                        onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
+                        className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                      >
+                        <td className="py-2 px-2.5 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs truncate max-w-[130px]">
+                          {p.clientName}
+                        </td>
+                        <td className="py-2 px-2.5 font-medium text-[#4B5563] text-xs truncate max-w-[150px]">
+                          {p.title || p.name}
+                        </td>
+                        <td className="py-2 px-2.5 whitespace-nowrap">
+                          {getStatusBadge(p.status)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right text-[10.5px] text-[#6B7280] font-medium whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            <Calendar size={9} className="text-[#9CA3AF]" />
+                            <span>{formatISTDate(p.dueDate || Date.now())}</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         {/* Table 2: Recent Leads */}
-        <div className="lg:col-span-6 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col">
-          <div className="flex items-center justify-between pb-3 border-b border-[#EAE6F7]/80 mb-1">
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-md bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center">
-                <Users size={13} />
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7] mb-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-md bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center">
+                  <Users size={13} />
+                </div>
+                <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
+                  Recent Leads
+                </h3>
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
-                Recent Leads
-              </h3>
+
+              <button
+                onClick={() => onNavigateTab('leads')}
+                className="text-[11px] font-bold text-[#5B4CF5] hover:text-[#E85AA0] flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>View All Leads</span>
+                <ArrowRight size={11} />
+              </button>
             </div>
 
-            <button
-              onClick={() => onNavigateTab('leads')}
-              className="text-[11px] font-bold text-[#5B4CF5] hover:text-[#E85AA0] flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <span>View All Leads</span>
-              <ArrowRight size={12} />
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse table-auto">
-              <thead>
-                <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-[35%]">Lead</th>
-                  <th className="py-2.5 px-3 w-[33%]">Service Needed</th>
-                  <th className="py-2.5 px-3 w-[16%]">Source</th>
-                  <th className="py-2.5 px-3 w-[16%] text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EAE6F7]/60">
-                {displayLeads.map((ld: any, idx) => {
-                  const leadName = ld.name || ld.clientName || 'Valued Lead';
-                  const initials = getMonogram(leadName);
-                  const leadEmail = ld.email || 'inquiry@lead.in';
-                  return (
-                    <tr
-                      key={ld.id || idx}
-                      onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
-                      className="hover:bg-white/60 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[9px] flex items-center justify-center shrink-0">
-                            {initials}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse table-auto">
+                <thead>
+                  <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
+                    <th className="py-2 px-2.5 w-[35%]">Lead</th>
+                    <th className="py-2 px-2.5 w-[33%]">Service Needed</th>
+                    <th className="py-2 px-2.5 w-[16%]">Source</th>
+                    <th className="py-2 px-2.5 w-[16%] text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EAE6F7]/60">
+                  {displayLeads.map((ld: any, idx) => {
+                    const leadName = ld.name || ld.clientName || 'Valued Lead';
+                    const initials = getMonogram(leadName);
+                    const leadEmail = ld.email || 'inquiry@lead.in';
+                    return (
+                      <tr
+                        key={ld.id || idx}
+                        onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
+                        className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                      >
+                        <td className="py-2 px-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5.5 h-5.5 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[8.5px] flex items-center justify-center shrink-0">
+                              {initials}
+                            </div>
+                            <div className="truncate max-w-[130px]">
+                              <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-[11px] leading-tight">{leadName}</div>
+                              <div className="text-[9px] text-[#9CA3AF] truncate leading-tight">{leadEmail}</div>
+                            </div>
                           </div>
-                          <div className="truncate max-w-[140px]">
-                            <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-[11px]">{leadName}</div>
-                            <div className="text-[9.5px] text-[#9CA3AF] truncate">{leadEmail}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="font-semibold text-[#4B5563] truncate max-w-[150px] block text-[11px]">
-                          {ld.service || ld.requirements || 'Digital Architecture'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="text-[10.5px] font-medium text-[#6B7280]">
-                          {ld.source || 'Website'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right whitespace-nowrap">
-                        {getStatusBadge(ld.status || 'New')}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-2 px-2.5">
+                          <span className="font-semibold text-[#4B5563] truncate max-w-[140px] block text-[11px]">
+                            {ld.service || ld.requirements || 'Digital Architecture'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5">
+                          <span className="text-[10px] font-medium text-[#6B7280]">
+                            {ld.source || 'Website'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5 text-right whitespace-nowrap">
+                          {getStatusBadge(ld.status || 'New')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

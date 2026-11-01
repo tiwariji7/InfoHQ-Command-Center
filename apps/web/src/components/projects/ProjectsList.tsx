@@ -248,12 +248,15 @@ export const ProjectsList: React.FC = () => {
           <button
             onClick={() => setIsCreateModalOpen(true)}
             style={{
-              background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-              boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+              background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+              boxShadow: '0 8px 24px -2px rgba(91, 76, 245, 0.42), 0 2px 8px rgba(232, 90, 160, 0.28)',
+              color: '#FFFFFF',
             }}
-            className="h-8 px-3.5 rounded-full text-white text-xs font-bold inline-flex items-center gap-1.5 hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            className="h-10 sm:h-11 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 cursor-pointer shadow-lg shrink-0"
           >
-            <Plus size={13} className="stroke-[2.5]" />
+            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Plus size={14} className="stroke-[3] text-white" />
+            </div>
             <span>New Project</span>
           </button>
         </div>
@@ -283,7 +286,7 @@ export const ProjectsList: React.FC = () => {
               className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                 isHovered
                   ? 'text-white -translate-y-1'
-                  : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+                  : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -330,7 +333,7 @@ export const ProjectsList: React.FC = () => {
       {/* ========================================================= */}
       {/* 1.1 SPRINT EXECUTION & DELIVERABLES GRAPH DECK            */}
       {/* ========================================================= */}
-      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-[#E5E1F0] p-4 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
             <BarChart2 size={13} />
@@ -377,7 +380,7 @@ export const ProjectsList: React.FC = () => {
       {/* ========================================================= */}
       {/* 2. FILTER TABS & SEARCH TOOLBAR                           */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/85 backdrop-blur-md p-2.5 rounded-2xl border border-white/80 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)]">
         {/* Status Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
           {STATUS_CHIPS.map((chip) => {
@@ -470,7 +473,7 @@ export const ProjectsList: React.FC = () => {
               <div
                 key={proj.id}
                 onClick={() => setSelectedProjectId(proj.id)}
-                className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white hover:border-[#5B4CF5]/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(91,76,245,0.08)] transition-all cursor-pointer flex flex-col justify-between gap-3 group"
+                className="bg-white rounded-2xl border border-[#E5E1F0] p-4 shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(91,76,245,0.08)] transition-all cursor-pointer flex flex-col justify-between gap-3 group"
               >
                 <div className="space-y-2.5">
                   {/* Top Bar: Service Tag & Status Badge */}
