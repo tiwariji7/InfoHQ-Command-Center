@@ -77,17 +77,16 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  if (!payment) return null;
-
-  const clientName = payment.clientName || 'Shivam';
-  const clientEmail = payment.clientEmail || 'tiwarijofficial4@gmail.com';
-  const clientPhone = payment.clientPhone || '+91 83818 35420';
-  const companyName = payment.company || 'Shivam Tech Pvt. Ltd.';
+  const clientName = payment?.clientName || 'Shivam';
+  const clientEmail = payment?.clientEmail || 'tiwarijofficial4@gmail.com';
+  const clientPhone = payment?.clientPhone || '+91 83818 35420';
+  const companyName = payment?.company || 'Shivam Tech Pvt. Ltd.';
   const initials = getInitials(clientName);
-  const clientId = `CLT-${payment.id.slice(-4).toUpperCase()}`;
+  const clientId = payment ? `CLT-${payment.id.slice(-4).toUpperCase()}` : 'CLT-0001';
 
-  // Filter all payments belonging to this client
+  // Filter all payments belonging to this client (Always called before any early return)
   const clientInvoices = useMemo(() => {
+    if (!payment) return [];
     const matched = allPayments.filter(
       (p) =>
         (p.clientName && p.clientName.toLowerCase() === clientName.toLowerCase()) ||
@@ -111,6 +110,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
   // Derived client projects
   const clientProjects = useMemo(() => {
+    if (!payment) return [];
     const uniqueProjectsMap = new Map<string, { id: string; title: string; subtitle: string; progress: number; status: 'active' | 'completed'; dates: string; icon: string }>();
 
     clientInvoices.forEach((inv) => {
@@ -143,7 +143,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       });
     }
     return projectsList;
-  }, [clientInvoices]);
+  }, [clientInvoices, payment]);
 
   // Filtered projects
   const filteredProjects = useMemo(() => {
@@ -158,6 +158,9 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     if (invoiceFilter === 'pending') return clientInvoices.filter((p) => p.status !== 'received');
     return clientInvoices;
   }, [clientInvoices, invoiceFilter]);
+
+  // Safe early return after ALL hooks are registered
+  if (!payment) return null;
 
   return (
     <div

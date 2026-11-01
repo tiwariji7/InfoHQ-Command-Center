@@ -454,16 +454,23 @@ export const PaymentsView: React.FC = () => {
                         {py.invoiceNumber || `INV-${py.id.slice(-6).toUpperCase()}`}
                       </td>
 
-                      {/* 2. Clients (Client name + small company name beneath, simple text) */}
+                      {/* 2. Clients (Profile pic initial e.g. Shivam -> S + Client name + small company name) */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-xs text-[#1A085C] leading-snug group-hover:text-[#5B4CF5] transition-colors">
-                          {py.clientName || 'Direct Client'}
-                        </div>
-                        {py.company && (
-                          <div className="text-[10px] text-[#6B7280] leading-snug mt-0.5">
-                            {py.company}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
+                            {(py.clientName?.trim()?.[0] || 'C').toUpperCase()}
                           </div>
-                        )}
+                          <div className="min-w-0">
+                            <div className="font-semibold text-xs text-[#1A085C] leading-snug group-hover:text-[#5B4CF5] transition-colors truncate">
+                              {py.clientName || 'Direct Client'}
+                            </div>
+                            {py.company && (
+                              <div className="text-[10px] text-[#6B7280] leading-snug mt-0.5 truncate">
+                                {py.company}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* 3. Project (Only project name, truncated if long) */}
