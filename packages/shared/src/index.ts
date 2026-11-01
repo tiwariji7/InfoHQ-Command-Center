@@ -62,6 +62,7 @@ export type LeadSource = z.infer<typeof LeadSourceSchema>;
 
 export const LeadSchema = z.object({
   id: z.string(),
+  clientId: z.string().nullable().optional(),
   name: z.string().min(1),
   email: z.string().email().nullable().optional(),
   phone: z.string().nullable().optional(),
@@ -126,10 +127,27 @@ export const SetFollowUpSchema = z.object({
 
 export type SetFollowUpInput = z.infer<typeof SetFollowUpSchema>;
 
+export const LeadStatusHistorySchema = z.object({
+  id: z.string(),
+  leadId: z.string(),
+  oldStatus: z.string(),
+  newStatus: z.string(),
+  reasonLost: z.string().nullable().optional(),
+  actorId: z.string().nullable().optional(),
+  createdAt: z.number(),
+});
+export type LeadStatusHistory = z.infer<typeof LeadStatusHistorySchema>;
+
 export interface LeadDetailResponse {
   lead: Lead;
   activities: LeadActivity[];
   notes: LeadNote[];
+  statusHistory?: LeadStatusHistory[];
+  relatedData?: {
+    client?: Client | null;
+    projects?: Project[];
+    payments?: Payment[];
+  };
 }
 
 export const LeadActivitySchema = z.object({
@@ -229,6 +247,7 @@ export type ProjectTask = z.infer<typeof ProjectTaskSchema>;
 
 export const ProjectSchema = z.object({
   id: z.string(),
+  clientId: z.string().nullable().optional(),
   leadId: z.string().nullable().optional(),
   title: z.string().min(1),
   clientName: z.string().min(1),
@@ -249,6 +268,7 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 
 export const CreateProjectSchema = z.object({
+  clientId: z.string().trim().optional(),
   leadId: z.string().trim().optional(),
   title: z.string().trim().min(1, 'Project title is required'),
   clientName: z.string().trim().min(1, 'Client name is required'),
@@ -323,6 +343,7 @@ export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 export const PaymentSchema = z.object({
   id: z.string(),
   projectId: z.string(),
+  clientId: z.string().nullable().optional(),
   leadId: z.string().nullable().optional(),
   title: z.string().optional(),
   amount: z.number(),
@@ -396,6 +417,60 @@ export interface PaymentSummary {
 export interface PaymentListResponse {
   payments: Payment[];
   summary: PaymentSummary;
+}
+
+// --- Clients Master Models ---
+
+export const ClientStatusSchema = z.enum(['active', 'inactive', 'archived']);
+export type ClientStatus = z.infer<typeof ClientStatusSchema>;
+
+export const ClientSchema = z.object({
+  id: z.string(), // CLT-2026-XXXXX
+  name: z.string().min(1),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  sourceLeadId: z.string().nullable().optional(),
+  status: ClientStatusSchema.default('active'),
+  totalBilled: z.number().default(0),
+  totalPaid: z.number().default(0),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  // Aggregated analytics fields
+  totalProjects: z.number().optional(),
+  activeProjects: z.number().optional(),
+  totalInvoices: z.number().optional(),
+  pendingAmount: z.number().optional(),
+});
+
+export type Client = z.infer<typeof ClientSchema>;
+
+export const CreateClientSchema = z.object({
+  name: z.string().trim().min(1, 'Client name is required'),
+  email: z.string().trim().email('Invalid email').optional().or(z.literal('')),
+  phone: z.string().trim().optional().or(z.literal('')),
+  company: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  sourceLeadId: z.string().trim().optional(),
+});
+export type CreateClientInput = z.infer<typeof CreateClientSchema>;
+
+export const UpdateClientSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  email: z.string().trim().email().optional().or(z.literal('')),
+  phone: z.string().trim().optional().or(z.literal('')),
+  company: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  status: ClientStatusSchema.optional(),
+});
+export type UpdateClientInput = z.infer<typeof UpdateClientSchema>;
+
+export interface ClientDetailResponse {
+  client: Client;
+  projects: Project[];
+  payments: Payment[];
+  lead?: Lead | null;
 }
 
 // --- Dashboard & Analytics Models ---

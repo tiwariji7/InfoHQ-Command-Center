@@ -214,6 +214,8 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
       amount: payment.amount,
       invoiceNumber,
       description: payment.title || 'InfoHQ Service Milestone',
+      paymentDbId: paymentId,
+      clientId: payment.clientId || undefined,
       customer: {
         name: payment.clientName || 'Valued Client',
         email: payment.clientEmail,

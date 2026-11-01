@@ -26,6 +26,10 @@ import type {
   MorningBriefingDigest,
   AutomationAlert,
   AutoConvertWonLeadInput,
+  Client,
+  ClientDetailResponse,
+  CreateClientInput,
+  UpdateClientInput,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -425,6 +429,58 @@ export async function generateRazorpayPaymentLinkApi(
     {
       method: 'POST',
     }
+  );
+}
+
+// --- Clients Master API Calls ---
+
+export async function fetchClients(
+  getToken: () => Promise<string | null>,
+  query?: { search?: string }
+): Promise<{ data: Client[] }> {
+  const searchParams = new URLSearchParams();
+  if (query?.search && query.search.trim().length > 0) {
+    searchParams.set('search', query.search.trim());
+  }
+  const qs = searchParams.toString();
+  return fetchWithAuth<{ data: Client[] }>(qs ? `/api/clients?${qs}` : '/api/clients', getToken);
+}
+
+export async function fetchClientDetail(
+  getToken: () => Promise<string | null>,
+  idOrName: string
+): Promise<ClientDetailResponse> {
+  return fetchWithAuth<ClientDetailResponse>(`/api/clients/${encodeURIComponent(idOrName)}`, getToken);
+}
+
+export async function createClientApi(
+  getToken: () => Promise<string | null>,
+  input: CreateClientInput
+): Promise<{ success: boolean; data: Client }> {
+  return fetchWithAuth<{ success: boolean; data: Client }>('/api/clients', getToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateClientApi(
+  getToken: () => Promise<string | null>,
+  clientId: string,
+  input: UpdateClientInput
+): Promise<{ success: boolean; data: Client }> {
+  return fetchWithAuth<{ success: boolean; data: Client }>(`/api/clients/${encodeURIComponent(clientId)}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchLeadRelatedData(
+  getToken: () => Promise<string | null>,
+  leadId: string
+): Promise<{ client: Client | null; projects: Project[]; payments: Payment[] }> {
+  return fetchWithAuth<{ client: Client | null; projects: Project[]; payments: Payment[] }>(
+    `/api/leads/${leadId}/related`,
+    getToken
   );
 }
 

@@ -136,31 +136,61 @@ export const PipelineView: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('');
 
   const loadPipelineLeads = useCallback(
-    async (showRefreshIndicator = false) => {
-      if (showRefreshIndicator) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
+    async (showRefreshIndicator = false, isBackground = false) => {
+      if (!isBackground) {
+        if (showRefreshIndicator) {
+          setIsRefreshing(true);
+        } else {
+          setIsLoading(true);
+        }
+        setErrorMessage(null);
       }
-      setErrorMessage(null);
 
       try {
         const res = await fetchLeads(getToken, { page: 1, pageSize: 50 });
         setLeads(res.data);
       } catch (err: unknown) {
-        setErrorMessage(
-          err instanceof Error ? err.message : 'Failed to load pipeline leads.'
-        );
+        if (!isBackground) {
+          setErrorMessage(
+            err instanceof Error ? err.message : 'Failed to load pipeline leads.'
+          );
+        }
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
+        if (!isBackground) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
     [getToken]
   );
 
   useEffect(() => {
-    loadPipelineLeads();
+    loadPipelineLeads(false, false);
+  }, [loadPipelineLeads]);
+
+  // Silent live auto-refresh without page reloads or spinners
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadPipelineLeads(false, true);
+      }
+    }, 10000);
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        loadPipelineLeads(false, true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [loadPipelineLeads]);
 
   const filteredLeads = useMemo(() => {

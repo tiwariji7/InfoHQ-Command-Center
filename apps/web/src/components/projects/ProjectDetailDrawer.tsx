@@ -574,9 +574,16 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                           <User size={12} className="text-[#9CA3AF]" />
                           <span>Client</span>
                         </span>
-                        <span className="font-semibold text-[#1A085C] truncate max-w-[200px]">
-                          {project.clientName}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-[#1A085C] truncate max-w-[150px]">
+                            {project.clientName}
+                          </span>
+                          {project.clientId && (
+                            <span className="font-mono text-[9.5px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                              {project.clientId}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between py-1 border-b border-[#F0EDF9]">

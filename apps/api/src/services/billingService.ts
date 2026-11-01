@@ -1,6 +1,8 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Bindings } from '../types/env.js';
 import type { AutoConvertWonLeadInput, Payment } from '@infohq/shared';
+import { createOrGetClient } from './clientService.js';
+import { generateInvoiceNumber } from '../utils/idGenerator.js';
 
 export interface RazorpayLinkResult {
   id: string;
@@ -13,6 +15,8 @@ export async function createRazorpayPaymentLink(
     amount: number; // in Rupees
     invoiceNumber: string;
     description: string;
+    paymentDbId?: string;
+    clientId?: string;
     customer: {
       name: string;
       email?: string | null;
@@ -21,22 +25,38 @@ export async function createRazorpayPaymentLink(
   },
   keys: { keyId: string; keySecret: string }
 ): Promise<RazorpayLinkResult | null> {
-  const { amount, invoiceNumber, description, customer } = params;
+  const { amount, invoiceNumber, description, paymentDbId, clientId, customer } = params;
 
   // Clean Indian mobile number if provided
-  let contact = customer.contact ? customer.contact.replace(/[^\d+]/g, '') : undefined;
-  if (contact && !contact.startsWith('+') && contact.length === 10) {
-    contact = `+91${contact}`;
+  let contact: string | undefined = undefined;
+  if (customer.contact) {
+    const digits = customer.contact.replace(/\D/g, '');
+    if (digits.length === 10) {
+      contact = `+91${digits}`;
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+      contact = `+91${digits.slice(1)}`;
+    } else if (digits.length === 12 && digits.startsWith('91')) {
+      contact = `+${digits}`;
+    } else if (digits.length >= 10) {
+      contact = `+${digits}`;
+    }
+  }
+
+  // Validate email format loosely to prevent Razorpay 400 validation error
+  let email: string | undefined = undefined;
+  if (customer.email && customer.email.includes('@') && customer.email.includes('.')) {
+    email = customer.email.trim();
   }
 
   const payload = {
-    amount: Math.round(amount * 100), // Razorpay accepts paise
+    amount: Math.max(100, Math.round(amount * 100)), // Razorpay accepts paise (minimum 100 paise = ₹1)
     currency: 'INR',
     accept_partial: false,
+    reference_id: paymentDbId || invoiceNumber,
     description: `${description} (${invoiceNumber})`,
     customer: {
       name: customer.name,
-      email: customer.email || undefined,
+      email: email || undefined,
       contact: contact || undefined,
     },
     notify: {
@@ -45,12 +65,17 @@ export async function createRazorpayPaymentLink(
     },
     reminder_enable: true,
     notes: {
+      paymentDbId: paymentDbId || '',
+      clientId: clientId || '',
       invoiceNumber,
+      customerName: customer.name || '',
       platform: 'InfoHQ Command Center',
     },
   };
 
-  const authHeader = `Basic ${btoa(`${keys.keyId}:${keys.keySecret}`)}`;
+  const cleanKeyId = keys.keyId.replace(/^['"]|['"]$/g, '').trim();
+  const cleanKeySecret = keys.keySecret.replace(/^['"]|['"]$/g, '').trim();
+  const authHeader = `Basic ${btoa(`${cleanKeyId}:${cleanKeySecret}`)}`;
 
   try {
     const res = await fetch('https://api.razorpay.com/v1/payment_links', {
@@ -269,13 +294,59 @@ export async function sendInvoiceEmailViaResend(
   }
 }
 
-// 3. Telegram Alert: Payment Link Generated
+// 3. Telegram Sanitization & Alert Delivery Infrastructure
 function escapeHtml(str: string | null | undefined): string {
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+export function getCleanTelegramCredentials(env: Bindings): { token: string; chatId: string } | null {
+  const rawToken = env.TELEGRAM_BOT_TOKEN;
+  const rawChatId = env.TELEGRAM_CHAT_ID;
+  if (!rawToken || !rawChatId) return null;
+  const token = rawToken.replace(/^['"]|['"]$/g, '').trim();
+  const chatId = rawChatId.replace(/^['"]|['"]$/g, '').trim();
+  if (!token || !chatId) return null;
+  return { token, chatId };
+}
+
+export async function sendTelegramMessage(text: string, env: Bindings): Promise<boolean> {
+  const creds = getCleanTelegramCredentials(env);
+  if (!creds) {
+    console.warn('[Telegram Alert]: Bot token or Chat ID not configured.');
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout to avoid any hang
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${creds.token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: creds.chatId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.warn('[Telegram Alert Warning]: HTTP', res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    console.error('[Telegram Alert Exception]:', err instanceof Error ? err.message : err);
+    return false;
+  }
 }
 
 // 3. Telegram Alert: Advance Payment Link Generated (Message 1)
@@ -290,35 +361,19 @@ export async function sendTelegramPaymentLinkAlert(
   },
   env: Bindings
 ) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
   const msg =
-    `💳 <b>New Invoice & Razorpay Payment Link Generated!</b>\n\n` +
+    `🔗 <b>New Payment Link Generated!</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💰 <b>Advance Milestone:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `📊 <b>Total Contract Value:</b> ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
-    `🔗 <b>Payment Link:</b> ${params.paymentLinkUrl || 'Direct settlement'}`;
+    `💰 <b>Amount Due:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `📊 <b>Total Project Budget:</b> ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
+    (params.paymentLinkUrl
+      ? `🌐 <b>Payment Link:</b>\n${params.paymentLinkUrl}\n\n`
+      : `ℹ️ <i>Direct offline settlement recorded.</i>\n\n`) +
+    `⚡ <i>Client can settle instantly via UPI, Cards, or NetBanking.</i>`;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: msg,
-        parse_mode: 'HTML',
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[Telegram Link Alert Warning]: HTTP', res.status, await res.text());
-    }
-  } catch (err) {
-    console.error('[Telegram Link Alert Failed]:', err);
-  }
+  return sendTelegramMessage(msg, env);
 }
 
 // 4. Telegram Alert: Payment Success Verified
@@ -334,37 +389,18 @@ export async function sendTelegramPaymentSuccessAlert(
   },
   env: Bindings
 ) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
   const msg =
-    `✅ <b>Payment Received &amp; Verified!</b>\n\n` +
+    `💰 <b>Payment Received &amp; Verified!</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💰 <b>Amount Paid:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `💵 <b>Amount Paid:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
     `💳 <b>Razorpay ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
     `🏦 <b>Method:</b> ${escapeHtml(params.paymentMethod || 'UPI / Online')}\n` +
     `📅 <b>Settled At:</b> ${escapeHtml(params.paidAtIST)}\n\n` +
-    `🚀 <b>CRM Action:</b> Invoice marked as PAID &amp; Receipt logged.`;
+    `✅ <b>CRM Status:</b> Marked as PAID in Database &amp; Live Dashboard!`;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: msg,
-        parse_mode: 'HTML',
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[Telegram Success Alert Warning]: HTTP', res.status, await res.text());
-    }
-  } catch (err) {
-    console.error('[Telegram Success Alert Failed]:', err);
-  }
+  return sendTelegramMessage(msg, env);
 }
 
 // 4.1 Telegram Alert: Payment Attempt Failed
@@ -380,37 +416,18 @@ export async function sendTelegramPaymentFailedAlert(
   },
   env: Bindings
 ) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
   const msg =
     `⚠️ <b>Payment Attempt Failed Alert!</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💰 <b>Amount:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `❌ <b>Reason:</b> ${escapeHtml(params.errorReason)}\n` +
+    `💸 <b>Attempted Amount:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `❌ <b>Failure Reason:</b> ${escapeHtml(params.errorReason)}\n` +
     `🆔 <b>Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
     `⏱ <b>Failed At:</b> ${escapeHtml(params.failedAtIST)}\n\n` +
-    `ℹ️ Client se contact karein ya link dobara verify karein.`;
+    `🔔 <i>Client se contact karein ya CRM se replacement link verify karein.</i>`;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: msg,
-        parse_mode: 'HTML',
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[Telegram Payment Failed Alert Warning]: HTTP', res.status, await res.text());
-    }
-  } catch (err) {
-    console.error('[Telegram Payment Failed Alert Exception]:', err);
-  }
+  return sendTelegramMessage(msg, env);
 }
 
 // 4.2 Telegram Alert: Refund Processed
@@ -426,12 +443,8 @@ export async function sendTelegramRefundProcessedAlert(
   },
   env: Bindings
 ) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
   const msg =
-    `🔄 <b>Refund Processed Alert</b>\n\n` +
+    `🔄 <b>Refund Processed Alert!</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
@@ -439,24 +452,9 @@ export async function sendTelegramRefundProcessedAlert(
     `🆔 <b>Refund ID:</b> <code>${escapeHtml(params.refundId)}</code>\n` +
     `💳 <b>Original Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
     `⏱ <b>Processed At:</b> ${escapeHtml(params.processedAtIST)}\n\n` +
-    `ℹ️ Refund client ke original payment method par 5-7 din me settle hoga.`;
+    `ℹ️ <i>Refund client ke source account par 5-7 din me credit ho jayega.</i>`;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: msg,
-        parse_mode: 'HTML',
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[Telegram Refund Alert Warning]: HTTP', res.status, await res.text());
-    }
-  } catch (err) {
-    console.error('[Telegram Refund Alert Exception]:', err);
-  }
+  return sendTelegramMessage(msg, env);
 }
 
 // 5. Complete Won Deal to Project & Advance Invoice Auto-Generator
@@ -500,6 +498,16 @@ export async function autoConvertWonLeadToProjectAndInvoice(
     ? `Advance Milestone: ${serviceNeeded}`
     : `${advancePercent}% Advance Milestone: ${serviceNeeded}`;
 
+  // 1.1 Ensure Client Record exists in clients table with formatted CLT-YYYY-XXXXX
+  const client = await createOrGetClient(db, {
+    name: clientName,
+    email: clientEmail,
+    phone: clientPhone,
+    company: company,
+    sourceLeadId: leadId,
+  });
+  const clientId = client.id;
+
   // 2. Create Project in projects table
   const projectId = `proj_${crypto.randomUUID()}`;
   const projectTitle = `${clientName} - ${serviceNeeded}`;
@@ -507,14 +515,20 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   await db
     .prepare(`
       INSERT INTO projects (
-        id, lead_id, title, client_name, status, budget, start_date, deadline, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
+        id, client_id, lead_id, title, client_name, client_email, client_phone, company, service_type, description, status, budget, start_date, deadline, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
     `)
     .bind(
       projectId,
+      clientId,
       leadId,
       projectTitle,
       clientName,
+      clientEmail,
+      clientPhone,
+      company,
+      serviceNeeded,
+      `Converted from lead ${leadId}. Total budget: ₹${totalBudget.toLocaleString('en-IN')}`,
       `₹${totalBudget.toLocaleString('en-IN')}`,
       now,
       deadline,
@@ -533,10 +547,10 @@ export async function autoConvertWonLeadToProjectAndInvoice(
     .bind(taskId, projectId, now + 7 * 24 * 60 * 60 * 1000, now, now)
     .run();
 
-  // 3. Generate Invoice Number & Line Items
-  const invoiceSuffix = Math.floor(100 + Math.random() * 900);
-  const invoiceNumber = `INV-2026-${invoiceSuffix}`;
+  // 3. Generate Sequential Invoice Number & Line Items
+  const invoiceNumber = await generateInvoiceNumber(db);
   const dueDate = now + 3 * 24 * 60 * 60 * 1000; // 3 days due
+  const paymentId = `pay_${crypto.randomUUID()}`;
 
   const lineItems = [
     {
@@ -561,6 +575,8 @@ export async function autoConvertWonLeadToProjectAndInvoice(
         amount: advanceAmount,
         invoiceNumber,
         description: `${advanceLabel}`,
+        paymentDbId: paymentId,
+        clientId,
         customer: {
           name: clientName,
           email: clientEmail,
@@ -577,17 +593,17 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   }
 
   // 5. Insert Invoice into payments table
-  const paymentId = `pay_${crypto.randomUUID()}`;
   await db
     .prepare(`
       INSERT INTO payments (
-        id, project_id, amount, status, invoice_number, paid_at, created_at,
-        client_name, client_email, client_phone, title, due_date, notes,
+        id, client_id, project_id, amount, status, invoice_number, paid_at, created_at,
+        client_name, client_email, client_phone, company, title, due_date, notes,
         payment_method, razorpay_payment_link_id, razorpay_payment_link_url, items_json
-      ) VALUES (?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
     `)
     .bind(
       paymentId,
+      clientId,
       projectId,
       String(advanceAmount),
       invoiceNumber,
@@ -595,6 +611,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
       clientName,
       clientEmail,
       clientPhone,
+      company,
       advanceLabel,
       dueDate,
       `Advance milestone billing for ${projectTitle}.`,
@@ -604,11 +621,24 @@ export async function autoConvertWonLeadToProjectAndInvoice(
     )
     .run();
 
-  // 6. Update Lead stage to 'won' and log activity
+  // 6. Update Lead stage to 'won' and log activity & history
   await db
-    .prepare("UPDATE leads SET stage = 'won', updated_at = ? WHERE id = ?")
-    .bind(now, leadId)
+    .prepare("UPDATE leads SET stage = 'won', client_id = ?, updated_at = ? WHERE id = ?")
+    .bind(clientId, now, leadId)
     .run();
+
+  const historyId = `lsh_${crypto.randomUUID()}`;
+  try {
+    await db
+      .prepare(`
+        INSERT INTO lead_status_history (id, lead_id, old_status, new_status, reason_lost, actor_id, created_at)
+        VALUES (?, ?, ?, 'won', NULL, 'superadmin', ?)
+      `)
+      .bind(historyId, leadId, String(leadRow.stage || 'new'), now)
+      .run();
+  } catch {
+    // Graceful fallback
+  }
 
   const activityId = `act_${crypto.randomUUID()}`;
   await db
@@ -620,7 +650,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
     .bind(
       activityId,
       leadId,
-      `Deal won! Converted to project "${projectTitle}" with advance invoice ${invoiceNumber} (₹${advanceAmount.toLocaleString('en-IN')}).`,
+      `Deal won! Converted to client [${clientId}], project "${projectTitle}" with advance invoice ${invoiceNumber} (₹${advanceAmount.toLocaleString('en-IN')}).`,
       now
     )
     .run();
@@ -724,7 +754,8 @@ export async function autoConvertWonLeadToProjectAndInvoice(
 // 6. Handle Razorpay Webhook Events (Payment Success, Failed, Refund)
 export async function handleRazorpayWebhookEvent(
   eventBody: Record<string, unknown>,
-  env: Bindings
+  env: Bindings,
+  ctx?: { waitUntil: (p: Promise<unknown>) => void }
 ): Promise<{ success: boolean; message: string }> {
   const db = env.DB || env.COMMAND_DB;
   if (!db) {
@@ -739,6 +770,16 @@ export async function handleRazorpayWebhookEvent(
   const paymentObj = (payload.payment as { entity?: Record<string, unknown> })?.entity;
   const refundObj = (payload.refund as { entity?: Record<string, unknown> })?.entity;
 
+  const paymentLinkNotes = (paymentLinkObj?.notes as Record<string, unknown>) || {};
+  const paymentNotes = (paymentObj?.notes as Record<string, unknown>) || {};
+
+  const paymentDbIdFromNotes =
+    String(paymentLinkNotes.paymentDbId || paymentNotes.paymentDbId || '').trim() || null;
+  const clientIdFromNotes =
+    String(paymentLinkNotes.clientId || paymentNotes.clientId || '').trim() || null;
+  const referenceId =
+    String(paymentLinkObj?.reference_id || paymentObj?.reference_id || '').trim() || null;
+
   const now = Date.now();
   const timeIST = new Intl.DateTimeFormat('en-IN', {
     timeZone: 'Asia/Kolkata',
@@ -750,13 +791,22 @@ export async function handleRazorpayWebhookEvent(
     hour12: true,
   }).format(new Date(now));
 
+  // Helper for fast non-blocking alert dispatch
+  const dispatchAlert = (p: Promise<unknown>) => {
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      ctx.waitUntil(p);
+    } else {
+      p.catch((err) => console.error('[Webhook alert dispatch error]:', err));
+    }
+  };
+
   // Extract all possible identifiers
   const paymentLinkId = paymentLinkObj?.id
     ? String(paymentLinkObj.id)
     : paymentObj?.payment_link_id
       ? String(paymentObj.payment_link_id)
-      : (paymentObj?.notes as Record<string, unknown>)?.paymentLinkId
-        ? String((paymentObj?.notes as Record<string, unknown>).paymentLinkId)
+      : paymentNotes.paymentLinkId
+        ? String(paymentNotes.paymentLinkId)
         : null;
 
   const razorpayPaymentId = paymentObj?.id
@@ -774,10 +824,10 @@ export async function handleRazorpayWebhookEvent(
 
   // Invoice Number Extraction (from notes or description regex)
   let invoiceNumber: string | null = null;
-  if (paymentLinkObj?.notes && (paymentLinkObj.notes as Record<string, unknown>).invoiceNumber) {
-    invoiceNumber = String((paymentLinkObj.notes as Record<string, unknown>).invoiceNumber);
-  } else if (paymentObj?.notes && (paymentObj.notes as Record<string, unknown>).invoiceNumber) {
-    invoiceNumber = String((paymentObj.notes as Record<string, unknown>).invoiceNumber);
+  if (paymentLinkNotes.invoiceNumber) {
+    invoiceNumber = String(paymentLinkNotes.invoiceNumber);
+  } else if (paymentNotes.invoiceNumber) {
+    invoiceNumber = String(paymentNotes.invoiceNumber);
   } else {
     const rawDesc = String(paymentObj?.description || paymentLinkObj?.description || '');
     const match = rawDesc.match(/INV-\d+-\d+/i);
@@ -788,7 +838,10 @@ export async function handleRazorpayWebhookEvent(
 
   // Deep API lookup if identifiers are missing
   if (env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) {
-    const authHeader = `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`;
+    const cleanKeyId = env.RAZORPAY_KEY_ID.replace(/^['"]|['"]$/g, '').trim();
+    const cleanKeySec = env.RAZORPAY_KEY_SECRET.replace(/^['"]|['"]$/g, '').trim();
+    const authHeader = `Basic ${btoa(`${cleanKeyId}:${cleanKeySec}`)}`;
+
     if (razorpayPaymentId && (!invoiceNumber || !paymentLinkId)) {
       try {
         const res = await fetch(`https://api.razorpay.com/v1/payments/${razorpayPaymentId}`, {
@@ -828,6 +881,24 @@ export async function handleRazorpayWebhookEvent(
 
   // Helper to find payment row in D1 across multiple search strategies
   async function findMatchingPaymentRow(): Promise<Record<string, unknown> | null> {
+    // 0. Highest precision: by direct paymentDbId passed in notes
+    if (paymentDbIdFromNotes) {
+      const row = await db
+        .prepare('SELECT * FROM payments WHERE id = ?')
+        .bind(paymentDbIdFromNotes)
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
+    // 0.1 By reference_id matching payment ID or invoice number
+    if (referenceId) {
+      const row = await db
+        .prepare('SELECT * FROM payments WHERE id = ? OR invoice_number = ?')
+        .bind(referenceId, referenceId)
+        .first<Record<string, unknown>>();
+      if (row) return row;
+    }
+
     // 1. By razorpay_payment_link_id
     if (paymentLinkId) {
       const row = await db
@@ -873,15 +944,6 @@ export async function handleRazorpayWebhookEvent(
       if (row) return row;
     }
 
-    // 6. Fallback: by amount for recent invoices (created within 48h)
-    if (amountInRupees > 0) {
-      const row = await db
-        .prepare("SELECT * FROM payments WHERE (amount = ? OR amount = ?) ORDER BY created_at DESC")
-        .bind(String(amountInRupees), String(Math.round(amountInRupees)))
-        .first<Record<string, unknown>>();
-      if (row) return row;
-    }
-
     return null;
   }
 
@@ -914,18 +976,20 @@ export async function handleRazorpayWebhookEvent(
         'Client Project'
     );
 
-    // 2. DISPATCH TELEGRAM ALERT DIRECTLY FROM RAZORPAY CONFIRMATION (Independent of CRM match)
-    await sendTelegramPaymentSuccessAlert(
-      {
-        clientName,
-        projectTitle,
-        invoiceNumber: invNum,
-        amount: actualAmount,
-        paymentId: effectivePaymentId,
-        paymentMethod,
-        paidAtIST: timeIST,
-      },
-      env
+    // 2. DISPATCH TELEGRAM ALERT: Fast & reliable
+    dispatchAlert(
+      sendTelegramPaymentSuccessAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber: invNum,
+          amount: actualAmount,
+          paymentId: effectivePaymentId,
+          paymentMethod,
+          paidAtIST: timeIST,
+        },
+        env
+      )
     );
 
     // 3. Update CRM database if matching row is found
@@ -939,13 +1003,38 @@ export async function handleRazorpayWebhookEvent(
           SET status = 'received',
               paid_at = ?,
               payment_method = ?,
-              razorpay_payment_id = ?
+              razorpay_payment_id = ?,
+              updated_at = ?
           WHERE id = ?
         `)
-        .bind(now, paymentMethod, effectivePaymentId, paymentDbId)
+        .bind(now, paymentMethod, effectivePaymentId, now, paymentDbId)
         .run();
 
-      // B. Auto-update associated Project to 'in_progress'
+      // B. Update Client's total_paid in clients table
+      const targetClientId = clientIdFromNotes || (paymentRow.client_id ? String(paymentRow.client_id) : null);
+      if (targetClientId) {
+        await db
+          .prepare(`
+            UPDATE clients
+            SET total_paid = total_paid + ?,
+                updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(actualAmount, now, targetClientId)
+          .run();
+      } else if (clientName && clientName !== 'Valued Client') {
+        await db
+          .prepare(`
+            UPDATE clients
+            SET total_paid = total_paid + ?,
+                updated_at = ?
+            WHERE LOWER(name) = LOWER(?)
+          `)
+          .bind(actualAmount, now, clientName)
+          .run();
+      }
+
+      // C. Auto-update associated Project to 'in_progress'
       if (paymentRow.project_id) {
         await db
           .prepare(`
@@ -981,7 +1070,7 @@ export async function handleRazorpayWebhookEvent(
         }
       }
 
-      // C. Log alert in CRM
+      // D. Log alert in CRM
       const alertId = `alert_paid_${now}`;
       await db
         .prepare(`
@@ -998,7 +1087,7 @@ export async function handleRazorpayWebhookEvent(
         .run();
 
       console.log(`[Razorpay Webhook Success]: Verified payment for ${invNum} and updated CRM for ${clientName}.`);
-      return { success: true, message: `Payment for ${invNum} marked as received and Telegram alert dispatched.` };
+      return { success: true, message: `Payment for ${invNum} marked as received, database synced and Telegram alert dispatched.` };
     } else {
       console.log(`[Razorpay Direct Success]: Verified payment ${effectivePaymentId} on Razorpay, Telegram alert sent.`);
       return { success: true, message: `Payment verified on Razorpay, Telegram alert dispatched.` };
@@ -1019,7 +1108,7 @@ export async function handleRazorpayWebhookEvent(
 
     const clientName = String(
       paymentRow?.client_name ||
-        (paymentObj?.notes as Record<string, unknown>)?.customerName ||
+        paymentNotes.customerName ||
         paymentObj?.email ||
         paymentObj?.contact ||
         'Client'
@@ -1033,17 +1122,19 @@ export async function handleRazorpayWebhookEvent(
     const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
 
     // Dispatch Telegram Alert: Payment Failed ALWAYS directly from Razorpay
-    await sendTelegramPaymentFailedAlert(
-      {
-        clientName,
-        projectTitle,
-        invoiceNumber: invNum,
-        amount: actualAmount,
-        paymentId: effectivePaymentId,
-        errorReason: errorDescription,
-        failedAtIST: timeIST,
-      },
-      env
+    dispatchAlert(
+      sendTelegramPaymentFailedAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber: invNum,
+          amount: actualAmount,
+          paymentId: effectivePaymentId,
+          errorReason: errorDescription,
+          failedAtIST: timeIST,
+        },
+        env
+      )
     );
 
     // Log alert in CRM
@@ -1077,38 +1168,54 @@ export async function handleRazorpayWebhookEvent(
 
     const clientName = String(
       paymentRow?.client_name ||
-        (paymentObj?.notes as Record<string, unknown>)?.customerName ||
+        paymentNotes.customerName ||
         'Client'
     );
     const projectTitle = String(paymentRow?.title || 'Client Project');
     const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV');
     const effectivePaymentId = razorpayPaymentId || String(paymentRow?.razorpay_payment_id || 'unknown');
 
-    // Update payment status in D1 if found
+    // Update payment notes in D1 if found (maintaining status constraint valid)
     if (paymentRow) {
       await db
         .prepare(`
           UPDATE payments
-          SET status = 'refunded',
-              notes = COALESCE(notes, '') || ?
+          SET notes = COALESCE(notes, '') || ?,
+              updated_at = ?
           WHERE id = ?
         `)
-        .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, String(paymentRow.id))
+        .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, now, String(paymentRow.id))
         .run();
+
+      // Decrement client's total_paid in clients table
+      const targetClientId = clientIdFromNotes || (paymentRow.client_id ? String(paymentRow.client_id) : null);
+      if (targetClientId) {
+        await db
+          .prepare(`
+            UPDATE clients
+            SET total_paid = MAX(0, total_paid - ?),
+                updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(refundAmountRupees, now, targetClientId)
+          .run();
+      }
     }
 
     // Dispatch Telegram Alert: Refund Processed ALWAYS directly from Razorpay
-    await sendTelegramRefundProcessedAlert(
-      {
-        clientName,
-        projectTitle,
-        invoiceNumber: invNum,
-        refundAmount: refundAmountRupees,
-        refundId,
-        paymentId: effectivePaymentId,
-        processedAtIST: timeIST,
-      },
-      env
+    dispatchAlert(
+      sendTelegramRefundProcessedAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber: invNum,
+          refundAmount: refundAmountRupees,
+          refundId,
+          paymentId: effectivePaymentId,
+          processedAtIST: timeIST,
+        },
+        env
+      )
     );
 
     // Log alert in CRM

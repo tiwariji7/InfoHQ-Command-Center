@@ -15,6 +15,7 @@ import {
   createLead,
   checkDuplicate,
   getLeadById,
+  getLeadRelatedData,
   updateLeadStage,
   addLeadNote,
   setLeadFollowUp,
@@ -137,6 +138,22 @@ leadsRouter.get('/:id', async (c) => {
   } catch (err: unknown) {
     console.error('Error getting lead details:', err instanceof Error ? err.message : err);
     return c.json({ error: 'internal_error', message: 'Failed to retrieve lead details.' }, 500);
+  }
+});
+
+// GET /api/leads/:id/related - Fetch linked client, converted projects and invoices
+leadsRouter.get('/:id/related', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const leadId = c.req.param('id');
+  try {
+    const related = await getLeadRelatedData(c.env.DB, leadId);
+    return c.json(related);
+  } catch (err: unknown) {
+    console.error('Error getting related lead data:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to retrieve related data.' }, 500);
   }
 });
 

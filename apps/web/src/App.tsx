@@ -58,16 +58,23 @@ export const App: React.FC = () => {
       });
   }, []);
 
+  const clerkUserId = clerkUser?.id;
+  const userEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+
   // When signed in with Clerk, verify authorization server-side
   useEffect(() => {
-    if (!isSignedIn) {
+    if (!isSignedIn || !clerkUserId) {
       setAuthenticatedUser(null);
       setAccessDeniedReason(null);
       return;
     }
 
     let isMounted = true;
-    setIsVerifyingWithApi(true);
+    // Only show full-screen verification on INITIAL load before authenticatedUser is established
+    // Once authenticated, background re-verifications happen silently without unmounting <Shell />
+    if (!authenticatedUser) {
+      setIsVerifyingWithApi(true);
+    }
 
     fetchMe(getToken)
       .then((res) => {
@@ -87,9 +94,9 @@ export const App: React.FC = () => {
             console.warn('API verification warning:', err);
             // Default to local display if user is logged in
             setAuthenticatedUser({
-              id: clerkUser?.id || 'unknown',
-              clerkUserId: clerkUser?.id || 'unknown',
-              email: clerkUser?.primaryEmailAddress?.emailAddress || null,
+              id: clerkUserId,
+              clerkUserId: clerkUserId,
+              email: userEmail || null,
               role: 'superadmin',
               status: 'active',
             });
@@ -105,7 +112,7 @@ export const App: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [isSignedIn, clerkUser, getToken]);
+  }, [isSignedIn, clerkUserId]);
 
   const [initTimeoutReached, setInitTimeoutReached] = useState(false);
 
@@ -131,7 +138,8 @@ export const App: React.FC = () => {
     return <SignInCard hasValidKey={true} />;
   }
 
-  if (isVerifyingWithApi) {
+  // Only block the UI if we don't have an authenticated user yet
+  if (isVerifyingWithApi && !authenticatedUser) {
     return (
       <div className="min-h-screen bg-brand-page flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">

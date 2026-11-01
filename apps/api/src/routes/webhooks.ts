@@ -217,7 +217,7 @@ webhooksRouter.post('/razorpay', async (c) => {
   }
 
   try {
-    const result = await handleRazorpayWebhookEvent(body, c.env);
+    const result = await handleRazorpayWebhookEvent(body, c.env, c.executionCtx);
     return c.json(result);
   } catch (err: unknown) {
     console.error('[Razorpay Webhook Error]:', err);

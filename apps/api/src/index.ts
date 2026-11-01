@@ -9,6 +9,7 @@ import { overviewRouter } from './routes/overview.js';
 import { automationsRouter } from './routes/automations.js';
 import { intakeRouter } from './routes/intake.js';
 import { webhooksRouter } from './routes/webhooks.js';
+import { clientsRouter } from './routes/clients.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
@@ -101,6 +102,9 @@ app.route('/api/webhook', webhooksRouter);
 
 // Protected: Leads core router
 app.route('/api/leads', leadsRouter);
+
+// Protected: Clients master router
+app.route('/api/clients', clientsRouter);
 
 // Protected: Projects and tasks router
 app.route('/api/projects', projectsRouter);

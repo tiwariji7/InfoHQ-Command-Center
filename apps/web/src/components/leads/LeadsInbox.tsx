@@ -5,8 +5,11 @@ import type {
   LeadStage,
   PaginatedResponse,
   DashboardOverviewResponse,
+  Client,
+  Project,
+  Payment,
 } from '@infohq/shared';
-import { fetchLeads, fetchDashboardOverview, updateLeadStageApi } from '../../lib/api.js';
+import { fetchLeads, fetchDashboardOverview, updateLeadStageApi, fetchLeadRelatedData } from '../../lib/api.js';
 import { AddLeadModal } from './AddLeadModal.js';
 import {
   Search,
@@ -56,6 +59,26 @@ export const LeadsInbox: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [leadDrawerTab, setLeadDrawerTab] = useState<'overview' | 'projects' | 'invoices' | 'payments'>('overview');
+  const [leadRelated, setLeadRelated] = useState<{ client: Client | null; projects: Project[]; payments: Payment[] } | null>(null);
+
+  // Fetch linked client, converted projects and invoices when lead is selected
+  useEffect(() => {
+    if (!selectedLead) {
+      setLeadRelated(null);
+      return;
+    }
+    let isMounted = true;
+    fetchLeadRelatedData(getToken, selectedLead.id)
+      .then((data) => {
+        if (isMounted) setLeadRelated(data);
+      })
+      .catch((err) => {
+        console.warn('[fetchLeadRelatedData error]:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [getToken, selectedLead]);
 
   // Close profile drawer on Esc key
   useEffect(() => {
@@ -79,9 +102,11 @@ export const LeadsInbox: React.FC = () => {
   }, [getToken]);
 
   // Load leads with filters & pagination (DO NOT auto-select lead)
-  const loadLeads = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const loadLeads = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setIsLoading(true);
+      setErrorMessage(null);
+    }
     try {
       const stageParam =
         activeStageTab === 'all'
@@ -97,9 +122,13 @@ export const LeadsInbox: React.FC = () => {
       setLeadsData(res);
       // NOTE: selectedLead is intentionally NOT set here so client profile does NOT auto-open
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to load inbound leads.');
+      if (!isBackground) {
+        setErrorMessage(err instanceof Error ? err.message : 'Failed to load inbound leads.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackground) {
+        setIsLoading(false);
+      }
     }
   }, [getToken, page, pageSize, activeStageTab, searchQuery]);
 
@@ -108,8 +137,34 @@ export const LeadsInbox: React.FC = () => {
   }, [loadOverview]);
 
   useEffect(() => {
-    loadLeads();
+    loadLeads(false);
   }, [loadLeads]);
+
+  // Silent live auto-refresh without page reloads or spinners
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadLeads(true);
+        loadOverview();
+      }
+    }, 10000);
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        loadLeads(true);
+        loadOverview();
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [loadLeads, loadOverview]);
 
   const handleStageChange = async (leadId: string, newStage: LeadStage) => {
     try {
@@ -684,6 +739,11 @@ export const LeadsInbox: React.FC = () => {
                       <h3 className="text-sm font-bold text-[#1A085C] truncate">{selectedLead.name}</h3>
                       {/* Status badge next to name */}
                       {getStatusBadge(selectedLead.stage)}
+                      {(selectedLead.clientId || leadRelated?.client?.id) && (
+                        <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                          {selectedLead.clientId || leadRelated?.client?.id}
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-1 space-y-0.5 text-[11px] text-[#6B7280]">
@@ -791,14 +851,14 @@ export const LeadsInbox: React.FC = () => {
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#6B7280]">Company</span>
                         <span className="font-semibold text-[#1A085C] truncate max-w-[200px]">
-                          {selectedLead.company || 'Shivam Tech Pvt. Ltd.'}
+                          {selectedLead.company || leadRelated?.client?.company || '—'}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#6B7280]">Location</span>
                         <span className="font-semibold text-[#1A085C]">
-                          {selectedLead.company ? 'Lucknow, India' : 'Pan-India'}
+                          {leadRelated?.client?.address || 'India'}
                         </span>
                       </div>
 
@@ -819,7 +879,7 @@ export const LeadsInbox: React.FC = () => {
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#6B7280]">Assigned To</span>
                         <span className="font-semibold text-[#1A085C]">
-                          Ankit
+                          Engineering Team
                         </span>
                       </div>
                     </div>
@@ -833,7 +893,7 @@ export const LeadsInbox: React.FC = () => {
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[#6B7280]">Service Needed</span>
                         <span className="font-semibold text-[#1A085C] truncate max-w-[200px]">
-                          {selectedLead.serviceNeeded || 'Website Development'}
+                          {selectedLead.serviceNeeded || 'Engineering & Design'}
                         </span>
                       </div>
 
@@ -844,14 +904,14 @@ export const LeadsInbox: React.FC = () => {
                             ? selectedLead.budget.startsWith('₹')
                               ? selectedLead.budget
                               : `₹${selectedLead.budget}`
-                            : '₹50,000 – ₹1,00,000'}
+                            : 'To be scoped'}
                         </span>
                       </div>
 
                       <div className="pt-2">
                         <span className="text-[#6B7280] block mb-1">Requirement</span>
                         <div className="text-xs text-[#374151] leading-relaxed bg-white p-2.5 rounded-lg border border-[#E5E1F0]/70">
-                          {selectedLead.message || 'Need a company website with product pages and contact form.'}
+                          {selectedLead.message || 'No specific requirements submitted.'}
                         </div>
                       </div>
                     </div>
@@ -881,39 +941,110 @@ export const LeadsInbox: React.FC = () => {
               )}
 
               {leadDrawerTab === 'projects' && (
-                <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] space-y-3">
-                  <div className="text-xs font-bold text-[#1A085C]">Project Scope & Milestones</div>
-                  <div className="bg-white p-3 rounded-lg border border-[#E5E1F0] space-y-1.5">
-                    <div className="font-bold text-xs text-[#1A085C]">
-                      {selectedLead.serviceNeeded || 'Modern Web Engineering'}
+                <div className="space-y-3">
+                  {leadRelated?.projects && leadRelated.projects.length > 0 ? (
+                    leadRelated.projects.map((proj) => (
+                      <div key={proj.id} className="bg-[#FBFBFE] rounded-xl p-3.5 border border-[#E5E1F0] space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-bold text-xs text-[#1A085C]">{proj.title}</div>
+                            <div className="text-[10.5px] text-[#6B7280] mt-0.5">{proj.budget || 'Custom scope'}</div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EFF6FF] text-[#1D4ED8] capitalize">
+                            {proj.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[#9CA3AF] flex items-center gap-1.5 pt-1 border-t border-[#F1EEF8]">
+                          <Calendar size={10} />
+                          <span>Created: {new Date(proj.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] space-y-2">
+                      <div className="text-xs font-bold text-[#1A085C]">Lead Project Scope</div>
+                      <div className="bg-white p-3 rounded-lg border border-[#E5E1F0] space-y-1">
+                        <div className="font-bold text-xs text-[#1A085C]">
+                          {selectedLead.serviceNeeded || 'Modern Web Engineering'}
+                        </div>
+                        <div className="text-[11px] text-[#6B7280]">
+                          Estimated Budget: {selectedLead.budget || '₹50,000 – ₹1,00,000'}
+                        </div>
+                        <div className="text-[10px] text-[#5B4CF5] font-semibold mt-1">
+                          Status: Discovery &amp; Architecture Scoping
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#6B7280]">
-                      Budget Range: {selectedLead.budget || '₹50,000 – ₹1,00,000'}
-                    </div>
-                    <div className="text-[10px] text-[#5B4CF5] font-semibold mt-1">
-                      Status: Scoping & Architecture Review
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {leadDrawerTab === 'invoices' && (
-                <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] text-center py-8 space-y-2">
-                  <FileText size={24} className="mx-auto text-[#9CA3AF]" />
-                  <div className="text-xs font-bold text-[#1A085C]">No Invoices Issued Yet</div>
-                  <div className="text-[11px] text-[#6B7280]">
-                    Invoices and milestones are created once this lead converts to a won deal.
-                  </div>
+                <div className="space-y-2.5">
+                  {leadRelated?.payments && leadRelated.payments.length > 0 ? (
+                    leadRelated.payments.map((inv) => (
+                      <div key={inv.id} className="bg-[#FBFBFE] rounded-xl p-3.5 border border-[#E5E1F0] space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-[#1D4ED8]">
+                            {inv.invoiceNumber || `INV-${inv.id.slice(-4).toUpperCase()}`}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            inv.status === 'received' ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FEF3C7] text-[#B45309]'
+                          }`}>
+                            {inv.status === 'received' ? 'PAID' : 'PENDING'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs font-bold text-[#1A085C]">
+                          <span>Amount:</span>
+                          <span className="text-sm">₹{inv.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                        {inv.razorpayPaymentLinkUrl && inv.status !== 'received' && (
+                          <a
+                            href={inv.razorpayPaymentLinkUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10.5px] font-bold text-[#5B4CF5] hover:underline block pt-1"
+                          >
+                            Open Online Payment Link →
+                          </a>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] text-center py-6 space-y-1.5">
+                      <FileText size={22} className="mx-auto text-[#9CA3AF]" />
+                      <div className="text-xs font-bold text-[#1A085C]">No Invoices Issued</div>
+                      <div className="text-[10.5px] text-[#6B7280]">
+                        Invoices are generated upon deal conversion or client kickoff.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {leadDrawerTab === 'payments' && (
-                <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] text-center py-8 space-y-2">
-                  <Clock size={24} className="mx-auto text-[#9CA3AF]" />
-                  <div className="text-xs font-bold text-[#1A085C]">Payment Tracking Inactive</div>
-                  <div className="text-[11px] text-[#6B7280]">
-                    Advance retainer or milestone payment links will show here after deal confirmation.
-                  </div>
+                <div className="space-y-2.5">
+                  {leadRelated?.payments && leadRelated.payments.filter((p) => p.status === 'received').length > 0 ? (
+                    leadRelated.payments.filter((p) => p.status === 'received').map((p) => (
+                      <div key={p.id} className="bg-[#FBFBFE] rounded-xl p-3 border border-[#E5E1F0] flex justify-between items-center">
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">₹{p.amount.toLocaleString('en-IN')}</div>
+                          <div className="text-[10px] text-slate-500">Method: {p.paymentMethod || 'UPI / Online'}</div>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Settled
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-[#FBFBFE] rounded-xl p-4 border border-[#E5E1F0] text-center py-6 space-y-1.5">
+                      <Clock size={22} className="mx-auto text-[#9CA3AF]" />
+                      <div className="text-xs font-bold text-[#1A085C]">No Settled Payments</div>
+                      <div className="text-[10.5px] text-[#6B7280]">
+                        Receipts will be displayed here once client completes payment.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

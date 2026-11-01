@@ -8,10 +8,12 @@ import type {
   UpdateTaskInput,
   ProjectDetailResponse,
 } from '@infohq/shared';
+import { createOrGetClient } from './clientService.js';
 
 function mapDbRowToProject(row: Record<string, unknown>): Project {
   return {
     id: String(row.id),
+    clientId: row.client_id ? String(row.client_id) : null,
     leadId: row.lead_id ? String(row.lead_id) : null,
     title: String(row.title),
     clientName: String(row.client_name),
@@ -60,7 +62,7 @@ export async function getProjects(
 
   if (params.search && params.search.trim().length > 0) {
     const term = `%${params.search.trim().toLowerCase()}%`;
-    conditions.push('(LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(l.company) LIKE ?)');
+    conditions.push('(LOWER(p.title) LIKE ? OR LOWER(p.client_name) LIKE ? OR LOWER(COALESCE(p.company, l.company, "")) LIKE ?)');
     bindings.push(term, term, term);
   }
 
@@ -69,6 +71,7 @@ export async function getProjects(
   const sql = `
     SELECT 
       p.id,
+      p.client_id,
       p.lead_id,
       p.title,
       p.client_name,
@@ -78,11 +81,11 @@ export async function getProjects(
       p.deadline,
       p.created_at,
       p.updated_at,
-      l.email as client_email,
-      l.phone as client_phone,
-      l.company as company,
-      l.service_needed as service_type,
-      l.message as description,
+      COALESCE(p.client_email, l.email) as client_email,
+      COALESCE(p.client_phone, l.phone) as client_phone,
+      COALESCE(p.company, l.company) as company,
+      COALESCE(p.service_type, l.service_needed) as service_type,
+      COALESCE(p.description, l.message) as description,
       COUNT(t.id) as total_tasks, 
       SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed_tasks
     FROM projects p
@@ -104,6 +107,7 @@ export async function getProjectById(
   const projectSql = `
     SELECT 
       p.id,
+      p.client_id,
       p.lead_id,
       p.title,
       p.client_name,
@@ -113,11 +117,11 @@ export async function getProjectById(
       p.deadline,
       p.created_at,
       p.updated_at,
-      l.email as client_email,
-      l.phone as client_phone,
-      l.company as company,
-      l.service_needed as service_type,
-      l.message as description,
+      COALESCE(p.client_email, l.email) as client_email,
+      COALESCE(p.client_phone, l.phone) as client_phone,
+      COALESCE(p.company, l.company) as company,
+      COALESCE(p.service_type, l.service_needed) as service_type,
+      COALESCE(p.description, l.message) as description,
       COUNT(t.id) as total_tasks, 
       SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed_tasks
     FROM projects p
@@ -131,7 +135,7 @@ export async function getProjectById(
   if (!projectRow) return null;
 
   const tasksSql = `
-    SELECT id, project_id, title, status, due_date, created_at, updated_at
+    SELECT id, project_id, title, description, status, priority, due_date, completed_at, created_at, updated_at
     FROM tasks 
     WHERE project_id = ? 
     ORDER BY 
@@ -159,16 +163,39 @@ export async function createProject(
   const id = `proj_${crypto.randomUUID()}`;
   const now = Date.now();
 
+  // Auto create or link client record with CLT-YYYY-XXXXX
+  let clientId = input.clientId || null;
+  if (!clientId && input.clientName) {
+    try {
+      const client = await createOrGetClient(db, {
+        name: input.clientName,
+        email: input.clientEmail || null,
+        phone: input.clientPhone || null,
+        company: input.company || null,
+        sourceLeadId: input.leadId || null,
+      });
+      clientId = client.id;
+    } catch (err) {
+      console.warn('[createProject] Failed to link client record:', err);
+    }
+  }
+
   const insertStmt = db.prepare(`
     INSERT INTO projects (
-      id, lead_id, title, client_name, status, budget,
-      start_date, deadline, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, client_id, lead_id, title, client_name, client_email, client_phone, company,
+      service_type, description, status, budget, start_date, deadline, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id,
+    clientId,
     input.leadId || null,
     input.title,
     input.clientName,
+    input.clientEmail || null,
+    input.clientPhone || null,
+    input.company || null,
+    input.serviceType || null,
+    input.description || null,
     input.status || 'in_progress',
     input.budget || null,
     input.startDate || null,
@@ -190,8 +217,8 @@ export async function createProject(
       activityId,
       input.leadId,
       actorClerkUserId,
-      `Lead converted to project: "${input.title}"`,
-      JSON.stringify({ projectId: id, title: input.title, status: input.status }),
+      `Lead converted to project: "${input.title}" [Client: ${clientId || 'N/A'}]`,
+      JSON.stringify({ projectId: id, title: input.title, status: input.status, clientId }),
       now
     );
     stmts.push(activityStmt);
@@ -225,6 +252,26 @@ export async function updateProject(
   if (input.clientName !== undefined) {
     updates.push('client_name = ?');
     bindings.push(input.clientName);
+  }
+  if (input.clientEmail !== undefined) {
+    updates.push('client_email = ?');
+    bindings.push(input.clientEmail || null);
+  }
+  if (input.clientPhone !== undefined) {
+    updates.push('client_phone = ?');
+    bindings.push(input.clientPhone || null);
+  }
+  if (input.company !== undefined) {
+    updates.push('company = ?');
+    bindings.push(input.company || null);
+  }
+  if (input.serviceType !== undefined) {
+    updates.push('service_type = ?');
+    bindings.push(input.serviceType || null);
+  }
+  if (input.description !== undefined) {
+    updates.push('description = ?');
+    bindings.push(input.description || null);
   }
   if (input.budget !== undefined) {
     updates.push('budget = ?');
@@ -268,19 +315,21 @@ export async function createTask(
 
   await db.prepare(`
     INSERT INTO tasks (
-      id, project_id, title, status, due_date, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      id, project_id, title, description, status, priority, due_date, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id,
     projectId,
     input.title,
+    input.description || null,
     input.status || 'todo',
+    input.priority || 'medium',
     input.dueDate || null,
     now,
     now
   ).run();
 
-  const row = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  const row = await db.prepare('SELECT id, project_id, title, description, status, priority, due_date, completed_at, created_at, updated_at FROM tasks WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!row) throw new Error('Task creation verification failed.');
   return mapDbRowToTask(row);
 }
@@ -291,7 +340,7 @@ export async function updateTask(
   taskId: string,
   input: UpdateTaskInput
 ): Promise<ProjectTask | null> {
-  const existingRow = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
+  const existingRow = await db.prepare('SELECT id, project_id, title, description, status, priority, due_date, completed_at, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
     .bind(taskId, projectId)
     .first<Record<string, unknown>>();
 
@@ -305,6 +354,14 @@ export async function updateTask(
     updates.push('title = ?');
     bindings.push(input.title);
   }
+  if (input.description !== undefined) {
+    updates.push('description = ?');
+    bindings.push(input.description || null);
+  }
+  if (input.priority !== undefined) {
+    updates.push('priority = ?');
+    bindings.push(input.priority);
+  }
   if (input.dueDate !== undefined) {
     updates.push('due_date = ?');
     bindings.push(input.dueDate);
@@ -312,6 +369,12 @@ export async function updateTask(
   if (input.status !== undefined) {
     updates.push('status = ?');
     bindings.push(input.status);
+    if (input.status === 'done') {
+      updates.push('completed_at = ?');
+      bindings.push(now);
+    } else {
+      updates.push('completed_at = NULL');
+    }
   }
 
   if (updates.length === 0) {
@@ -326,7 +389,7 @@ export async function updateTask(
   const sql = `UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND project_id = ?`;
   await db.prepare(sql).bind(...bindings).run();
 
-  const updatedRow = await db.prepare('SELECT id, project_id, title, status, due_date, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
+  const updatedRow = await db.prepare('SELECT id, project_id, title, description, status, priority, due_date, completed_at, created_at, updated_at FROM tasks WHERE id = ? AND project_id = ?')
     .bind(taskId, projectId)
     .first<Record<string, unknown>>();
 

@@ -54,13 +54,36 @@ interface NavSection {
 export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health, apiError: _apiError }) => {
   const { signOut } = useClerk();
   const { user: clerkUser } = useUser();
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  const getInitialTab = (): string => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (hash) return hash;
+      const saved = localStorage.getItem('infohq_active_tab');
+      if (saved) return saved;
+    }
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync state if hash in URL changes
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (hash && hash !== activeTab) {
+        setActiveTab(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [activeTab]);
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -171,6 +194,10 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
   const handleSelectTab = (tabId: string) => {
     setActiveTab(tabId);
     setMobileMenuOpen(false);
+    if (typeof window !== 'undefined') {
+      window.location.hash = `#/${tabId}`;
+      localStorage.setItem('infohq_active_tab', tabId);
+    }
   };
 
   const renderActiveView = () => {

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Payment } from '@infohq/shared';
+import { useAuth } from '@clerk/clerk-react';
+import type { Payment, ClientDetailResponse } from '@infohq/shared';
+import { fetchClientDetail } from '../../lib/api.js';
 import {
   X,
   User,
@@ -77,23 +79,49 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const clientName = payment?.clientName || 'Shivam';
-  const clientEmail = payment?.clientEmail || 'tiwarijofficial4@gmail.com';
-  const clientPhone = payment?.clientPhone || '+91 83818 35420';
-  const companyName = payment?.company || 'Shivam Tech Pvt. Ltd.';
+  const { getToken } = useAuth();
+  const [clientDetail, setClientDetail] = useState<ClientDetailResponse | null>(null);
+
+  useEffect(() => {
+    if (!payment) return;
+    const identifier = payment.clientId || payment.clientName;
+    if (!identifier) return;
+
+    let isMounted = true;
+    fetchClientDetail(getToken, identifier)
+      .then((res) => {
+        if (isMounted) setClientDetail(res);
+      })
+      .catch((err) => {
+        console.warn('[fetchClientDetail fallback]:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [getToken, payment]);
+
+  const clientName = clientDetail?.client?.name || payment?.clientName || 'Client';
+  const clientEmail = clientDetail?.client?.email || payment?.clientEmail || '—';
+  const clientPhone = clientDetail?.client?.phone || payment?.clientPhone || '—';
+  const companyName = clientDetail?.client?.company || payment?.company || '—';
   const initials = getInitials(clientName);
-  const clientId = payment ? `CLT-${payment.id.slice(-4).toUpperCase()}` : 'CLT-0001';
+  const clientId = clientDetail?.client?.id || payment?.clientId || (payment ? `CLT-2026-${payment.id.slice(-4).toUpperCase()}` : 'CLT-2026-00001');
 
   // Filter all payments belonging to this client (Always called before any early return)
   const clientInvoices = useMemo(() => {
+    if (clientDetail?.payments && clientDetail.payments.length > 0) {
+      return clientDetail.payments;
+    }
     if (!payment) return [];
     const matched = allPayments.filter(
       (p) =>
         (p.clientName && p.clientName.toLowerCase() === clientName.toLowerCase()) ||
+        (p.clientId && p.clientId === clientId) ||
         p.id === payment.id
     );
     return matched.length > 0 ? matched : [payment];
-  }, [allPayments, clientName, payment]);
+  }, [allPayments, clientDetail, clientName, clientId, payment]);
 
   // Derived metrics
   const totalReceived = useMemo(() => {
@@ -108,8 +136,25 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       .reduce((sum, p) => sum + p.amount, 0);
   }, [clientInvoices]);
 
-  // Derived client projects
+  // Derived client projects from live API data (No hardcoded dummy items)
   const clientProjects = useMemo(() => {
+    if (clientDetail?.projects && clientDetail.projects.length > 0) {
+      return clientDetail.projects.map((proj) => {
+        const total = proj.totalTasks || 0;
+        const done = proj.completedTasks || 0;
+        const calcProgress = total > 0 ? Math.round((done / total) * 100) : (proj.status === 'completed' ? 100 : 50);
+        return {
+          id: proj.id,
+          title: proj.title,
+          subtitle: proj.description || proj.serviceType || 'Client Project Milestone',
+          progress: calcProgress,
+          status: proj.status === 'completed' ? ('completed' as const) : ('active' as const),
+          dates: `${formatISTDate(proj.startDate || proj.createdAt)} - ${formatISTDate(proj.targetDate)}`,
+          icon: 'code',
+        };
+      });
+    }
+
     if (!payment) return [];
     const uniqueProjectsMap = new Map<string, { id: string; title: string; subtitle: string; progress: number; status: 'active' | 'completed'; dates: string; icon: string }>();
 
@@ -129,21 +174,8 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       }
     });
 
-    const projectsList = Array.from(uniqueProjectsMap.values());
-    if (projectsList.length === 1 && !projectsList[0].title.includes('Website')) {
-      // Add reference portfolio items if just 1 item exists for rich display
-      projectsList.push({
-        id: 'proj-mobile',
-        title: 'Mobile App Development',
-        subtitle: '30% Advance Milestone Sprint',
-        progress: 45,
-        status: 'active',
-        dates: '05 Oct 2026 - 30 Nov 2026',
-        icon: 'mobile',
-      });
-    }
-    return projectsList;
-  }, [clientInvoices, payment]);
+    return Array.from(uniqueProjectsMap.values());
+  }, [clientDetail, clientInvoices, payment]);
 
   // Filtered projects
   const filteredProjects = useMemo(() => {

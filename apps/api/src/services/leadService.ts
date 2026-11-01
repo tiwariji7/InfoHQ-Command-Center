@@ -3,12 +3,18 @@ import type {
   Lead,
   LeadActivity,
   LeadNote,
+  LeadStatusHistory,
   CreateLeadInput,
   UpdateLeadStageInput,
   LeadListQuery,
   PaginatedResponse,
   DuplicateCheckResult,
+  Client,
+  Project,
+  Payment,
 } from '@infohq/shared';
+import { generateLeadId } from '../utils/idGenerator.js';
+import { createOrGetClient, getClientByIdOrName } from './clientService.js';
 
 export class DuplicateLeadError extends Error {
   matches: DuplicateCheckResult['matches'];
@@ -23,6 +29,7 @@ export class DuplicateLeadError extends Error {
 function mapDbRowToLead(row: Record<string, unknown>): Lead {
   return {
     id: String(row.id),
+    clientId: row.client_id ? String(row.client_id) : null,
     name: String(row.name),
     email: row.email ? String(row.email) : null,
     phone: row.phone ? String(row.phone) : null,
@@ -59,7 +66,6 @@ export async function checkDuplicate(
   }
 
   if (phone && phone.trim().length > 0) {
-    // Digits-only phone match
     const cleanPhone = phone.replace(/\D/g, '');
     conditions.push('REPLACE(REPLACE(REPLACE(phone, " ", ""), "-", ""), "+", "") LIKE ?');
     bindings.push(`%${cleanPhone}%`);
@@ -117,13 +123,11 @@ export async function getLeads(
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // Count total query
   const countSql = `SELECT COUNT(*) as total FROM leads ${whereClause}`;
   const countStmt = db.prepare(countSql).bind(...bindings);
   const countRes = await countStmt.first<{ total: number }>();
   const total = countRes?.total || 0;
 
-  // Data query with parameterized pagination
   const dataSql = `SELECT * FROM leads ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
   const dataStmt = db.prepare(dataSql).bind(...bindings, pageSize, offset);
   const { results } = await dataStmt.all<Record<string, unknown>>();
@@ -159,11 +163,13 @@ export async function createLead(
   }
 
   const now = Date.now();
-  const leadId = `lead_${crypto.randomUUID()}`;
+  // Formatted ID: LD-YYYY-XXXXX (e.g., LD-2026-00001)
+  const leadId = await generateLeadId(db);
   const activityId = `act_${crypto.randomUUID()}`;
 
   const leadRow = {
     id: leadId,
+    client_id: null as string | null,
     name: input.name.trim(),
     email: normalizedEmail,
     phone: normalizedPhone,
@@ -175,6 +181,7 @@ export async function createLead(
     message: input.message?.trim() || null,
     source: input.source,
     stage: input.stage,
+    lost_reason: null as string | null,
     next_follow_up_at: input.nextFollowUpAt || null,
     created_at: now,
     updated_at: now,
@@ -203,6 +210,7 @@ export async function createLead(
   );
 
   const afterJson = JSON.stringify({
+    id: leadRow.id,
     name: leadRow.name,
     email: leadRow.email,
     phone: leadRow.phone,
@@ -219,7 +227,7 @@ export async function createLead(
     leadId,
     actorClerkUserId,
     'created',
-    'Lead created manually by Superadmin',
+    `Lead ${leadId} created manually by Superadmin`,
     null,
     afterJson,
     now
@@ -234,7 +242,12 @@ export async function createLead(
 export async function getLeadById(
   db: D1Database,
   leadId: string
-): Promise<{ lead: Lead; activities: LeadActivity[]; notes: LeadNote[] } | null> {
+): Promise<{
+  lead: Lead;
+  activities: LeadActivity[];
+  notes: LeadNote[];
+  statusHistory?: LeadStatusHistory[];
+} | null> {
   const leadRow = await db
     .prepare('SELECT * FROM leads WHERE id = ?')
     .bind(leadId)
@@ -251,6 +264,17 @@ export async function getLeadById(
     .prepare('SELECT * FROM lead_notes WHERE lead_id = ? ORDER BY created_at DESC')
     .bind(leadId)
     .all<Record<string, unknown>>();
+
+  // Fetch status transition history
+  let historyRows: { results?: Record<string, unknown>[] } = { results: [] };
+  try {
+    historyRows = await db
+      .prepare('SELECT * FROM lead_status_history WHERE lead_id = ? ORDER BY created_at DESC')
+      .bind(leadId)
+      .all<Record<string, unknown>>();
+  } catch {
+    // If table not yet queried
+  }
 
   const activities: LeadActivity[] = (activitiesRows.results || []).map((r) => ({
     id: String(r.id),
@@ -272,10 +296,21 @@ export async function getLeadById(
     updatedAt: Number(r.updated_at),
   }));
 
+  const statusHistory: LeadStatusHistory[] = (historyRows.results || []).map((r) => ({
+    id: String(r.id),
+    leadId: String(r.lead_id),
+    oldStatus: String(r.old_status),
+    newStatus: String(r.new_status),
+    reasonLost: r.reason_lost ? String(r.reason_lost) : null,
+    actorId: r.actor_id ? String(r.actor_id) : null,
+    createdAt: Number(r.created_at),
+  }));
+
   return {
     lead: mapDbRowToLead(leadRow),
     activities,
     notes,
+    statusHistory,
   };
 }
 
@@ -299,48 +334,195 @@ export async function updateLeadStage(
   const lostReason = newStage === 'lost' ? (input.lostReason?.trim() || null) : null;
   const now = Date.now();
   const activityId = `act_${crypto.randomUUID()}`;
+  const historyId = `lsh_${crypto.randomUUID()}`;
 
-  const updateLeadStmt = db.prepare(`
-    UPDATE leads
-    SET stage = ?, lost_reason = ?, updated_at = ?
-    WHERE id = ?
-  `).bind(newStage, lostReason, now, leadId);
+  let assignedClientId = leadRow.client_id ? String(leadRow.client_id) : null;
 
-  const beforeJson = JSON.stringify({
-    stage: previousStage,
-    lostReason: leadRow.lost_reason || null,
-  });
+  // If newly converted to WON and has no client_id, auto-generate & link Client record
+  if (newStage === 'won' && !assignedClientId) {
+    try {
+      const client = await createOrGetClient(db, {
+        name: String(leadRow.name),
+        email: leadRow.email ? String(leadRow.email) : null,
+        phone: leadRow.phone ? String(leadRow.phone) : null,
+        company: leadRow.company ? String(leadRow.company) : null,
+        sourceLeadId: leadId,
+      });
+      assignedClientId = client.id;
+    } catch (err) {
+      console.error('[updateLeadStage] Failed to create or link client:', err);
+    }
+  }
 
-  const afterJson = JSON.stringify({
-    stage: newStage,
-    lostReason,
-  });
+  const batchStmts: any[] = [];
 
-  const summary = `Stage moved from "${previousStage}" to "${newStage}"${lostReason ? ` (Reason: ${lostReason})` : ''
-    }`;
-
-  const insertActivityStmt = db.prepare(`
-    INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    activityId,
-    leadId,
-    actorClerkUserId,
-    'stage_change',
-    summary,
-    beforeJson,
-    afterJson,
-    now
+  // 1. Update lead with new stage, lost reason, and client_id
+  batchStmts.push(
+    db.prepare(`
+      UPDATE leads
+      SET stage = ?, lost_reason = ?, client_id = COALESCE(?, client_id), updated_at = ?
+      WHERE id = ?
+    `).bind(newStage, lostReason, assignedClientId, now, leadId)
   );
 
-  await db.batch([updateLeadStmt, insertActivityStmt]);
+  // 2. Insert into lead_status_history table
+  try {
+    batchStmts.push(
+      db.prepare(`
+        INSERT INTO lead_status_history (id, lead_id, old_status, new_status, reason_lost, actor_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(historyId, leadId, previousStage, newStage, lostReason, actorClerkUserId, now)
+    );
+  } catch {
+    // Graceful fallback
+  }
+
+  // 3. Insert into lead_activities
+  const summary = `Stage moved from "${previousStage}" to "${newStage}"${
+    lostReason ? ` (Reason: ${lostReason})` : ''
+  }${assignedClientId ? ` [Linked Client: ${assignedClientId}]` : ''}`;
+
+  batchStmts.push(
+    db.prepare(`
+      INSERT INTO lead_activities (id, lead_id, actor_clerk_user_id, activity_type, summary, before_json, after_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      activityId,
+      leadId,
+      actorClerkUserId,
+      'stage_change',
+      summary,
+      JSON.stringify({ stage: previousStage, lostReason: leadRow.lost_reason || null }),
+      JSON.stringify({ stage: newStage, lostReason, clientId: assignedClientId }),
+      now
+    )
+  );
+
+  await db.batch(batchStmts);
 
   return mapDbRowToLead({
     ...leadRow,
     stage: newStage,
     lost_reason: lostReason,
+    client_id: assignedClientId,
     updated_at: now,
   });
+}
+
+export async function getLeadRelatedData(
+  db: D1Database,
+  leadId: string
+): Promise<{
+  client: Client | null;
+  projects: Project[];
+  payments: Payment[];
+}> {
+  const leadRow = await db
+    .prepare('SELECT * FROM leads WHERE id = ?')
+    .bind(leadId)
+    .first<Record<string, unknown>>();
+
+  if (!leadRow) {
+    return { client: null, projects: [], payments: [] };
+  }
+
+  const clientId = leadRow.client_id ? String(leadRow.client_id) : null;
+  const leadName = String(leadRow.name);
+
+  // Fetch client details if client exists
+  let client: Client | null = null;
+  if (clientId) {
+    const detail = await getClientByIdOrName(db, clientId);
+    client = detail?.client || null;
+  } else {
+    // Try matching by name
+    const detail = await getClientByIdOrName(db, leadName);
+    client = detail?.client || null;
+  }
+
+  // Fetch projects linked by lead_id or client_id
+  const projectsRes = await db
+    .prepare(`
+      SELECT p.*,
+        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) as total_tasks,
+        (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'done') as completed_tasks
+      FROM projects p
+      WHERE p.lead_id = ? OR (p.client_id IS NOT NULL AND p.client_id = ?) OR LOWER(p.client_name) = LOWER(?)
+      ORDER BY p.created_at DESC
+    `)
+    .bind(leadId, clientId || '', leadName)
+    .all<Record<string, unknown>>();
+
+  const projects: Project[] = (projectsRes.results || []).map((row) => ({
+    id: String(row.id),
+    clientId: row.client_id ? String(row.client_id) : clientId,
+    leadId: row.lead_id ? String(row.lead_id) : leadId,
+    title: String(row.title),
+    clientName: String(row.client_name),
+    clientEmail: row.client_email ? String(row.client_email) : null,
+    clientPhone: row.client_phone ? String(row.client_phone) : null,
+    company: row.company ? String(row.company) : null,
+    serviceType: row.service_type ? String(row.service_type) : undefined,
+    budget: row.budget ? String(row.budget) : null,
+    status: row.status as Project['status'],
+    startDate: row.start_date ? Number(row.start_date) : null,
+    targetDate: row.deadline ? Number(row.deadline) : null,
+    description: row.description ? String(row.description) : null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    totalTasks: Number(row.total_tasks || 0),
+    completedTasks: Number(row.completed_tasks || 0),
+  }));
+
+  // Fetch payments
+  const projectIds = projects.map((p) => p.id);
+  let payments: Payment[] = [];
+
+  if (projectIds.length > 0) {
+    const placeholders = projectIds.map(() => '?').join(',');
+    const paymentsRes = await db
+      .prepare(`
+        SELECT p.*, pr.title as project_title
+        FROM payments p
+        LEFT JOIN projects pr ON pr.id = p.project_id
+        WHERE p.project_id IN (${placeholders}) OR p.client_id = ? OR LOWER(p.client_name) = LOWER(?)
+        ORDER BY p.created_at DESC
+      `)
+      .bind(...projectIds, clientId || '', leadName)
+      .all<Record<string, unknown>>();
+
+    payments = (paymentsRes.results || []).map((row) => ({
+      id: String(row.id),
+      projectId: String(row.project_id),
+      clientId: row.client_id ? String(row.client_id) : clientId,
+      leadId,
+      title: row.title ? String(row.title) : undefined,
+      amount: Number(row.amount),
+      currency: 'INR',
+      status: row.status as Payment['status'],
+      paymentMethod: row.payment_method ? String(row.payment_method) : null,
+      invoiceNumber: row.invoice_number ? String(row.invoice_number) : null,
+      dueDate: row.due_date ? Number(row.due_date) : null,
+      paidAt: row.paid_at ? Number(row.paid_at) : null,
+      notes: row.notes ? String(row.notes) : null,
+      createdAt: Number(row.created_at),
+      projectTitle: row.project_title ? String(row.project_title) : undefined,
+      clientName: row.client_name ? String(row.client_name) : leadName,
+      clientEmail: row.client_email ? String(row.client_email) : null,
+      clientPhone: row.client_phone ? String(row.client_phone) : null,
+      company: row.company ? String(row.company) : null,
+      razorpayPaymentLinkId: row.razorpay_payment_link_id ? String(row.razorpay_payment_link_id) : null,
+      razorpayPaymentLinkUrl: row.razorpay_payment_link_url ? String(row.razorpay_payment_link_url) : null,
+      razorpayPaymentId: row.razorpay_payment_id ? String(row.razorpay_payment_id) : null,
+      itemsJson: row.items_json ? String(row.items_json) : null,
+    }));
+  }
+
+  return {
+    client,
+    projects,
+    payments,
+  };
 }
 
 export async function addLeadNote(

@@ -7,11 +7,13 @@ import type {
   UpdatePaymentInput,
   RecordPaymentInput,
 } from '@infohq/shared';
+import { generateInvoiceNumber } from '../utils/idGenerator.js';
 
 function mapDbRowToPayment(row: Record<string, unknown>): Payment {
   return {
     id: String(row.id),
     projectId: String(row.project_id),
+    clientId: row.client_id ? String(row.client_id) : null,
     leadId: row.lead_id ? String(row.lead_id) : null,
     title: row.title
       ? String(row.title)
@@ -62,9 +64,9 @@ export async function getPayments(
   if (params.search && params.search.trim().length > 0) {
     const term = `%${params.search.trim().toLowerCase()}%`;
     conditions.push(
-      '(LOWER(COALESCE(py.title, p.title, "")) LIKE ? OR LOWER(COALESCE(py.client_name, p.client_name, "")) LIKE ? OR LOWER(COALESCE(py.invoice_number, "")) LIKE ?)'
+      '(LOWER(COALESCE(py.title, p.title, "")) LIKE ? OR LOWER(COALESCE(py.client_name, p.client_name, c.name, "")) LIKE ? OR LOWER(COALESCE(py.invoice_number, "")) LIKE ? OR LOWER(COALESCE(py.company, p.company, c.company, "")) LIKE ?)'
     );
-    bindings.push(term, term, term);
+    bindings.push(term, term, term, term);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -73,13 +75,16 @@ export async function getPayments(
     SELECT 
       py.*,
       COALESCE(py.title, p.title) as project_title,
-      COALESCE(py.client_name, p.client_name) as client_name,
+      COALESCE(py.client_name, p.client_name, c.name) as client_name,
+      COALESCE(py.client_email, p.client_email, c.email) as client_email,
+      COALESCE(py.client_phone, p.client_phone, c.phone) as client_phone,
+      COALESCE(py.company, p.company, l.company, c.company) as company,
       COALESCE(py.due_date, p.deadline) as due_date,
-      p.lead_id,
-      l.company
+      p.lead_id
     FROM payments py
     LEFT JOIN projects p ON py.project_id = p.id
     LEFT JOIN leads l ON p.lead_id = l.id
+    LEFT JOIN clients c ON (c.id = py.client_id OR c.id = p.client_id)
     ${whereClause}
     ORDER BY 
       CASE py.status
@@ -135,13 +140,16 @@ export async function getPaymentById(
     SELECT 
       py.*,
       COALESCE(py.title, p.title) as project_title,
-      COALESCE(py.client_name, p.client_name) as client_name,
+      COALESCE(py.client_name, p.client_name, c.name) as client_name,
+      COALESCE(py.client_email, p.client_email, c.email) as client_email,
+      COALESCE(py.client_phone, p.client_phone, c.phone) as client_phone,
+      COALESCE(py.company, p.company, l.company, c.company) as company,
       COALESCE(py.due_date, p.deadline) as due_date,
-      p.lead_id,
-      l.company
+      p.lead_id
     FROM payments py
     LEFT JOIN projects p ON py.project_id = p.id
     LEFT JOIN leads l ON p.lead_id = l.id
+    LEFT JOIN clients c ON (c.id = py.client_id OR c.id = p.client_id)
     WHERE py.id = ?
   `;
   const row = await db.prepare(sql).bind(paymentId).first<Record<string, unknown>>();
@@ -155,20 +163,37 @@ export async function createPayment(
   const id = `pay_${crypto.randomUUID()}`;
   const now = Date.now();
 
-  const invoiceNum = input.invoiceNumber || input.title || `INV-2026-${Math.floor(100 + Math.random() * 900)}`;
+  // Fetch parent project to get client link and contact details
+  const projectRow = await db
+    .prepare('SELECT client_id, client_name, client_email, client_phone, company, title FROM projects WHERE id = ?')
+    .bind(input.projectId)
+    .first<Record<string, unknown>>();
+
+  const clientId = projectRow?.client_id ? String(projectRow.client_id) : null;
+  const clientName = projectRow?.client_name ? String(projectRow.client_name) : null;
+  const clientEmail = projectRow?.client_email ? String(projectRow.client_email) : null;
+  const clientPhone = projectRow?.client_phone ? String(projectRow.client_phone) : null;
+  const company = projectRow?.company ? String(projectRow.company) : null;
+
+  const invoiceNum = input.invoiceNumber || (await generateInvoiceNumber(db));
 
   await db.prepare(`
     INSERT INTO payments (
-      id, project_id, amount, status, invoice_number, paid_at, created_at,
-      title, due_date, notes
-    ) VALUES (?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?)
+      id, client_id, project_id, amount, status, invoice_number, paid_at, created_at,
+      client_name, client_email, client_phone, company, title, due_date, notes
+    ) VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     id,
+    clientId,
     input.projectId,
     String(input.amount),
     invoiceNum,
     now,
-    input.title || 'Milestone Invoice',
+    clientName,
+    clientEmail,
+    clientPhone,
+    company,
+    input.title || `${projectRow?.title || 'Milestone'} Invoice`,
     input.dueDate || null,
     input.notes || null
   ).run();

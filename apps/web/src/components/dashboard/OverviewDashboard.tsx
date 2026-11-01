@@ -64,23 +64,53 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const loadDashboard = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const loadDashboard = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const res = await fetchDashboardOverview(getToken);
       setData(res);
     } catch (err: unknown) {
-      console.error('Failed to load dashboard overview:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data.');
+      if (!isBackground) {
+        console.error('Failed to load dashboard overview:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackground) {
+        setIsLoading(false);
+      }
     }
   }, [getToken]);
 
   useEffect(() => {
-    loadDashboard();
+    loadDashboard(false);
+  }, [loadDashboard]);
+
+  // Silent live auto-refresh without page reloads or spinners
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadDashboard(true);
+      }
+    }, 12000);
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        loadDashboard(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [loadDashboard]);
 
   const formatCurrency = (amt: number) => {
@@ -342,7 +372,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         <div className="flex items-center gap-3.5 sm:gap-4 self-start sm:self-auto select-none">
           {/* Clickable Live Data without pill background */}
           <button
-            onClick={loadDashboard}
+            onClick={() => loadDashboard(false)}
             disabled={isLoading}
             className="text-xs font-bold text-[#1A085C] hover:text-[#5B4CF5] inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 group py-1"
             title="Live Data Active • Click to sync latest metrics"

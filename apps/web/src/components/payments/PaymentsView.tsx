@@ -49,9 +49,11 @@ export const PaymentsView: React.FC = () => {
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Payment | null>(null);
   const [selectedClientForDetail, setSelectedClientForDetail] = useState<Payment | null>(null);
 
-  const loadPayments = async () => {
-    setIsLoading(true);
-    setError(null);
+  const loadPayments = async (isBackground = false) => {
+    if (!isBackground) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetchPayments(getToken, {
         status: selectedStatus,
@@ -60,27 +62,55 @@ export const PaymentsView: React.FC = () => {
       setPayments(res.payments);
       setSummary(res.summary);
     } catch (err: unknown) {
-      console.error('Failed to load payments:', err);
-      setError(err instanceof Error ? err.message : 'Failed to retrieve payments.');
+      if (!isBackground) {
+        console.error('Failed to load payments:', err);
+        setError(err instanceof Error ? err.message : 'Failed to retrieve payments.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackground) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadPayments();
+    loadPayments(false);
+  }, [selectedStatus, searchTerm, getToken]);
+
+  // Silent live auto-refresh without page reloads or spinners
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadPayments(true);
+      }
+    }, 8000);
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        loadPayments(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [selectedStatus, searchTerm, getToken]);
 
   const handlePaymentCreated = (newPayment: Payment) => {
     setPayments((prev) => [newPayment, ...prev]);
-    loadPayments();
+    loadPayments(true);
   };
 
   const handlePaymentRecorded = (updatedPayment: Payment) => {
     setPayments((prev) =>
       prev.map((p) => (p.id === updatedPayment.id ? updatedPayment : p))
     );
-    loadPayments();
+    loadPayments(true);
   };
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -217,9 +247,15 @@ export const PaymentsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Live Sync Real-time Badge */}
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-bold shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Live Sync</span>
+          </div>
+
           {/* Refresh Button */}
           <button
-            onClick={loadPayments}
+            onClick={() => loadPayments(false)}
             disabled={isLoading}
             className="h-8 px-3 rounded-full bg-white/85 backdrop-blur-md hover:bg-white border border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
             title="Refresh Invoices"
@@ -447,7 +483,7 @@ export const PaymentsView: React.FC = () => {
                     <tr
                       key={py.id}
                       onClick={() => setSelectedClientForDetail(py)}
-                      className="hover:bg-white/60 transition-colors group cursor-pointer"
+                      className="hover:bg-slate-50/80 transition-all duration-300 ease-in-out group cursor-pointer"
                     >
                       {/* 1. Invoice Number (Simple text, no pills) */}
                       <td className="py-3.5 px-4 font-mono text-xs font-semibold text-[#1A085C]" title={`Created: ${formatISTDate(py.createdAt)}`}>
