@@ -561,7 +561,7 @@ export const PipelineView: React.FC = () => {
       {/* ========================================================= */}
       {/* 2. PIPELINE BOARD LANES WITH DEAL VELOCITY CARDS          */}
       {/* ========================================================= */}
-      <div className="overflow-x-auto pb-4 -mx-2 px-2 sm:mx-0 sm:px-0">
+      <div className="overflow-x-auto pb-4 -mx-2 px-2 sm:mx-0 sm:px-0 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex gap-3.5 min-w-[1260px]">
           {STAGES.map((col) => {
             const stageLeads = groupedLeads[col.id] || [];
@@ -608,7 +608,7 @@ export const PipelineView: React.FC = () => {
                 )}
 
                 {/* Cards Container */}
-                <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100vh-340px)] min-h-[300px] pr-0.5">
+                <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100vh-340px)] min-h-[300px] pr-0.5 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {dragOverStage === col.id && (
                     <div className="h-11 mb-2 rounded-xl border-2 border-dashed border-[#5B4CF5] bg-[#EDE9FE]/60 flex items-center justify-center text-xs font-bold text-[#5B4CF5] animate-pulse">
                       Drop deal here

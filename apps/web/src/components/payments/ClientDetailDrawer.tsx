@@ -164,14 +164,14 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end transition-opacity"
+      className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
-      {/* Side Card Container (Compact, clean width, no excessive spread) */}
+      {/* Side Popup Card (Compact popup feel, rounded-3xl, not full page height) */}
       <div
-        className="w-full max-w-[420px] bg-white h-full shadow-2xl flex flex-col border-l border-[#E5E1F0] overflow-hidden animate-in slide-in-from-right duration-250"
+        className="w-full sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
@@ -267,7 +267,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
         {/* ========================================================= */}
         {/* 4. TAB PANELS CONTENT                                     */}
         {/* ========================================================= */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+        <div className="flex-1 overflow-y-auto popup-scroll p-4 space-y-3.5 text-xs">
           {/* ========================================================= */}
           {/* TAB 1: OVERVIEW                                           */}
           {/* ========================================================= */}

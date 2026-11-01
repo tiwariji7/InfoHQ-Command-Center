@@ -647,8 +647,8 @@ export const LeadsInbox: React.FC = () => {
             onClick={() => setSelectedLead(null)}
           />
 
-          {/* Side Drawer Panel (Compact, clean max-w-[420px], single card) */}
-          <div className="fixed top-0 right-0 bottom-0 w-full max-w-[420px] bg-white z-50 shadow-2xl border-l border-[#E5E1F0] flex flex-col animate-in slide-in-from-right duration-250 overflow-hidden">
+          {/* Side Drawer Popup (Compact, clean max-w-[420px], floating card popup) */}
+          <div className="fixed top-3 bottom-3 right-3 sm:top-5 sm:bottom-5 sm:right-6 w-[calc(100%-1.5rem)] sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white z-50 shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] rounded-3xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
             {/* 1. TOP TITLE BAR */}
             <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-2 text-[#1A085C]">
@@ -773,7 +773,7 @@ export const LeadsInbox: React.FC = () => {
             </div>
 
             {/* 4. SCROLLABLE TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+            <div className="flex-1 overflow-y-auto popup-scroll p-4 space-y-3.5 text-xs">
               {leadDrawerTab === 'overview' && (
                 <>
                   {/* Card 1: Lead Information */}
