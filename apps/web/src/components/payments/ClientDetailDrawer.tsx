@@ -171,13 +171,13 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     >
       {/* Side Popup Card (Compact popup feel, rounded-3xl, not full page height) */}
       <div
-        className="w-full sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="popup-card w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
-        {/* 1. TOP TITLE BAR                                          */}
+        {/* 1. TOP TITLE BAR (Pinned at top)                          */}
         {/* ========================================================= */}
-        <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0">
+        <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20">
           <div className="flex items-center gap-2 text-[#1A085C]">
             <button
               onClick={onClose}
@@ -198,76 +198,76 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 2. CLIENT PROFILE HEADER (Clean typography, NO PILL)       */}
+        {/* SCROLLABLE BODY (Scrollable on cursor hover across card)   */}
         {/* ========================================================= */}
-        <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
-              {initials}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-[#1A085C] truncate">{clientName}</h3>
-                {/* Active Client status - SIMPLE TEXT WITH DOT, NO PILL */}
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Active Client</span>
-                </span>
+        <div className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col">
+          {/* 2. CLIENT PROFILE HEADER */}
+          <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
+                {initials}
               </div>
 
-              {/* Email & Phone */}
-              <div className="mt-1 space-y-0.5 text-[11px] text-[#6B7280]">
-                {clientEmail && (
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Mail size={11} className="text-[#9CA3AF] shrink-0" />
-                    <span className="truncate">{clientEmail}</span>
-                  </div>
-                )}
-                {clientPhone && (
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Phone size={11} className="text-[#9CA3AF] shrink-0" />
-                    <span>{clientPhone}</span>
-                  </div>
-                )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[#1A085C] truncate">{clientName}</h3>
+                  {/* Active Client status - SIMPLE TEXT WITH DOT, NO PILL */}
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Active Client</span>
+                  </span>
+                </div>
+
+                {/* Email & Phone */}
+                <div className="mt-1 space-y-0.5 text-[11px] text-[#6B7280]">
+                  {clientEmail && (
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Mail size={11} className="text-[#9CA3AF] shrink-0" />
+                      <span className="truncate">{clientEmail}</span>
+                    </div>
+                  )}
+                  {clientPhone && (
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Phone size={11} className="text-[#9CA3AF] shrink-0" />
+                      <span>{clientPhone}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* ========================================================= */}
-          {/* 3. TABS BAR (Clean text with active underline, NO PILL)   */}
-          {/* ========================================================= */}
-          <div className="flex items-center justify-between border-b border-[#E5E1F0] mt-4 pt-1 text-xs">
-            {(['overview', 'projects', 'invoices', 'payments'] as TabType[]).map((tab) => {
-              const isActive = activeTab === tab;
-              const labels: Record<TabType, string> = {
-                overview: 'Overview',
-                projects: `Projects (${clientProjects.length})`,
-                invoices: `Invoices (${clientInvoices.length})`,
-                payments: `Payments (${clientInvoices.length})`,
-              };
+          {/* 3. TABS BAR (Sticky at top when scrolling) */}
+          <div className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 px-4 pt-2 border-b border-[#E5E1F0]">
+            <div className="flex items-center justify-between text-xs">
+              {(['overview', 'projects', 'invoices', 'payments'] as TabType[]).map((tab) => {
+                const isActive = activeTab === tab;
+                const labels: Record<TabType, string> = {
+                  overview: 'Overview',
+                  projects: `Projects (${clientProjects.length})`,
+                  invoices: `Invoices (${clientInvoices.length})`,
+                  payments: `Payments (${clientInvoices.length})`,
+                };
 
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-2 px-1 text-xs font-semibold capitalize transition-all cursor-pointer border-b-2 ${
-                    isActive
-                      ? 'border-[#5B4CF5] text-[#5B4CF5] font-bold'
-                      : 'border-transparent text-[#6B7280] hover:text-[#1A085C]'
-                  }`}
-                >
-                  {labels[tab]}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`pb-2 px-1 text-xs font-semibold capitalize transition-all cursor-pointer border-b-2 ${
+                      isActive
+                        ? 'border-[#5B4CF5] text-[#5B4CF5] font-bold'
+                        : 'border-transparent text-[#6B7280] hover:text-[#1A085C]'
+                    }`}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* ========================================================= */}
-        {/* 4. TAB PANELS CONTENT                                     */}
-        {/* ========================================================= */}
-        <div className="flex-1 overflow-y-auto popup-scroll p-4 space-y-3.5 text-xs">
+          {/* 4. TAB PANELS CONTENT */}
+          <div className="p-4 space-y-3.5 text-xs flex-1">
           {/* ========================================================= */}
           {/* TAB 1: OVERVIEW                                           */}
           {/* ========================================================= */}
@@ -690,6 +690,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
               </button>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

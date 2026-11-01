@@ -401,15 +401,15 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
       {/* Floating Popup Card (Sleek popup, rounded-3xl, centered/right-docked with margins) */}
       <div
-        className="fixed top-3 bottom-3 right-3 sm:top-5 sm:bottom-5 sm:right-6 w-[calc(100%-1.5rem)] sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white z-50 shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] rounded-3xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
+        className="popup-card fixed top-3 bottom-3 right-3 sm:top-5 sm:bottom-5 sm:right-6 w-[calc(100%-1.5rem)] sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white z-50 shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] rounded-3xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
-        {/* 1. TOP TITLE BAR                                          */}
+        {/* 1. TOP TITLE BAR (Pinned at top)                          */}
         {/* ========================================================= */}
-        <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0">
+        <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20">
           <div className="flex items-center gap-2 text-[#1A085C]">
             <button
               onClick={onClose}
@@ -430,114 +430,116 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 2. PROFILE HERO HEADER (Avatar, Title, Contact Pills)     */}
+        {/* SCROLLABLE BODY (Scrollable on cursor hover across card)   */}
         {/* ========================================================= */}
-        <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
-              {getMonogram(project?.clientName || project?.title)}
+        <div className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col">
+          {/* 2. PROFILE HERO HEADER (Avatar, Title, Contact Pills)     */}
+          <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
+                {getMonogram(project?.clientName || project?.title)}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-black text-[#1A085C] tracking-tight truncate">
+                    {project?.clientName || project?.title || 'Project Dossier'}
+                  </h3>
+                  {renderStatusText(project?.status)}
+                </div>
+
+                <div className="text-[11px] text-[#6B7280] font-medium truncate mt-0.5">
+                  {project?.title}
+                </div>
+
+                <div className="text-[11px] text-[#6B7280] flex items-center gap-2 mt-0.5 truncate">
+                  {project?.clientEmail && <span className="truncate">{project.clientEmail}</span>}
+                  {project?.clientPhone && <span>{project.clientPhone}</span>}
+                </div>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-black text-[#1A085C] tracking-tight truncate">
-                  {project?.clientName || project?.title || 'Project Dossier'}
-                </h3>
-                {renderStatusText(project?.status)}
-              </div>
-
-              <div className="text-[11px] text-[#6B7280] font-medium truncate mt-0.5">
-                {project?.title}
-              </div>
-
-              <div className="text-[11px] text-[#6B7280] flex items-center gap-2 mt-0.5 truncate">
-                {project?.clientEmail && <span className="truncate">{project.clientEmail}</span>}
-                {project?.clientPhone && <span>{project.clientPhone}</span>}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Action Contact Pills (Call, WhatsApp, Email - strictly 3 pills, NO 3-dots) */}
-          <div className="grid grid-cols-3 gap-2 mt-3.5">
-            {project?.clientPhone ? (
-              <a
-                href={`tel:${project.clientPhone}`}
-                className="h-9 px-3 rounded-full bg-white hover:bg-purple-50 border border-[#E5E1F0] hover:border-[#5B4CF5] text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
-              >
-                <Phone size={13} className="text-[#5B4CF5] group-hover:scale-110 transition-transform" />
-                <span>Call</span>
-              </a>
-            ) : (
-              <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
-                <Phone size={13} />
-                <span>Call</span>
-              </div>
-            )}
-
-            {waUrl ? (
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="h-9 px-3 rounded-full bg-white hover:bg-emerald-50 border border-[#E5E1F0] hover:border-emerald-500 text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
-              >
-                <MessageCircle size={13} className="text-[#10B981] group-hover:scale-110 transition-transform" />
-                <span>WhatsApp</span>
-              </a>
-            ) : (
-              <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
-                <MessageCircle size={13} />
-                <span>WhatsApp</span>
-              </div>
-            )}
-
-            {mailtoUrl ? (
-              <a
-                href={mailtoUrl}
-                className="h-9 px-3 rounded-full bg-white hover:bg-blue-50 border border-[#E5E1F0] hover:border-blue-500 text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
-              >
-                <Mail size={13} className="text-[#3B82F6] group-hover:scale-110 transition-transform" />
-                <span>Email</span>
-              </a>
-            ) : (
-              <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
-                <Mail size={13} />
-                <span>No Email</span>
-              </div>
-            )}
-          </div>
-
-          {/* 4 Clean Underline Tabs: Overview, Tasks, Invoices, Team */}
-          <div className="flex items-center justify-between border-b border-[#E5E1F0] mt-3.5 pt-1 text-xs">
-            {(['overview', 'tasks', 'invoices', 'team'] as const).map((tab) => {
-              const isActive = activeTab === tab;
-              const labels: Record<TabType, string> = {
-                overview: 'Overview',
-                tasks: `Tasks (${totalTasksCount})`,
-                invoices: `Invoices (${projectPayments.length})`,
-                team: 'Team',
-              };
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-2 px-1 text-xs font-semibold capitalize transition-all cursor-pointer border-b-2 ${
-                    isActive
-                      ? 'border-[#5B4CF5] text-[#5B4CF5] font-bold'
-                      : 'border-transparent text-[#6B7280] hover:text-[#1A085C]'
-                  }`}
+            {/* Quick Action Contact Pills (Call, WhatsApp, Email - strictly 3 pills, NO 3-dots) */}
+            <div className="grid grid-cols-3 gap-2 mt-3.5">
+              {project?.clientPhone ? (
+                <a
+                  href={`tel:${project.clientPhone}`}
+                  className="h-9 px-3 rounded-full bg-white hover:bg-purple-50 border border-[#E5E1F0] hover:border-[#5B4CF5] text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
                 >
-                  {labels[tab]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  <Phone size={13} className="text-[#5B4CF5] group-hover:scale-110 transition-transform" />
+                  <span>Call</span>
+                </a>
+              ) : (
+                <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
+                  <Phone size={13} />
+                  <span>Call</span>
+                </div>
+              )}
 
-        {/* ========================================================= */}
-        {/* 3. SCROLLABLE TAB PANELS CONTENT                          */}
-        {/* ========================================================= */}
-        <div className="flex-1 overflow-y-auto popup-scroll p-4 space-y-3.5 text-xs">
+              {waUrl ? (
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-9 px-3 rounded-full bg-white hover:bg-emerald-50 border border-[#E5E1F0] hover:border-emerald-500 text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
+                >
+                  <MessageCircle size={13} className="text-[#10B981] group-hover:scale-110 transition-transform" />
+                  <span>WhatsApp</span>
+                </a>
+              ) : (
+                <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
+                  <MessageCircle size={13} />
+                  <span>WhatsApp</span>
+                </div>
+              )}
+
+              {mailtoUrl ? (
+                <a
+                  href={mailtoUrl}
+                  className="h-9 px-3 rounded-full bg-white hover:bg-blue-50 border border-[#E5E1F0] hover:border-blue-500 text-[#1A085C] text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
+                >
+                  <Mail size={13} className="text-[#3B82F6] group-hover:scale-110 transition-transform" />
+                  <span>Email</span>
+                </a>
+              ) : (
+                <div className="h-9 px-3 rounded-full bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
+                  <Mail size={13} />
+                  <span>No Email</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3. TABS BAR (Sticky at top when scrolling) */}
+          <div className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 px-4 pt-2 border-b border-[#E5E1F0]">
+            <div className="flex items-center justify-between text-xs">
+              {(['overview', 'tasks', 'invoices', 'team'] as const).map((tab) => {
+                const isActive = activeTab === tab;
+                const labels: Record<TabType, string> = {
+                  overview: 'Overview',
+                  tasks: `Tasks (${totalTasksCount})`,
+                  invoices: `Invoices (${projectPayments.length})`,
+                  team: 'Team',
+                };
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`pb-2 px-1 text-xs font-semibold capitalize transition-all cursor-pointer border-b-2 ${
+                      isActive
+                        ? 'border-[#5B4CF5] text-[#5B4CF5] font-bold'
+                        : 'border-transparent text-[#6B7280] hover:text-[#1A085C]'
+                    }`}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. SCROLLABLE TAB PANELS CONTENT */}
+          <div className="p-4 space-y-3.5 text-xs flex-1">
           {isLoading && !project && (
             <div className="flex flex-col items-center justify-center py-20 gap-2 text-[#6B7280]">
               <Loader2 size={24} className="animate-spin text-[#5B4CF5]" />
@@ -996,6 +998,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
               )}
             </>
           )}
+        </div>
         </div>
 
         {/* ========================================================= */}
