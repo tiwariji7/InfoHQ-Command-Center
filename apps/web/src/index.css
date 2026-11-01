@@ -153,6 +153,7 @@
   overflow-y: auto !important;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   scrollbar-width: thin;
   scrollbar-color: rgba(124, 58, 237, 0.45) transparent;
 }

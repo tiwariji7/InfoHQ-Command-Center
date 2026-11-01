@@ -32,6 +32,12 @@ export const App: React.FC = () => {
       duration: 0.8,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
+      prevent: (node) => {
+        return Boolean(
+          node.hasAttribute?.('data-lenis-prevent') ||
+          node.closest?.('[data-lenis-prevent], .popup-scroll, .popup-card, [role="dialog"]')
+        );
+      },
     });
 
     function raf(time: number) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Payment, ClientDetailResponse } from '@infohq/shared';
 import { fetchClientDetail } from '../../lib/api.js';
+import { useDraggable } from '../../lib/useDraggable.js';
 import {
   X,
   User,
@@ -18,6 +19,7 @@ import {
   Smartphone,
   Cloud,
   ChevronRight,
+  GripHorizontal,
 } from 'lucide-react';
 
 interface ClientDetailDrawerProps {
@@ -69,6 +71,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<InvoiceFilter>('all');
+  const { position, handlePointerDown, resetPosition } = useDraggable('payment_client_drawer');
 
   // Escape key handler
   useEffect(() => {
@@ -199,20 +202,29 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity"
       role="dialog"
       aria-modal="true"
+      data-lenis-prevent="true"
       onClick={onClose}
     >
-      {/* Side Popup Card (Compact popup feel, rounded-3xl, not full page height) */}
+      {/* Side Popup Card (Compact popup feel, rounded-3xl, not full page height, draggable anywhere) */}
       <div
         className="popup-card w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
+        data-lenis-prevent="true"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
-        {/* 1. TOP TITLE BAR (Pinned at top)                          */}
+        {/* 1. TOP TITLE BAR (Pinned at top & Draggable Handle)       */}
         {/* ========================================================= */}
-        <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20">
+        <div
+          onPointerDown={handlePointerDown}
+          onDoubleClick={resetPosition}
+          className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20 cursor-grab active:cursor-grabbing select-none"
+          title="Click and drag to move card anywhere • Double-click to reset position"
+        >
           <div className="flex items-center gap-2 text-[#1A085C]">
             <button
               onClick={onClose}
+              data-no-drag="true"
               className="p-1 -ml-1 text-[#6B7280] hover:text-[#1A085C] rounded-md transition-colors cursor-pointer"
               title="Back"
             >
@@ -220,8 +232,19 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             </button>
             <h2 className="text-xs font-bold text-[#1A085C] tracking-tight">Client Details</h2>
           </div>
+
+          {/* Drag Handle Indicator */}
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3F0FF]/80 text-[#7C5CE8] text-[10px] font-semibold"
+            title="Drag to move card"
+          >
+            <GripHorizontal size={14} />
+            <span className="hidden sm:inline">Move</span>
+          </div>
+
           <button
             onClick={onClose}
+            data-no-drag="true"
             className="w-7 h-7 rounded-lg text-[#6B7280] hover:text-[#1A085C] hover:bg-[#F3F0FF] flex items-center justify-center transition-colors cursor-pointer"
             title="Close"
           >
@@ -232,7 +255,11 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
         {/* ========================================================= */}
         {/* SCROLLABLE BODY (Scrollable on cursor hover across card)   */}
         {/* ========================================================= */}
-        <div className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col focus:outline-none"
+          data-lenis-prevent="true"
+          tabIndex={0}
+        >
           {/* 2. CLIENT PROFILE HEADER */}
           <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
             <div className="flex items-start gap-3">

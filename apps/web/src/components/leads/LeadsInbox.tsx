@@ -36,7 +36,9 @@ import {
   Edit3,
   User,
   FileText,
+  GripHorizontal,
 } from 'lucide-react';
+import { useDraggable } from '../../lib/useDraggable.js';
 
 export const LeadsInbox: React.FC = () => {
   const { getToken } = useAuth();
@@ -60,6 +62,7 @@ export const LeadsInbox: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [leadDrawerTab, setLeadDrawerTab] = useState<'overview' | 'projects' | 'invoices' | 'payments'>('overview');
   const [leadRelated, setLeadRelated] = useState<{ client: Client | null; projects: Project[]; payments: Payment[] } | null>(null);
+  const { position: leadPos, handlePointerDown: handleLeadPointerDown, resetPosition: resetLeadPosition } = useDraggable('leads_drawer');
 
   // Fetch linked client, converted projects and invoices when lead is selected
   useEffect(() => {
@@ -695,20 +698,31 @@ export const LeadsInbox: React.FC = () => {
       {/*     with Cut 'X' button & complete premium profile)       */}
       {/* ========================================================= */}
       {selectedLead && (
-        <>
-          {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          data-lenis-prevent="true"
+          onClick={() => setSelectedLead(null)}
+        >
+          {/* Side Drawer Popup (Matches Payment page Client Profile size exactly, rounded-3xl, not full page height, draggable anywhere) */}
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 transition-opacity animate-in fade-in duration-200"
-            onClick={() => setSelectedLead(null)}
-          />
-
-          {/* Side Drawer Popup (Compact, clean max-w-[420px], floating card popup) */}
-          <div className="popup-card fixed top-3 bottom-3 right-3 sm:top-5 sm:bottom-5 sm:right-6 w-[calc(100%-1.5rem)] sm:w-[420px] max-w-[420px] max-h-[calc(100vh-2.5rem)] bg-white z-50 shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] rounded-3xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
-            {/* 1. TOP TITLE BAR (Pinned at top) */}
-            <div className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20">
+            className="popup-card w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            style={{ transform: `translate3d(${leadPos.x}px, ${leadPos.y}px, 0)` }}
+            data-lenis-prevent="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 1. TOP TITLE BAR (Pinned at top & Draggable Handle) */}
+            <div
+              onPointerDown={handleLeadPointerDown}
+              onDoubleClick={resetLeadPosition}
+              className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20 cursor-grab active:cursor-grabbing select-none"
+              title="Click and drag to move card anywhere • Double-click to reset position"
+            >
               <div className="flex items-center gap-2 text-[#1A085C]">
                 <button
                   onClick={() => setSelectedLead(null)}
+                  data-no-drag="true"
                   className="p-1 -ml-1 text-[#6B7280] hover:text-[#1A085C] rounded-md transition-colors cursor-pointer"
                   title="Back"
                 >
@@ -716,8 +730,19 @@ export const LeadsInbox: React.FC = () => {
                 </button>
                 <h2 className="text-xs font-bold text-[#1A085C] tracking-tight">Lead Details</h2>
               </div>
+
+              {/* Drag Handle Indicator */}
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3F0FF]/80 text-[#7C5CE8] text-[10px] font-semibold"
+                title="Drag to move card"
+              >
+                <GripHorizontal size={14} />
+                <span className="hidden sm:inline">Move</span>
+              </div>
+
               <button
                 onClick={() => setSelectedLead(null)}
+                data-no-drag="true"
                 className="w-7 h-7 rounded-lg text-[#6B7280] hover:text-[#1A085C] hover:bg-[#F3F0FF] flex items-center justify-center transition-colors cursor-pointer"
                 title="Close"
               >
@@ -726,7 +751,11 @@ export const LeadsInbox: React.FC = () => {
             </div>
 
             {/* SCROLLABLE BODY (Scrollable on cursor hover across entire card) */}
-            <div className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col">
+            <div
+              className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col focus:outline-none"
+              data-lenis-prevent="true"
+              tabIndex={0}
+            >
               {/* 2. PROFILE HEADER */}
               <div className="p-4 bg-gradient-to-b from-[#FBFBFE] to-white border-b border-[#E5E1F0] shrink-0">
                 <div className="flex items-start gap-3">
@@ -1075,7 +1104,7 @@ export const LeadsInbox: React.FC = () => {
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Add Lead Modal */}
