@@ -19,6 +19,7 @@ import {
   Clock,
   MessageCircle,
   FileCheck2,
+  Calendar,
 } from 'lucide-react';
 
 interface InvoiceDetailDrawerProps {
@@ -196,7 +197,7 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#5B4CF5] animate-ping" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#5B4CF5]">
-                Invoice &amp; Client Profile
+                Invoice &amp; Client Dossier
               </span>
             </div>
 
@@ -275,22 +276,24 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
               </div>
             </div>
 
-            {/* Direct Client Contact Action Pills */}
-            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#FAF9FD]">
+            {/* Direct High-End Communication Action Pills */}
+            <div className="grid grid-cols-3 gap-2.5 pt-1 border-t border-[#FAF9FD]">
               {payment.clientPhone ? (
                 <a
                   href={`tel:${payment.clientPhone}`}
                   style={{
-                    background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                    boxShadow: '0 4px 12px rgba(99, 88, 240, 0.25)',
+                    background: 'linear-gradient(135deg, #5B4CF5 0%, #4338CA 100%)',
+                    boxShadow: '0 4px 14px rgba(91, 76, 245, 0.30)',
                   }}
-                  className="p-2.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-95 transition-all"
+                  className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
                 >
-                  <Phone size={13} className="stroke-[2.5]" />
-                  <span>Call Client</span>
+                  <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Phone size={12} className="stroke-[2.8] text-white" />
+                  </div>
+                  <span className="text-[11.5px] font-extrabold tracking-wide">Call Client</span>
                 </a>
               ) : (
-                <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                <div className="h-11 px-2.5 rounded-2xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
                   <Phone size={13} />
                   <span>No Phone</span>
                 </div>
@@ -300,22 +303,36 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
               <button
                 type="button"
                 onClick={handleSendReminder}
-                className="p-2.5 rounded-xl bg-[#F0FDF4] hover:bg-[#DCFCE7] text-[#15803D] text-xs font-bold flex items-center justify-center gap-1.5 border border-green-200 transition-colors shadow-2xs cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.30)',
+                }}
+                className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
               >
-                <MessageCircle size={13} className="stroke-[2.2]" />
-                <span>{reminderCopied ? 'Sent!' : 'WhatsApp'}</span>
+                <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <MessageCircle size={13} className="stroke-[2.8] text-white" />
+                </div>
+                <span className="text-[11.5px] font-extrabold tracking-wide">
+                  {reminderCopied ? 'Sent!' : 'WhatsApp'}
+                </span>
               </button>
 
               {payment.clientEmail ? (
                 <a
                   href={`mailto:${payment.clientEmail}?subject=Invoice%20${invoiceCode}%20Payment`}
-                  className="p-2.5 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#E5E1F0] transition-colors shadow-2xs"
+                  style={{
+                    background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.30)',
+                  }}
+                  className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
                 >
-                  <Mail size={13} className="stroke-[2.2]" />
-                  <span>Email</span>
+                  <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Mail size={12} className="stroke-[2.8] text-white" />
+                  </div>
+                  <span className="text-[11.5px] font-extrabold tracking-wide">Email</span>
                 </a>
               ) : (
-                <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                <div className="h-11 px-2.5 rounded-2xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
                   <Mail size={13} />
                   <span>No Email</span>
                 </div>
@@ -342,6 +359,50 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
                 <span className="font-semibold text-[#1A085C] truncate max-w-[220px]">
                   {payment.clientEmail || 'Not Available'}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 2.15 IMPORTANT DATES & TIMELINE CARD                      */}
+          {/* ========================================================= */}
+          <div className="bg-white rounded-2xl p-4 border border-[#E5E1F0] shadow-2xs space-y-3">
+            <span className="text-[10.5px] font-bold text-[#1A085C] uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar size={13} className="text-[#5B4CF5]" />
+              <span>Important Dates &amp; Timeline</span>
+            </span>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-[#FAF9FD] p-2.5 rounded-xl border border-[#E5E1F0]">
+                <div className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider flex items-center gap-1">
+                  <Calendar size={10} className="text-[#5B4CF5]" />
+                  <span>Issued Date</span>
+                </div>
+                <div className="text-xs font-black text-[#1A085C] mt-1 tabular-nums">
+                  {formatISTDate(payment.createdAt)}
+                </div>
+                <div className="text-[9.5px] text-[#9CA3AF] mt-0.5">
+                  Invoice Generation
+                </div>
+              </div>
+
+              <div className="bg-[#FAF9FD] p-2.5 rounded-xl border border-[#E5E1F0]">
+                <div className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider flex items-center gap-1">
+                  <Clock size={10} className={isPaid ? 'text-[#10B981]' : isOverdue ? 'text-rose-500' : 'text-[#F97316]'} />
+                  <span>{isPaid ? 'Settled Date' : 'Due Date'}</span>
+                </div>
+                <div className={`text-xs font-black mt-1 tabular-nums ${isPaid ? 'text-[#15803D]' : isOverdue ? 'text-rose-700' : 'text-[#C2410C]'}`}>
+                  {isPaid ? formatISTDate(payment.paidAt || payment.updatedAt) : formatISTDate(payment.dueDate)}
+                </div>
+                <div className="text-[9.5px] mt-0.5 font-bold">
+                  {isPaid ? (
+                    <span className="text-[#15803D]">Payment Received ✓</span>
+                  ) : isOverdue ? (
+                    <span className="text-rose-600">Overdue Notice</span>
+                  ) : (
+                    <span className="text-[#6B7280]">Payment Due</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -415,84 +476,91 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* 2.4 ONLINE RAZORPAY PAYMENT LINK & SETTLEMENT ACTION       */}
+          {/* 2.4 HERO PAYMENT ACTIONS (High-End Tactile Buttons)       */}
           {/* ========================================================= */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {!isPaid && (
               <>
+                {/* HERO CTA BUTTON: RECORD FUNDS / MARK AS PAID */}
+                <button
+                  type="button"
+                  onClick={() => onRecordPayment(payment)}
+                  style={{
+                    background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 45%, #E85AA0 100%)',
+                    boxShadow: '0 8px 24px -2px rgba(91, 76, 245, 0.42), 0 2px 8px rgba(232, 90, 160, 0.28)',
+                    color: '#FFFFFF',
+                  }}
+                  className="w-full h-12 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2.5 hover:brightness-110 hover:-translate-y-0.5 active:scale-98 transition-all cursor-pointer shadow-lg group"
+                >
+                  <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <FileCheck2 size={14} className="stroke-[3] text-white" />
+                  </div>
+                  <span>Record Received Funds (Mark Paid)</span>
+                </button>
+
+                {/* RAZORPAY PAYMENT LINK */}
                 {localPaymentLink ? (
                   <a
                     href={localPaymentLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                      boxShadow: '0 6px 20px -2px rgba(16, 185, 129, 0.35)',
+                    }}
+                    className="w-full h-11 rounded-2xl text-white text-xs font-extrabold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-98 transition-all cursor-pointer shadow-md group"
                   >
-                    <span>Open Razorpay Live Payment Gateway</span>
-                    <ExternalLink size={13} />
+                    <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <ExternalLink size={13} className="text-white stroke-[2.8]" />
+                    </div>
+                    <span>Open Live Razorpay Gateway</span>
                   </a>
                 ) : (
                   <button
                     type="button"
                     onClick={handleGenerateRazorpayLink}
                     disabled={isGeneratingRzp}
-                    className="w-full h-10 rounded-xl bg-[#FAF9FD] hover:bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full h-11 rounded-2xl bg-white hover:bg-[#FAF9FD] text-[#5B4CF5] border-2 border-[#5B4CF5]/30 hover:border-[#5B4CF5] text-xs font-extrabold flex items-center justify-center gap-2 shadow-2xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50 group"
                   >
-                    {isGeneratingRzp ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Generating Payment Link...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={13} />
-                        <span>Generate Razorpay Online Payment Link</span>
-                      </>
-                    )}
+                    <div className="w-6 h-6 rounded-xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      {isGeneratingRzp ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="stroke-[2.5]" />}
+                    </div>
+                    <span>{isGeneratingRzp ? 'Generating Razorpay Link...' : 'Create Razorpay Payment Link'}</span>
                   </button>
                 )}
-
-                {/* Mark as Paid Action */}
-                <button
-                  type="button"
-                  onClick={() => onRecordPayment(payment)}
-                  style={{
-                    background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                    boxShadow: '0 4px 12px rgba(99, 88, 240, 0.25)',
-                    color: '#FFFFFF',
-                  }}
-                  className="w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-                >
-                  <FileCheck2 size={14} className="stroke-[2.5]" />
-                  <span>Record Funds / Mark Paid</span>
-                </button>
               </>
             )}
 
-            {/* View / Print Official Tax Invoice */}
-            <div className="flex items-center gap-2">
+            {/* View Invoice & Print PDF Action Deck */}
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={handlePrintOrView}
-                className="flex-1 h-9.5 rounded-xl bg-[#EFF6FF] hover:bg-blue-100/70 text-[#1D4ED8] text-xs font-bold flex items-center justify-center gap-1.5 border border-blue-200 transition-colors cursor-pointer shadow-2xs"
+                className="flex-1 h-10 rounded-2xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-2 border border-[#E5E1F0] hover:border-[#5B4CF5]/40 transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5 group"
               >
-                <Eye size={13} />
+                <div className="w-5 h-5 rounded-lg bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Eye size={12} className="stroke-[2.5]" />
+                </div>
                 <span>View Invoice</span>
               </button>
 
               <button
                 type="button"
                 onClick={handlePrintOrView}
-                className="flex-1 h-9.5 rounded-xl bg-[#F8F8FF] hover:bg-[#F3F0FF] text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#E5E1F0] transition-colors cursor-pointer shadow-2xs"
+                className="flex-1 h-10 rounded-2xl bg-white hover:bg-[#EFF6FF] text-[#1A085C] hover:text-[#1D4ED8] text-xs font-bold flex items-center justify-center gap-2 border border-[#E5E1F0] hover:border-blue-300 transition-all cursor-pointer shadow-2xs hover:-translate-y-0.5 group"
               >
-                <Download size={13} />
-                <span>Print / PDF</span>
+                <div className="w-5 h-5 rounded-lg bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Download size={12} className="stroke-[2.5]" />
+                </div>
+                <span>Download PDF</span>
               </button>
 
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className="w-9.5 h-9.5 rounded-xl bg-white border border-[#E5E1F0] text-[#6B7280] hover:text-[#1A085C] flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+                  className="w-10 h-10 rounded-2xl bg-white hover:bg-rose-50 text-[#6B7280] hover:text-rose-600 border border-[#E5E1F0] hover:border-rose-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="More actions"
                 >
                   <MoreHorizontal size={15} />
                 </button>
@@ -519,9 +587,9 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* 2.5 TABS: Items, Payments, Timeline, Notes                */}
+          {/* 2.5 SEGMENTED TABS: Items, Payments, Timeline, Notes      */}
           {/* ========================================================= */}
-          <div className="border-b border-[#E5E1F0] flex items-center gap-4 text-xs font-bold pt-2">
+          <div className="p-1 bg-[#FAF9FD] rounded-2xl border border-[#E5E1F0] flex items-center gap-1">
             {(['items', 'payments', 'timeline', 'notes'] as const).map((tab) => {
               const isActive = activeTab === tab;
               return (
@@ -529,9 +597,9 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-2 capitalize transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
                     isActive
-                      ? 'text-[#5B4CF5] border-b-2 border-[#5B4CF5]'
+                      ? 'bg-white text-[#5B4CF5] shadow-2xs border border-[#E5E1F0]'
                       : 'text-[#6B7280] hover:text-[#1A085C]'
                   }`}
                 >
@@ -655,7 +723,7 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-full bg-white border border-[#E5E1F0] hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            className="px-5 py-2 rounded-full bg-[#1A085C] hover:bg-[#2A108C] text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm hover:shadow-md"
           >
             Close Invoice
           </button>

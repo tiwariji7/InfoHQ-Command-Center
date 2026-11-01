@@ -674,22 +674,24 @@ export const LeadsInbox: React.FC = () => {
 
             {/* Scrollable Drawer Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-              {/* Quick Communication Actions Bar */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Direct High-End Communication Action Pills */}
+              <div className="grid grid-cols-3 gap-2.5 pt-1">
                 {selectedLead.phone ? (
                   <a
                     href={`tel:${selectedLead.phone}`}
                     style={{
-                      background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                      boxShadow: '0 4px 12px rgba(99, 88, 240, 0.25)',
+                      background: 'linear-gradient(135deg, #5B4CF5 0%, #4338CA 100%)',
+                      boxShadow: '0 4px 14px rgba(91, 76, 245, 0.30)',
                     }}
-                    className="p-2.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-95 transition-all"
+                    className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
                   >
-                    <Phone size={13} className="stroke-[2.5]" />
-                    <span>Call Now</span>
+                    <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <Phone size={12} className="stroke-[2.8] text-white" />
+                    </div>
+                    <span className="text-[11.5px] font-extrabold tracking-wide">Call Lead</span>
                   </a>
                 ) : (
-                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                  <div className="h-11 px-2.5 rounded-2xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
                     <Phone size={13} />
                     <span>No Phone</span>
                   </div>
@@ -700,13 +702,19 @@ export const LeadsInbox: React.FC = () => {
                     href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2.5 rounded-xl bg-[#F0FDF4] hover:bg-[#DCFCE7] text-[#15803D] text-xs font-bold flex items-center justify-center gap-1.5 border border-green-200 transition-colors shadow-2xs"
+                    style={{
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.30)',
+                    }}
+                    className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
                   >
-                    <MessageCircle size={13} className="stroke-[2.2]" />
-                    <span>WhatsApp</span>
+                    <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <MessageCircle size={13} className="stroke-[2.8] text-white" />
+                    </div>
+                    <span className="text-[11.5px] font-extrabold tracking-wide">WhatsApp</span>
                   </a>
                 ) : (
-                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                  <div className="h-11 px-2.5 rounded-2xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
                     <MessageCircle size={13} />
                     <span>WhatsApp</span>
                   </div>
@@ -715,13 +723,19 @@ export const LeadsInbox: React.FC = () => {
                 {selectedLead.email ? (
                   <a
                     href={`mailto:${selectedLead.email}`}
-                    className="p-2.5 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#E5E1F0] transition-colors shadow-2xs"
+                    style={{
+                      background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                      boxShadow: '0 4px 14px rgba(59, 130, 246, 0.30)',
+                    }}
+                    className="h-11 px-2.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-95 transition-all shadow-sm cursor-pointer group"
                   >
-                    <Mail size={13} className="stroke-[2.2]" />
-                    <span>Email</span>
+                    <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <Mail size={12} className="stroke-[2.8] text-white" />
+                    </div>
+                    <span className="text-[11.5px] font-extrabold tracking-wide">Email</span>
                   </a>
                 ) : (
-                  <div className="p-2.5 rounded-xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1 border border-[#E5E1F0]">
+                  <div className="h-11 px-2.5 rounded-2xl bg-[#FAF9FD] text-[#9CA3AF] text-xs font-medium flex items-center justify-center gap-1.5 border border-[#E5E1F0]">
                     <Mail size={13} />
                     <span>No Email</span>
                   </div>
@@ -838,7 +852,7 @@ export const LeadsInbox: React.FC = () => {
               </span>
               <button
                 onClick={() => setSelectedLead(null)}
-                className="px-4 py-1.5 rounded-full bg-white border border-[#E5E1F0] hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                className="px-5 py-2 rounded-full bg-[#1A085C] hover:bg-[#2A108C] text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm hover:shadow-md"
               >
                 Close Profile
               </button>

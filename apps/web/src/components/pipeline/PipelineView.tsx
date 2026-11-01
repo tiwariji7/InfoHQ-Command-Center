@@ -24,6 +24,7 @@ import {
   Target,
   KanbanSquare,
   BarChart3,
+  GripVertical,
 } from 'lucide-react';
 
 interface StageColumnConfig {
@@ -126,6 +127,10 @@ export const PipelineView: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [lostModalLead, setLostModalLead] = useState<Lead | null>(null);
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
+
+  // Drag-and-Drop Kanban State
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<LeadStage | null>(null);
 
   // Filter
   const [searchFilter, setSearchFilter] = useState('');
@@ -266,6 +271,49 @@ export const PipelineView: React.FC = () => {
     else if (lead.stage === 'contacted') performStageUpdate(lead.id, 'new');
   }
 
+  // Drag-and-Drop Handlers
+  const handleDragStart = (e: React.DragEvent, leadId: string) => {
+    e.dataTransfer.setData('text/plain', leadId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedLeadId(leadId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedLeadId(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (stage: LeadStage) => {
+    setDragOverStage(stage);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverStage(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStage: LeadStage) => {
+    e.preventDefault();
+    const leadId = e.dataTransfer.getData('text/plain') || draggedLeadId;
+    setDragOverStage(null);
+    setDraggedLeadId(null);
+
+    if (!leadId) return;
+    const targetLead = leads.find((l) => l.id === leadId);
+    if (!targetLead || targetLead.stage === targetStage) return;
+
+    if (targetStage === 'lost') {
+      setLostModalLead(targetLead);
+    } else {
+      performStageUpdate(leadId, targetStage);
+    }
+  };
+
   const pipelineMetricCards = [
     {
       id: 0,
@@ -347,7 +395,7 @@ export const PipelineView: React.FC = () => {
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Search deals..."
-              className="h-8 pl-8 pr-3 rounded-full border border-white/80 bg-white/85 backdrop-blur-md text-xs font-semibold text-[#1A085C] placeholder:text-[#9CA3AF] outline-none focus:border-[#5B4CF5] w-36 sm:w-48 transition-all shadow-2xs"
+              className="h-8.5 pl-8 pr-3 rounded-full border border-[#E5E1F0] bg-white text-xs font-semibold text-[#1A085C] placeholder:text-[#9CA3AF] outline-none focus:border-[#5B4CF5] w-36 sm:w-48 transition-all shadow-2xs"
             />
             <Search
               size={12}
@@ -359,7 +407,7 @@ export const PipelineView: React.FC = () => {
           <button
             onClick={() => loadPipelineLeads(true)}
             disabled={isRefreshing || isLoading}
-            className="h-8 px-3 rounded-full bg-white/85 backdrop-blur-md hover:bg-white border border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+            className="h-8.5 px-3 rounded-full bg-white hover:bg-[#F3F0FF] border border-[#E5E1F0] hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
             title="Refresh Pipeline"
           >
             <RefreshCw
@@ -373,12 +421,15 @@ export const PipelineView: React.FC = () => {
           <button
             onClick={() => setIsAddModalOpen(true)}
             style={{
-              background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-              boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+              background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+              boxShadow: '0 8px 24px -2px rgba(91, 76, 245, 0.42), 0 2px 8px rgba(232, 90, 160, 0.28)',
+              color: '#FFFFFF',
             }}
-            className="h-8 px-3.5 rounded-full text-white text-xs font-bold inline-flex items-center gap-1.5 hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            className="h-10 sm:h-11 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-200 cursor-pointer shadow-lg shrink-0"
           >
-            <Plus size={13} className="stroke-[2.5]" />
+            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Plus size={14} className="stroke-[3] text-white" />
+            </div>
             <span>Create Opportunity</span>
           </button>
         </div>
@@ -408,7 +459,7 @@ export const PipelineView: React.FC = () => {
               className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                 isHovered
                   ? 'text-white -translate-y-1'
-                  : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+                  : 'bg-white border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -455,7 +506,7 @@ export const PipelineView: React.FC = () => {
       {/* ========================================================= */}
       {/* 1.1 PIPELINE VELOCITY & STAGE CONVERSION GRAPH DECK       */}
       {/* ========================================================= */}
-      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-[#E5E1F0] p-4 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
             <BarChart3 size={13} />

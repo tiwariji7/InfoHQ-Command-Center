@@ -15,12 +15,13 @@ import {
   Receipt,
   RefreshCw,
   Clock,
-  Building2,
   FileCheck2,
   FileText,
   IndianRupee,
   AlertTriangle,
   TrendingUp,
+  Calendar,
+  FolderKanban,
 } from 'lucide-react';
 
 export const PaymentsView: React.FC = () => {
@@ -488,17 +489,17 @@ export const PaymentsView: React.FC = () => {
 
                       {/* Project & Client */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] font-black text-[9px] flex items-center justify-center shrink-0 border border-purple-100">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0 border border-purple-100">
                             {clientInitials}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-[#1A085C] text-xs truncate max-w-[160px]">
-                              {py.projectTitle || 'Client Deliverable'}
+                            <div className="font-bold text-[#1A085C] text-xs truncate max-w-[170px] group-hover:text-[#5B4CF5] transition-colors">
+                              {py.clientName || 'Direct Client'}
                             </div>
-                            <div className="text-[10px] text-[#6B7280] font-medium flex items-center gap-1 mt-0.5">
-                              <Building2 size={9} className="shrink-0 text-[#9CA3AF]" />
-                              <span className="truncate">{py.clientName}</span>
+                            <div className="text-[10px] text-[#6B7280] font-medium flex items-center gap-1 mt-0.5 truncate max-w-[170px]">
+                              <FolderKanban size={10} className="shrink-0 text-[#5B4CF5]" />
+                              <span className="truncate">{py.projectTitle || 'Project Milestone'}</span>
                               {py.company && <span className="text-[#9CA3AF]">({py.company})</span>}
                             </div>
                           </div>
@@ -510,26 +511,32 @@ export const PaymentsView: React.FC = () => {
                         {formatCurrency(py.amount, py.currency)}
                       </td>
 
-                      {/* Due / Paid Date */}
+                      {/* Important Dates (Issued & Due/Settled) */}
                       <td className="py-3 px-4 text-xs">
-                        {isPaid && py.paidAt ? (
-                          <div className="flex items-center gap-1 text-[#15803D] font-semibold text-[10.5px]">
-                            <CheckCircle2 size={11} />
-                            <span>Paid on {formatISTDate(py.paidAt)}</span>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-[10px] text-[#6B7280] font-medium">
+                            <Calendar size={10} className="text-[#9CA3AF]" />
+                            <span>Issued: {formatISTDate(py.createdAt)}</span>
                           </div>
-                        ) : isOverdue ? (
-                          <div className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 text-[9.5px] font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                            <span>Overdue: {formatISTDate(py.dueDate)}</span>
-                          </div>
-                        ) : py.dueDate ? (
-                          <div className="flex items-center gap-1 text-[#C2410C] font-medium text-[10.5px]">
-                            <Clock size={10} />
-                            <span>Due by {formatISTDate(py.dueDate)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[#9CA3AF] text-[10.5px]">No due date</span>
-                        )}
+                          {isPaid && py.paidAt ? (
+                            <div className="inline-flex items-center gap-1 text-[#15803D] bg-[#F0FDF4] px-1.5 py-0.5 rounded border border-green-200 font-bold text-[9.5px]">
+                              <CheckCircle2 size={10} />
+                              <span>Settled: {formatISTDate(py.paidAt)}</span>
+                            </div>
+                          ) : isOverdue ? (
+                            <div className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[9.5px] font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              <span>Overdue: {formatISTDate(py.dueDate)}</span>
+                            </div>
+                          ) : py.dueDate ? (
+                            <div className="inline-flex items-center gap-1 text-[#C2410C] bg-[#FFF7ED] px-1.5 py-0.5 rounded border border-orange-200 text-[9.5px] font-bold">
+                              <Clock size={10} />
+                              <span>Due: {formatISTDate(py.dueDate)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[#9CA3AF] text-[10px]">No due date</span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status Badge */}
@@ -554,12 +561,12 @@ export const PaymentsView: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center gap-1 justify-end">
+                        <div className="inline-flex items-center gap-1.5 justify-end">
                           {!isPaid && py.razorpayPaymentLinkId && (
                             <button
                               onClick={() => handleSyncRazorpay(py.id)}
                               disabled={syncingId === py.id}
-                              className="px-2 py-1 rounded-lg bg-[#F0FDF4] text-[#15803D] hover:bg-green-100 font-bold text-[10px] flex items-center gap-1 border border-green-200 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-xl bg-[#F0FDF4] text-[#15803D] hover:bg-green-100 font-bold text-[10.5px] flex items-center gap-1 border border-green-200 shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
                               title="Check & sync live status from Razorpay"
                             >
                               <RefreshCw size={10} className={syncingId === py.id ? 'animate-spin' : ''} />
@@ -570,20 +577,24 @@ export const PaymentsView: React.FC = () => {
                           {!isPaid && (
                             <button
                               onClick={() => setSelectedPaymentForRecord(py)}
-                              className="px-2 py-1 rounded-lg bg-[#F3F0FF] text-[#5B4CF5] hover:bg-[#E5DEFF] font-bold text-[10px] flex items-center gap-1 border border-purple-100 shadow-2xs transition-colors cursor-pointer"
+                              style={{
+                                background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
+                                boxShadow: '0 2px 8px rgba(91, 76, 245, 0.25)',
+                              }}
+                              className="px-3 py-1.5 rounded-xl text-white font-extrabold text-[10.5px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-2xs"
                               title="Record received funds"
                             >
-                              <FileCheck2 size={11} />
+                              <FileCheck2 size={11} className="stroke-[2.5]" />
                               <span>Record Paid</span>
                             </button>
                           )}
 
                           <button
                             onClick={() => setSelectedInvoiceForPrint(py)}
-                            className="px-2 py-1 rounded-lg bg-[#EFF6FF] text-[#1D4ED8] hover:bg-blue-100 font-bold text-[10px] flex items-center gap-1 border border-blue-200 shadow-2xs transition-colors cursor-pointer"
+                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#F3F0FF] text-[#1A085C] hover:text-[#5B4CF5] font-bold text-[10.5px] flex items-center gap-1 border border-[#E5E1F0] shadow-2xs transition-all cursor-pointer"
                             title="View & Download Invoice PDF"
                           >
-                            <FileText size={10} />
+                            <FileText size={11} />
                             <span>Invoice</span>
                           </button>
 
