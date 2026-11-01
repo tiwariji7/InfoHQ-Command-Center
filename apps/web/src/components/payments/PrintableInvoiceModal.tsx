@@ -336,9 +336,8 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
               <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] flex justify-between items-center mt-2">
                 <span className="font-bold text-slate-900 text-xs">Balance Due</span>
                 <span
-                  className={`font-black text-base tabular-nums ${
-                    isPaid ? 'text-[#15803D]' : 'text-[#1D4ED8]'
-                  }`}
+                  className={`font-black text-base tabular-nums ${isPaid ? 'text-[#15803D]' : 'text-[#1D4ED8]'
+                    }`}
                 >
                   {isPaid ? '₹0.00' : formatCurrency(balanceDue)}
                 </span>

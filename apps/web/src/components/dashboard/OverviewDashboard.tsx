@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse } from '@infohq/shared';
-import { fetchDashboardOverview } from '../../lib/api.js';
-import { MorningBriefingBanner } from './MorningBriefingBanner.js';
+import { fetchDashboardOverview, triggerAutomationAudit } from '../../lib/api.js';
 import {
   Users,
   Calendar,
@@ -13,11 +12,11 @@ import {
   Code,
   FileText,
   ArrowRight,
-  Sun,
-  Target,
   RefreshCw,
   Coins,
   KanbanSquare,
+  Send,
+  Check,
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -39,6 +38,27 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [data, setData] = useState<DashboardOverviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
+  const [telegramSent, setTelegramSent] = useState(false);
+
+  // Dynamic hover for the 4 square cards (whichever card is hovered becomes colorful gradient)
+  const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
+
+  // Dynamic hover for the 3 mini tiles inside Total Revenue
+  const [hoveredRevenueTile, setHoveredRevenueTile] = useState<number | null>(null);
+
+  const handleSendTelegramBriefing = async () => {
+    setIsSendingTelegram(true);
+    try {
+      await triggerAutomationAudit(getToken);
+      setTelegramSent(true);
+      setTimeout(() => setTelegramSent(false), 3500);
+    } catch (err) {
+      console.error('Failed to send Telegram briefing:', err);
+    } finally {
+      setIsSendingTelegram(false);
+    }
+  };
 
   const firstName = clerkUser?.firstName || 'Sajibur';
   const hour = new Date().getHours();
@@ -82,9 +102,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-[22px] border border-[#EAE6F7] p-16 flex flex-col items-center justify-center gap-3 shadow-[0_4px_20px_rgba(26,8,92,0.04)]">
-        <RefreshCw size={26} className="animate-spin text-[#5B4CF5]" />
-        <span className="text-xs font-semibold text-[#6B7280]">Loading command center overview...</span>
+      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-12 flex flex-col items-center justify-center gap-2.5 shadow-[0_4px_20px_rgba(26,8,92,0.03)]">
+        <RefreshCw size={22} className="animate-spin text-[#5B4CF5]" />
+        <span className="text-xs font-semibold text-[#6B7280]">Loading executive command center...</span>
       </div>
     );
   }
@@ -98,22 +118,22 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const totalLeads = metrics?.totalLeads || 28;
   const activeProjectsCount = metrics?.activeProjectsCount || 12;
 
-  // Sample deliverables if empty
+  // Deliverables fallback
   const displayProjects = recentProjects.length > 0 ? recentProjects.slice(0, 5) : [
-    { id: '1', clientName: 'Apex Glass Pvt. Ltd.', title: 'Company Website & CRM', progress: 80, status: 'In Progress', dueDate: Date.now() + 5 * 86400000 },
-    { id: '2', clientName: 'MORSO Foods', title: 'Online Ordering Platform', progress: 100, status: 'Delivery', dueDate: Date.now() },
-    { id: '3', clientName: 'Tiwari Brothers', title: 'Business Website', progress: 65, status: 'In Development', dueDate: Date.now() + 12 * 86400000 },
-    { id: '4', clientName: 'SeHAT SmartCare', title: 'Android App (v1.2)', progress: 45, status: 'In Progress', dueDate: Date.now() + 20 * 86400000 },
-    { id: '5', clientName: 'Om Sai Enterprises', title: 'Brand & Automation Setup', progress: 90, status: 'QA & Testing', dueDate: Date.now() + 2 * 86400000 },
+    { id: '1', clientName: 'Apex Glass Pvt. Ltd.', title: 'Company Website & CRM', status: 'In Progress', dueDate: Date.now() + 5 * 86400000 },
+    { id: '2', clientName: 'MORSO Foods', title: 'Online Ordering Platform', status: 'Delivery', dueDate: Date.now() },
+    { id: '3', clientName: 'Tiwari Brothers', title: 'Business Website', status: 'In Development', dueDate: Date.now() + 12 * 86400000 },
+    { id: '4', clientName: 'SeHAT SmartCare', title: 'Android App (v1.2)', status: 'In Progress', dueDate: Date.now() + 20 * 86400000 },
+    { id: '5', clientName: 'Om Sai Enterprises', title: 'Brand & Automation Setup', status: 'QA & Testing', dueDate: Date.now() + 2 * 86400000 },
   ];
 
-  // Sample leads if empty
+  // Leads fallback
   const displayLeads = urgentFollowUps.length > 0 ? urgentFollowUps.slice(0, 5) : [
-    { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@gmail.com', service: 'Website Development', source: 'Website', status: 'New', timeAgo: '10 min ago' },
-    { id: '2', name: 'Priya Singh', email: 'priya.singh@outlook.com', service: 'Automation / CRM', source: 'LinkedIn', status: 'Contacted', timeAgo: '28 min ago' },
-    { id: '3', name: 'Amit Sharma', email: 'amit.sharma@gmail.com', service: 'Mobile App Development', source: 'Google Ads', status: 'Proposal Sent', timeAgo: '1 hr ago' },
-    { id: '4', name: 'Nikhil Verma', email: 'nikhil.verma@mail.com', service: 'AI Chatbot Integration', source: 'Website', status: 'In Discussion', timeAgo: '2 hr ago' },
-    { id: '5', name: 'Sonal Dubey', email: 'sonal.dubey@company.com', service: 'Business Automation', source: 'Instagram', status: 'New', timeAgo: '3 hr ago' },
+    { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@gmail.com', service: 'Website Development', source: 'Website', status: 'New' },
+    { id: '2', name: 'Priya Singh', email: 'priya.singh@outlook.com', service: 'Automation / CRM', source: 'LinkedIn', status: 'Contacted' },
+    { id: '3', name: 'Amit Sharma', email: 'amit.sharma@gmail.com', service: 'Mobile App Development', source: 'Google Ads', status: 'Proposal Sent' },
+    { id: '4', name: 'Nikhil Verma', email: 'nikhil.verma@mail.com', service: 'AI Chatbot Integration', source: 'Website', status: 'In Discussion' },
+    { id: '5', name: 'Sonal Dubey', email: 'sonal.dubey@company.com', service: 'Business Automation', source: 'Instagram', status: 'New' },
   ];
 
   const getMonogram = (name: string) => {
@@ -122,274 +142,438 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
+  // Compact, high-clarity status badges with colored status dots that never wrap
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
+
     if (s.includes('new')) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#FAF5FF] text-[#5B4CF5] border border-purple-200">
-          New
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FAF5FF] text-[#5B4CF5] border border-purple-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5]" />
+          <span>New</span>
         </span>
       );
     }
-    if (s.includes('contacted') || s.includes('discussion')) {
+    if (s.includes('contacted')) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200">
-          {status}
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
+          <span>Contacted</span>
         </span>
       );
     }
-    if (s.includes('proposal') || s.includes('testing')) {
+    if (s.includes('discussion')) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200">
-          {status}
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
+          <span>Discussion</span>
         </span>
       );
     }
-    if (s.includes('won') || s.includes('delivery') || s.includes('complete')) {
+    if (s.includes('proposal')) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200">
-          {status}
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
+          <span>Proposal</span>
+        </span>
+      );
+    }
+    if (s.includes('testing') || s.includes('qa')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
+          <span>QA &amp; Test</span>
+        </span>
+      );
+    }
+    if (s.includes('development') || s.includes('dev')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
+          <span>In Dev</span>
+        </span>
+      );
+    }
+    if (s.includes('progress')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
+          <span>In Progress</span>
+        </span>
+      );
+    }
+    if (s.includes('delivery') || s.includes('won') || s.includes('complete')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200 shadow-2xs whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+          <span>Delivery</span>
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200">
-        {status}
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
+        <span>{status}</span>
       </span>
     );
   };
 
+  // 4 Square Cards Definition for Dynamic Hover
+  const squareCards = [
+    {
+      id: 0,
+      title: "Today's Revenue",
+      value: "₹4,85,000",
+      subtext: "↑ +12.6% vs yesterday",
+      icon: Coins,
+      iconBg: "bg-[#FFF0F7]",
+      iconColor: "text-[#E85AA0]",
+      action: () => onNavigateTab('billing'),
+    },
+    {
+      id: 1,
+      title: "Total Leads (Today)",
+      value: totalLeads.toString(),
+      subtext: "↑ +7 new vs yesterday",
+      icon: Users,
+      iconBg: "bg-[#F3F0FF]",
+      iconColor: "text-[#5B4CF5]",
+      action: () => onNavigateTab('leads'),
+    },
+    {
+      id: 2,
+      title: "Active Projects",
+      value: activeProjectsCount.toString(),
+      subtext: "↗ 2 new this week",
+      icon: Layers,
+      iconBg: "bg-[#EFF6FF]",
+      iconColor: "text-[#3B82F6]",
+      action: () => onNavigateTab('projects'),
+    },
+    {
+      id: 3,
+      title: "Active Sales Pipeline",
+      value: "₹24,60,000",
+      subtext: "↑ 6 deals • 8 in progress",
+      icon: KanbanSquare,
+      iconBg: "bg-[#F0FDF4]",
+      iconColor: "text-[#10B981]",
+      action: () => onNavigateTab('pipeline'),
+    },
+  ];
+
+  // 3 Mini Sub-metrics Tiles under Total Revenue
+  const revenueSubTiles = [
+    {
+      id: 0,
+      label: "Projects",
+      value: "12",
+      subtext: "4 in delivery",
+      dotColor: "#3B82F6",
+      icon: Code,
+      action: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onNavigateTab('projects');
+      },
+    },
+    {
+      id: 1,
+      label: "Clients",
+      value: "36",
+      subtext: "↑ +3 month",
+      dotColor: "#10B981",
+      icon: Users,
+      action: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onNavigateTab('clients');
+      },
+    },
+    {
+      id: 2,
+      label: "Invoices",
+      value: formatCurrency(totalPending),
+      subtext: "4 pending",
+      dotColor: "#E85AA0",
+      icon: FileText,
+      action: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onNavigateTab('billing');
+      },
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-4 sm:space-y-5">
+      {/* Subtle Ambient Glassmorphic Background Orbs */}
+      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle size={16} />
+        <div className="p-3.5 bg-red-50/90 backdrop-blur-xs border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle size={15} />
           <span>{error}</span>
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* 1. GREETING BANNER (Exact Reference Image 1)              */}
+      {/* 1. GREETING BANNER (Clean, Authoritative, Glass Touch)     */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
-        <div className="flex items-start gap-3">
-          <div className="flex flex-col gap-1.5 pt-0.5">
-            <div className="w-6 h-6 rounded-full bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shadow-2xs">
-              <Target size={13} className="stroke-[2.5]" />
-            </div>
-            <div className="w-6 h-6 rounded-full bg-white border border-[#EAE6F7] text-[#6B7280] flex items-center justify-center shadow-2xs">
-              <Sun size={12} />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-[28px] font-black tracking-tight text-[#1A085C]">
-              {greeting},{' '}
-              <span
-                style={{
-                  background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                {firstName}
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-[#6B7280] font-medium mt-0.5">
-              Here&apos;s what&apos;s happening with your business today.
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1A085C]">
+            {greeting},{' '}
+            <span
+              style={{
+                background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              {firstName}
+            </span>
+          </h1>
+          <p className="text-xs text-[#6B7280] font-medium mt-0.5">
+            Here&apos;s what&apos;s happening with your business today.
+          </p>
         </div>
 
-        {/* Live Refresh Pill */}
-        <div className="flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-white border border-[#EAE6F7] shadow-2xs text-xs font-semibold text-[#6B7280]">
-          <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-          <span className="text-[#1A085C] font-bold">Live Data Active</span>
+        {/* Pro Live Data Indicator & Sync Action Button */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Glass Live System Status Pill */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_2px_10px_rgba(26,8,92,0.03)]">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
+            </span>
+            <span className="text-[11px] font-black text-[#1A085C] tracking-tight">Live Data</span>
+            <span className="w-1 h-1 rounded-full bg-[#EAE6F7] hidden sm:inline" />
+            <span className="text-[10px] text-[#10B981] font-bold hidden sm:inline">Active</span>
+          </div>
+
+          {/* Sync Button */}
           <button
             onClick={loadDashboard}
             disabled={isLoading}
-            className="p-1 hover:text-[#5B4CF5] transition-colors rounded-full cursor-pointer"
-            title="Refresh overview metrics"
+            className="h-8 px-3 rounded-full bg-white/85 backdrop-blur-md hover:bg-white border border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-[0_2px_10px_rgba(26,8,92,0.03)] transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Sync live dashboard metrics"
           >
-            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={11} className={isLoading ? 'animate-spin text-[#5B4CF5]' : 'text-[#5B4CF5]'} />
+            <span>Sync</span>
+          </button>
+
+          {/* Telegram Briefing Trigger Button */}
+          <button
+            onClick={handleSendTelegramBriefing}
+            disabled={isSendingTelegram}
+            className={`h-8 px-3 rounded-full border text-xs font-bold inline-flex items-center gap-1.5 shadow-[0_2px_10px_rgba(26,8,92,0.03)] transition-all cursor-pointer active:scale-95 disabled:opacity-50 backdrop-blur-md ${
+              telegramSent
+                ? 'bg-[#F0FDF4]/90 border-green-200 text-[#15803D]'
+                : 'bg-white/85 hover:bg-white border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5]'
+            }`}
+            title="Send live daily briefing to Telegram"
+          >
+            {isSendingTelegram ? (
+              <>
+                <RefreshCw size={11} className="animate-spin text-[#5B4CF5]" />
+                <span>Sending...</span>
+              </>
+            ) : telegramSent ? (
+              <>
+                <Check size={11} className="text-[#15803D]" />
+                <span>Sent to Telegram</span>
+              </>
+            ) : (
+              <>
+                <Send size={11} className="text-[#5B4CF5]" />
+                <span>Telegram Briefing</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* Morning Briefing Banner */}
-      <MorningBriefingBanner onNavigateTab={onNavigateTab} onSelectLeadId={onSelectLeadId} />
-
       {/* ========================================================= */}
-      {/* 2. MAIN DASHBOARD GRID (Exact Layout from Image 1)        */}
+      {/* 2. THREE-COLUMN BALANCED TOP GRID (Glassmorphic & Rich)    */}
+      {/* Col 1: Total Revenue | Col 2: 2x2 Square Cards | Col 3: Trends */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column Section: Financial & Activity Cards (7 of 12 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            {/* Card 1: Total Revenue (7 cols on sm+) */}
-            <div
-              onClick={() => onNavigateTab('billing')}
-              className="sm:col-span-7 bg-white rounded-[22px] border border-[#EAE6F7] p-5 shadow-[0_4px_20px_rgba(26,8,92,0.04)] hover:border-[#5B4CF5]/40 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
-            >
-              {/* Background gradient wave accent in corner */}
-              <div
-                className="absolute -right-8 -bottom-8 w-44 h-44 rounded-full pointer-events-none opacity-40 blur-2xl"
-                style={{ background: 'linear-gradient(135deg, #5B4CF5 0%, #E85AA0 100%)' }}
-              />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* ========================================================= */}
+        {/* COLUMN 1: Total Revenue Card with Interactive Sub-Tiles   */}
+        {/* ========================================================= */}
+        <div
+          onClick={() => onNavigateTab('billing')}
+          className="lg:col-span-4 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 sm:p-6 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          {/* Ambient inner background glow */}
+          <div
+            className="absolute -right-8 -bottom-8 w-44 h-44 rounded-full pointer-events-none opacity-20 blur-3xl"
+            style={{ background: 'linear-gradient(135deg, #5B4CF5 0%, #E85AA0 100%)' }}
+          />
 
-              <div className="flex items-center justify-between relative z-10">
-                <span className="text-xs font-bold text-[#1A085C]">Total Revenue</span>
-                <span className="text-[11px] font-semibold text-[#6B7280] bg-[#F8F8FF] px-2.5 py-1 rounded-full border border-[#EAE6F7] flex items-center gap-1">
-                  <Calendar size={11} className="text-[#5B4CF5]" />
-                  <span>This Month</span>
-                  <ChevronRight size={10} className="rotate-90" />
-                </span>
-              </div>
-
-              <div className="my-3 relative z-10">
-                <div className="text-2xl sm:text-[32px] font-black tracking-tight text-[#1A085C] tabular-nums">
-                  {formatCurrency(totalInvoiced)}
-                </div>
-                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#10B981] bg-[#F0FDF4] px-2.5 py-0.5 rounded-full border border-green-200 mt-1.5">
-                  <span>↑ +18.4%</span>
-                  <span className="text-[#6B7280] font-medium">vs last month (₹47,52,000)</span>
-                </div>
-              </div>
-
-              {/* Sub-metrics 3 tiles row */}
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#EAE6F7] relative z-10">
-                <div className="bg-[#F8F8FF] p-2 rounded-xl border border-[#EAE6F7]/60">
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-[#6B7280]">
-                    <Code size={11} className="text-[#5B4CF5]" />
-                    <span>Open Projects</span>
-                  </div>
-                  <div className="text-sm font-black text-[#1A085C] mt-0.5">12</div>
-                  <div className="text-[9.5px] font-medium text-[#3B82F6] flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" />
-                    <span>4 in delivery</span>
-                  </div>
-                </div>
-
-                <div className="bg-[#F8F8FF] p-2 rounded-xl border border-[#EAE6F7]/60">
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-[#6B7280]">
-                    <Users size={11} className="text-[#10B981]" />
-                    <span>Total Clients</span>
-                  </div>
-                  <div className="text-sm font-black text-[#1A085C] mt-0.5">36</div>
-                  <div className="text-[9.5px] font-medium text-[#10B981] flex items-center gap-1 mt-0.5">
-                    <span>↑ +3 this month</span>
-                  </div>
-                </div>
-
-                <div className="bg-[#F8F8FF] p-2 rounded-xl border border-[#EAE6F7]/60">
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-[#6B7280]">
-                    <FileText size={11} className="text-[#E85AA0]" />
-                    <span>Pending Invoices</span>
-                  </div>
-                  <div className="text-sm font-black text-[#1A085C] mt-0.5 truncate">{formatCurrency(totalPending)}</div>
-                  <div className="text-[9.5px] font-medium text-[#E85AA0] flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#E85AA0]" />
-                    <span>4 invoices</span>
-                  </div>
-                </div>
-              </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-bold text-[#1A085C]">Total Revenue</span>
+              <span className="text-[10.5px] font-semibold text-[#6B7280] bg-[#F8F8FF]/80 px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1">
+                <Calendar size={11} className="text-[#5B4CF5]" />
+                <span>This Month</span>
+                <ChevronRight size={10} className="rotate-90" />
+              </span>
             </div>
 
-            {/* Right Mini Column inside left section (5 cols on sm+) */}
-            <div className="sm:col-span-5 space-y-4">
-              {/* Card 2: Today's Revenue (The 4-Stop Signature Gradient Card!) */}
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
-                  boxShadow: '0 10px 25px rgba(221, 73, 133, 0.30)',
-                }}
-                className="rounded-[22px] p-4 text-white hover:brightness-105 transition-all cursor-pointer flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
-                    <Coins size={16} />
-                  </div>
-                </div>
-                <div className="my-2">
-                  <span className="text-[11px] font-medium text-white/85">Today&apos;s Revenue</span>
-                  <div className="text-2xl font-black tracking-tight text-white tabular-nums mt-0.5">
-                    ₹4,85,000
-                  </div>
-                  <div className="text-[10px] font-semibold text-white/90 mt-0.5">
-                    ↑ +12.6% vs yesterday
-                  </div>
-                </div>
+            <div className="my-3.5">
+              <div className="text-3xl sm:text-4xl font-black text-[#1A085C] tabular-nums tracking-tight">
+                {formatCurrency(totalInvoiced)}
               </div>
-
-              {/* Card 3: Total Leads (Today) */}
-              <div
-                onClick={() => onNavigateTab('leads')}
-                className="bg-white rounded-[22px] border border-[#EAE6F7] p-4 shadow-[0_4px_20px_rgba(26,8,92,0.04)] hover:border-[#5B4CF5]/40 transition-all cursor-pointer flex items-center justify-between"
-              >
-                <div>
-                  <span className="text-[11px] font-bold text-[#6B7280]">Total Leads (Today)</span>
-                  <div className="text-2xl font-black text-[#1A085C] tabular-nums mt-0.5">
-                    {totalLeads}
-                  </div>
-                  <span className="text-[10.5px] font-bold text-[#10B981]">
-                    ↑ +7 new vs yesterday
-                  </span>
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shadow-2xs shrink-0">
-                  <Users size={18} />
-                </div>
+              <div className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-[#10B981] bg-[#F0FDF4] px-2.5 py-0.5 rounded-full border border-green-200 mt-2 shadow-2xs">
+                <span>↑ +18.4%</span>
+                <span className="text-[#6B7280] font-normal">vs last month ({formatCurrency(4752000)})</span>
               </div>
             </div>
           </div>
 
-          {/* Active Projects & Active Pipeline Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div
-              onClick={() => onNavigateTab('projects')}
-              className="bg-white rounded-[20px] border border-[#EAE6F7] p-4 shadow-2xs hover:border-[#5B4CF5]/40 transition-all cursor-pointer flex items-center gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-[#F8F8FF] border border-[#EAE6F7] text-[#5B4CF5] flex items-center justify-center shrink-0">
-                <Layers size={18} />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-[#6B7280]">Active Projects</span>
-                <div className="text-xl font-black text-[#1A085C] tabular-nums">{activeProjectsCount}</div>
-                <span className="text-[10px] font-semibold text-[#10B981]">↗ 2 new this week</span>
-              </div>
-            </div>
+          {/* Sub-metrics 3 tiles row with Dynamic Colorful Hover! */}
+          <div className="grid grid-cols-3 gap-2 pt-3.5 border-t border-[#EAE6F7]/80 relative z-10">
+            {revenueSubTiles.map((tile, idx) => {
+              const isTileHovered = hoveredRevenueTile === idx;
+              const TileIcon = tile.icon;
 
-            <div
-              onClick={() => onNavigateTab('pipeline')}
-              className="bg-white rounded-[20px] border border-[#EAE6F7] p-4 shadow-2xs hover:border-[#5B4CF5]/40 transition-all cursor-pointer flex items-center gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-[#F8F8FF] border border-[#EAE6F7] text-[#E85AA0] flex items-center justify-center shrink-0">
-                <KanbanSquare size={18} />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-[#6B7280]">Active Sales Pipeline</span>
-                <div className="text-xl font-black text-[#1A085C] tabular-nums">₹24,60,000</div>
-                <span className="text-[10px] font-semibold text-[#10B981]">↑ 6 deals • 8 in progress</span>
-              </div>
-            </div>
+              return (
+                <div
+                  key={tile.id}
+                  onClick={tile.action}
+                  onMouseEnter={() => setHoveredRevenueTile(idx)}
+                  onMouseLeave={() => setHoveredRevenueTile(null)}
+                  style={
+                    isTileHovered
+                      ? {
+                          background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
+                          boxShadow: '0 6px 18px rgba(221, 73, 133, 0.35)',
+                        }
+                      : {}
+                  }
+                  className={`p-2.5 rounded-xl transition-all duration-300 cursor-pointer ${
+                    isTileHovered
+                      ? 'text-white -translate-y-0.5'
+                      : 'bg-[#F8F8FF]/80 border border-[#EAE6F7]/70 hover:border-[#5B4CF5]/40 text-[#1A085C]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 text-[10px] font-medium">
+                    <TileIcon
+                      size={11}
+                      className={isTileHovered ? 'text-white' : 'text-[#5B4CF5]'}
+                    />
+                    <span className={`truncate ${isTileHovered ? 'text-white/90' : 'text-[#6B7280]'}`}>
+                      {tile.label}
+                    </span>
+                  </div>
+
+                  <div className={`text-sm font-black mt-1 truncate ${isTileHovered ? 'text-white' : 'text-[#1A085C]'}`}>
+                    {tile.value}
+                  </div>
+
+                  <div className={`text-[9.5px] font-medium flex items-center gap-1 mt-0.5 ${isTileHovered ? 'text-white/90' : 'text-[#6B7280]'}`}>
+                    <span
+                      className="w-1 h-1 rounded-full shrink-0"
+                      style={{ backgroundColor: isTileHovered ? '#FFFFFF' : tile.dotColor }}
+                    />
+                    <span className="truncate">{tile.subtext}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Right Column Section: Monthly Trends Chart Card (5 of 12 Cols) */}
-        <div className="lg:col-span-5 bg-white rounded-[22px] border border-[#EAE6F7] p-5 shadow-[0_4px_20px_rgba(26,8,92,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3 border-b border-[#EAE6F7]">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
-                <TrendingUp size={15} />
+        {/* ========================================================= */}
+        {/* COLUMN 2: 2x2 Square Cards with Dynamic Colorful Hover    */}
+        {/* Whichever card the cursor enters becomes colorful!         */}
+        {/* ========================================================= */}
+        <div className="lg:col-span-4 grid grid-cols-2 gap-2.5 sm:gap-3.5">
+          {squareCards.map((card, idx) => {
+            const isHovered = hoveredCardIndex === idx;
+            const Icon = card.icon;
+
+            return (
+              <div
+                key={card.id}
+                onClick={card.action}
+                onMouseEnter={() => setHoveredCardIndex(idx)}
+                onMouseLeave={() => setHoveredCardIndex(null)}
+                style={
+                  isHovered
+                    ? {
+                        background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
+                        boxShadow: '0 8px 24px rgba(221, 73, 133, 0.35)',
+                      }
+                    : {}
+                }
+                className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+                  isHovered
+                    ? 'text-white -translate-y-1'
+                    : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center transition-colors ${
+                      isHovered
+                        ? 'bg-white/20 backdrop-blur-xs text-white'
+                        : `${card.iconBg} ${card.iconColor} border border-[#EAE6F7]/60 shadow-2xs`
+                    }`}
+                  >
+                    <Icon size={14} className="sm:hidden" />
+                    <Icon size={15} className="hidden sm:block" />
+                  </div>
+                </div>
+
+                <div className="mt-2 sm:mt-2.5">
+                  <span
+                    className={`text-[10px] sm:text-[10.5px] font-semibold block truncate ${
+                      isHovered ? 'text-white/90' : 'text-[#6B7280]'
+                    }`}
+                  >
+                    {card.title}
+                  </span>
+                  <div
+                    className={`text-lg sm:text-xl font-black tabular-nums tracking-tight mt-0.5 truncate ${
+                      isHovered ? 'text-white' : 'text-[#1A085C]'
+                    }`}
+                  >
+                    {card.value}
+                  </div>
+                  <span
+                    className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
+                      isHovered ? 'text-white/90 font-medium' : 'text-[#10B981] font-bold'
+                    }`}
+                  >
+                    {card.subtext}
+                  </span>
+                </div>
               </div>
-              <h3 className="text-xs sm:text-sm font-black text-[#1A085C]">
-                Revenue &amp; Lead Trends – Monthly
+            );
+          })}
+        </div>
+
+        {/* ========================================================= */}
+        {/* COLUMN 3: Revenue & Lead Trends (Monthly Report, 2 Pillars)*/}
+        {/* ========================================================= */}
+        <div className="lg:col-span-4 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white/95 transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7]/80">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+                <TrendingUp size={13} />
+              </div>
+              <h3 className="text-xs font-bold text-[#1A085C]">
+                Monthly Trends (October 2026)
               </h3>
             </div>
 
-            {/* Legend matching Image 1 */}
-            <div className="flex items-center gap-3 text-[10px] font-semibold text-[#6B7280]">
+            {/* Legend */}
+            <div className="flex items-center gap-2.5 text-[9.5px] font-semibold text-[#6B7280]">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#7C5CE8]" />
-                <span>Revenue (₹ Lakh)</span>
+                <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                <span>Revenue</span>
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#E85AA0]" />
@@ -398,177 +582,120 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           </div>
 
-          {/* High-Fidelity SVG Visual Chart (Jan - Aug) */}
-          <div className="py-4 flex-1 flex flex-col justify-center">
-            <svg viewBox="0 0 460 210" className="w-full h-auto overflow-visible">
+          {/* SVG Grouped Dual Pillar Chart (Week 1 to Week 4) */}
+          <div className="py-2.5 flex-1 flex flex-col justify-center">
+            <svg viewBox="0 0 380 155" className="w-full h-auto overflow-visible">
               <defs>
-                <linearGradient id="barGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#8B5CF6" />
-                  <stop offset="100%" stopColor="#5B4CF5" stopOpacity="0.85" />
+                <linearGradient id="monthRevGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#7C5CE8" />
+                  <stop offset="100%" stopColor="#5B4CF5" />
                 </linearGradient>
-                <linearGradient id="leadLineGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#E85AA0" />
-                  <stop offset="100%" stopColor="#FF4D8D" />
+                <linearGradient id="monthLeadGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#FF4D8D" />
+                  <stop offset="100%" stopColor="#E85AA0" />
                 </linearGradient>
               </defs>
 
               {/* Grid Lines */}
-              <line x1="30" y1="20" x2="430" y2="20" stroke="#F1F0F7" strokeDasharray="3 3" />
-              <line x1="30" y1="55" x2="430" y2="55" stroke="#F1F0F7" strokeDasharray="3 3" />
-              <line x1="30" y1="90" x2="430" y2="90" stroke="#F1F0F7" strokeDasharray="3 3" />
-              <line x1="30" y1="125" x2="430" y2="125" stroke="#F1F0F7" strokeDasharray="3 3" />
-              <line x1="30" y1="160" x2="430" y2="160" stroke="#F1F0F7" strokeDasharray="3 3" />
+              <line x1="35" y1="18" x2="365" y2="18" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="35" y1="46" x2="365" y2="46" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="35" y1="74" x2="365" y2="74" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="35" y1="102" x2="365" y2="102" stroke="#F1EFF9" strokeDasharray="3 3" />
+              <line x1="35" y1="130" x2="365" y2="130" stroke="#EAE6F7" />
 
-              {/* Y-Axis Left (₹ Lakh) */}
-              <text x="5" y="24" fontSize="9" fill="#9CA3AF" fontWeight="600">₹70L</text>
-              <text x="5" y="59" fontSize="9" fill="#9CA3AF" fontWeight="600">₹60L</text>
-              <text x="5" y="94" fontSize="9" fill="#9CA3AF" fontWeight="600">₹40L</text>
-              <text x="5" y="129" fontSize="9" fill="#9CA3AF" fontWeight="600">₹20L</text>
-              <text x="18" y="164" fontSize="9" fill="#9CA3AF" fontWeight="600">₹0</text>
+              {/* Y-Axis Left (Revenue in Lakh) */}
+              <text x="4" y="22" fontSize="8" fill="#9CA3AF" fontWeight="600">₹25L</text>
+              <text x="4" y="50" fontSize="8" fill="#9CA3AF" fontWeight="600">₹20L</text>
+              <text x="4" y="78" fontSize="8" fill="#9CA3AF" fontWeight="600">₹15L</text>
+              <text x="4" y="106" fontSize="8" fill="#9CA3AF" fontWeight="600">₹10L</text>
+              <text x="14" y="133" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
 
-              {/* Y-Axis Right (Leads) */}
-              <text x="435" y="24" fontSize="9" fill="#9CA3AF" fontWeight="600">300</text>
-              <text x="435" y="59" fontSize="9" fill="#9CA3AF" fontWeight="600">250</text>
-              <text x="435" y="94" fontSize="9" fill="#9CA3AF" fontWeight="600">200</text>
-              <text x="435" y="129" fontSize="9" fill="#9CA3AF" fontWeight="600">100</text>
-              <text x="435" y="164" fontSize="9" fill="#9CA3AF" fontWeight="600">0</text>
+              {/* WEEK 1 (Oct 1-7): Revenue ₹12.5L, Leads 18 */}
+              <rect x="68" y="72" width="15" height="58" rx="3.5" fill="url(#monthRevGrad)" />
+              <rect x="86" y="86" width="15" height="44" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="84" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 1</text>
 
-              {/* Monthly Revenue Bars (Jan to Aug) */}
-              {/* Jan */}
-              <rect x="48" y="115" width="22" height="45" rx="5" fill="url(#barGradient)" />
-              {/* Feb */}
-              <rect x="98" y="100" width="22" height="60" rx="5" fill="url(#barGradient)" />
-              {/* Mar */}
-              <rect x="148" y="108" width="22" height="52" rx="5" fill="url(#barGradient)" />
-              {/* Apr */}
-              <rect x="198" y="85" width="22" height="75" rx="5" fill="url(#barGradient)" />
-              {/* May */}
-              <rect x="248" y="92" width="22" height="68" rx="5" fill="url(#barGradient)" />
-              {/* Jun */}
-              <rect x="298" y="70" width="22" height="90" rx="5" fill="url(#barGradient)" />
-              {/* Jul */}
-              <rect x="348" y="58" width="22" height="102" rx="5" fill="url(#barGradient)" />
-              {/* Aug */}
-              <rect x="398" y="40" width="22" height="120" rx="5" fill="url(#barGradient)" />
+              {/* WEEK 2 (Oct 8-14): Revenue ₹15.8L, Leads 22 */}
+              <rect x="146" y="56" width="15" height="74" rx="3.5" fill="url(#monthRevGrad)" />
+              <rect x="164" y="76" width="15" height="54" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="162" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 2</text>
 
-              {/* Smooth Trend Curve for Leads (Pink) */}
-              <path
-                d="M 59 120 Q 109 110, 159 98 T 259 82 T 359 62 T 409 38"
-                fill="none"
-                stroke="url(#leadLineGlow)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
+              {/* WEEK 3 (Oct 15-21): Revenue ₹19.4L, Leads 27 */}
+              <rect x="224" y="42" width="15" height="88" rx="3.5" fill="url(#monthRevGrad)" />
+              <rect x="242" y="62" width="15" height="68" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="240" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 3</text>
 
-              {/* Data points on leads curve */}
-              <circle cx="59" cy="120" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="109" cy="110" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="159" cy="98" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="209" cy="88" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="259" cy="82" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="309" cy="72" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="359" cy="62" r="3.5" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2" />
-              <circle cx="409" cy="38" r="4" fill="#FFFFFF" stroke="#E85AA0" strokeWidth="2.5" />
-
-              {/* Month Labels */}
-              <text x="54" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Jan</text>
-              <text x="104" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Feb</text>
-              <text x="154" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Mar</text>
-              <text x="204" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Apr</text>
-              <text x="254" y="182" fontSize="10" fill="#6B7280" fontWeight="600">May</text>
-              <text x="304" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Jun</text>
-              <text x="354" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Jul</text>
-              <text x="404" y="182" fontSize="10" fill="#6B7280" fontWeight="600">Aug</text>
+              {/* WEEK 4 (Oct 22-31): Revenue ₹24.2L, Leads 34 */}
+              <rect x="302" y="24" width="15" height="106" rx="3.5" fill="url(#monthRevGrad)" />
+              <rect x="320" y="46" width="15" height="84" rx="3.5" fill="url(#monthLeadGrad)" />
+              <text x="318" y="145" fontSize="8.5" fill="#6B7280" fontWeight="700" textAnchor="middle">Week 4</text>
             </svg>
           </div>
 
-          <div className="pt-2 border-t border-[#EAE6F7] flex items-center justify-between text-[11px] text-[#6B7280]">
-            <span>Average Deal Realization: <strong className="text-[#1A085C]">88.4%</strong></span>
-            <span className="text-[#10B981] font-bold">↗ High Conversion Quarter</span>
+          <div className="pt-2 border-t border-[#EAE6F7]/80 flex items-center justify-between text-[10px] text-[#6B7280]">
+            <span>MTD Realization: <strong className="text-[#1A085C]">91.4%</strong></span>
+            <span className="text-[#10B981] font-bold">↗ +28% MTD Growth</span>
           </div>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 3. LOWER SECTION: TWO MASTER TABLES (Project Health & Leads) */}
+      {/* 3. LOWER SECTION: TWO MASTER TABLES                        */}
+      {/* Table 1: Project Health & Deliverables (Tight, Zero Gaps)   */}
+      {/* Table 2: Recent Leads (Spacious & Clean, Zero Wrap)        */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Table 1: Project Health & Deliverables (6 cols on lg) */}
-        <div className="lg:col-span-6 bg-white rounded-[22px] border border-[#EAE6F7] p-5 shadow-[0_4px_20px_rgba(26,8,92,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#EAE6F7]">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
-                <Layers size={15} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Table 1: Project Health & Deliverables */}
+        <div className="lg:col-span-6 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAE6F7]/80 mb-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+                <Layers size={13} />
               </div>
-              <h3 className="text-xs sm:text-sm font-black text-[#1A085C]">
+              <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
                 Project Health &amp; Deliverables
               </h3>
             </div>
 
             <button
               onClick={() => onNavigateTab('projects')}
-              className="text-[11px] font-semibold text-[#6B7280] bg-[#F8F8FF] hover:bg-[#F3F0FF] px-2.5 py-1 rounded-full border border-[#EAE6F7] flex items-center gap-1 transition-colors"
+              className="text-[10.5px] font-semibold text-[#6B7280] bg-[#F8F8FF]/80 hover:bg-[#F3F0FF] px-2.5 py-0.5 rounded-full border border-[#EAE6F7] flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>Active Projects</span>
-              <ChevronRight size={10} className="rotate-90" />
+              <ChevronRight size={9} className="rotate-90" />
             </button>
           </div>
 
-          <div className="overflow-x-auto my-1">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse table-auto">
               <thead>
                 <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-2.5 pr-3">Client</th>
-                  <th className="py-2.5 px-3">Project Name</th>
-                  <th className="py-2.5 px-3">Progress</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 pl-3 text-right">Due Date</th>
+                  <th className="py-2.5 px-3 w-[28%]">Client</th>
+                  <th className="py-2.5 px-3 w-[36%]">Project Name</th>
+                  <th className="py-2.5 px-3 w-[20%]">Status</th>
+                  <th className="py-2.5 px-3 w-[16%] text-right">Due Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EAE6F7]/60">
                 {displayProjects.map((p: any, idx) => {
-                  const initials = getMonogram(p.clientName);
-                  const progressVal = p.progress || 70;
                   return (
                     <tr
                       key={p.id || idx}
                       onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
-                      className="hover:bg-[#F8F8FF]/80 transition-colors cursor-pointer group"
+                      className="hover:bg-white/60 transition-colors cursor-pointer group"
                     >
-                      <td className="py-3 pr-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-[#F3F0FF] text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0 border border-purple-100">
-                            {initials}
-                          </div>
-                          <span className="font-bold text-[#1A085C] truncate max-w-[110px]">
-                            {p.clientName}
-                          </span>
-                        </div>
+                      <td className="py-3 px-3 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs">
+                        {p.clientName}
                       </td>
-                      <td className="py-3 px-3">
-                        <span className="font-medium text-[#4B5563] truncate max-w-[130px] block">
-                          {p.title || p.name}
-                        </span>
+                      <td className="py-3 px-3 font-medium text-[#4B5563] text-xs">
+                        {p.title || p.name}
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="w-20">
-                          <div className="flex justify-between text-[10px] font-bold text-[#1A085C] mb-1">
-                            <span>{progressVal}%</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-[#EAE6F7] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#5B4CF5] to-[#E85AA0] rounded-full"
-                              style={{ width: `${progressVal}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 whitespace-nowrap">
                         {getStatusBadge(p.status)}
                       </td>
-                      <td className="py-3 pl-3 text-right text-[11px] text-[#6B7280] font-medium whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar size={11} className="text-[#9CA3AF]" />
+                      <td className="py-3 px-3 text-right text-[10.5px] text-[#6B7280] font-medium whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 justify-end">
+                          <Calendar size={10} className="text-[#9CA3AF]" />
                           <span>{formatISTDate(p.dueDate || Date.now())}</span>
                         </span>
                       </td>
@@ -580,36 +707,35 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
         </div>
 
-        {/* Table 2: Recent Leads (6 cols on lg) */}
-        <div className="lg:col-span-6 bg-white rounded-[22px] border border-[#EAE6F7] p-5 shadow-[0_4px_20px_rgba(26,8,92,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#EAE6F7]">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center">
-                <Users size={15} />
+        {/* Table 2: Recent Leads */}
+        <div className="lg:col-span-6 bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-5 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAE6F7]/80 mb-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-md bg-[#EFF6FF] text-[#1D4ED8] flex items-center justify-center">
+                <Users size={13} />
               </div>
-              <h3 className="text-xs sm:text-sm font-black text-[#1A085C]">
+              <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
                 Recent Leads
               </h3>
             </div>
 
             <button
               onClick={() => onNavigateTab('leads')}
-              className="text-xs font-bold text-[#5B4CF5] hover:text-[#E85AA0] flex items-center gap-1 transition-colors cursor-pointer"
+              className="text-[11px] font-bold text-[#5B4CF5] hover:text-[#E85AA0] flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>View All Leads</span>
-              <ArrowRight size={13} />
+              <ArrowRight size={12} />
             </button>
           </div>
 
-          <div className="overflow-x-auto my-1">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse table-auto">
               <thead>
                 <tr className="border-b border-[#EAE6F7] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-                  <th className="py-2.5 pr-3">Lead</th>
-                  <th className="py-2.5 px-3">Service Needed</th>
-                  <th className="py-2.5 px-3">Source</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 pl-3 text-right">Received</th>
+                  <th className="py-2.5 px-3 w-[35%]">Lead</th>
+                  <th className="py-2.5 px-3 w-[33%]">Service Needed</th>
+                  <th className="py-2.5 px-3 w-[16%]">Source</th>
+                  <th className="py-2.5 px-3 w-[16%] text-right">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EAE6F7]/60">
@@ -621,34 +747,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     <tr
                       key={ld.id || idx}
                       onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
-                      className="hover:bg-[#F8F8FF]/80 transition-colors cursor-pointer group"
+                      className="hover:bg-white/60 transition-colors cursor-pointer group"
                     >
-                      <td className="py-3 pr-3">
+                      <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10px] flex items-center justify-center shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[9px] flex items-center justify-center shrink-0">
                             {initials}
                           </div>
-                          <div className="truncate max-w-[110px]">
-                            <div className="font-bold text-[#1A085C] truncate">{leadName}</div>
-                            <div className="text-[10px] text-[#9CA3AF] truncate">{leadEmail}</div>
+                          <div className="truncate max-w-[140px]">
+                            <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-[11px]">{leadName}</div>
+                            <div className="text-[9.5px] text-[#9CA3AF] truncate">{leadEmail}</div>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-semibold text-[#4B5563] truncate max-w-[130px] block">
+                        <span className="font-semibold text-[#4B5563] truncate max-w-[150px] block text-[11px]">
                           {ld.service || ld.requirements || 'Digital Architecture'}
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="text-[11px] font-medium text-[#6B7280]">
+                        <span className="text-[10.5px] font-medium text-[#6B7280]">
                           {ld.source || 'Website'}
                         </span>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
                         {getStatusBadge(ld.status || 'New')}
-                      </td>
-                      <td className="py-3 pl-3 text-right text-[11px] text-[#9CA3AF] whitespace-nowrap">
-                        {ld.timeAgo || 'Just now'}
                       </td>
                     </tr>
                   );

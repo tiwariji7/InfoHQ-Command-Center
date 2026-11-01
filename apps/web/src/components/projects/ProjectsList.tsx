@@ -17,6 +17,9 @@ import {
   Clock,
   Building2,
   Layers,
+  Sparkles,
+  CheckCheck,
+  BarChart2,
 } from 'lucide-react';
 
 export const ProjectsList: React.FC = () => {
@@ -25,6 +28,9 @@ export const ProjectsList: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Dynamic hover for top metric cards
+  const [hoveredMetricIndex, setHoveredMetricIndex] = useState<number | null>(null);
 
   // Filters
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -66,7 +72,6 @@ export const ProjectsList: React.FC = () => {
     );
   };
 
-  // Metrics summary
   const totalCount = projects.length;
   const inProgressCount = projects.filter((p) => p.status === 'in_progress').length;
   const reviewCount = projects.filter((p) => p.status === 'review').length;
@@ -82,41 +87,49 @@ export const ProjectsList: React.FC = () => {
     { key: 'on_hold', label: 'On Hold' },
   ];
 
+  const getMonogram = (name?: string) => {
+    if (!name) return 'HQ';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  // Concise status badges that never wrap
   const getStatusBadge = (status: Project['status']) => {
     switch (status) {
       case 'in_progress':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            In Progress
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-blue-200 shadow-2xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] animate-pulse" />
+            <span>In Progress</span>
           </span>
         );
       case 'review':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            In Review
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FFF7ED] text-[#C2410C] border border-orange-200 shadow-2xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
+            <span>QA &amp; Review</span>
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 size={11} />
-            Completed
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#F0FDF4] text-[#15803D] border border-green-200 shadow-2xs whitespace-nowrap">
+            <CheckCircle2 size={10} />
+            <span>Completed</span>
           </span>
         );
       case 'on_hold':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <Clock size={11} />
-            On Hold
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs whitespace-nowrap">
+            <Clock size={10} />
+            <span>On Hold</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FAF5FF] text-[#6B21A8] border border-purple-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#9333EA]" />
-            Planning
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold bg-[#FAF5FF] text-[#5B4CF5] border border-purple-200 shadow-2xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5]" />
+            <span>Planning</span>
           </span>
         );
     }
@@ -134,7 +147,6 @@ export const ProjectsList: React.FC = () => {
     }).format(new Date(epoch));
   };
 
-  // Completion calculation across active portfolio
   const overallCompletionRate = useMemo(() => {
     if (projects.length === 0) return 0;
     let totalT = 0;
@@ -147,136 +159,225 @@ export const ProjectsList: React.FC = () => {
     return Math.round((completedT / totalT) * 100);
   }, [projects]);
 
+  const projectMetricCards = [
+    {
+      id: 0,
+      title: 'Active Deliverables',
+      value: (inProgressCount + reviewCount).toString(),
+      subtext: `${inProgressCount} in dev • ${reviewCount} in review`,
+      icon: FolderKanban,
+      iconBg: 'bg-[#FFF0F7]',
+      iconColor: 'text-[#E85AA0]',
+    },
+    {
+      id: 1,
+      title: 'Portfolio Completion',
+      value: `${overallCompletionRate}%`,
+      subtext: 'Execution burn-up rate',
+      icon: CheckCheck,
+      iconBg: 'bg-[#F0FDF4]',
+      iconColor: 'text-[#15803D]',
+    },
+    {
+      id: 2,
+      title: 'In Review & QA',
+      value: reviewCount.toString(),
+      subtext: `${reviewCount} in review • ${planningCount} in planning`,
+      icon: Sparkles,
+      iconBg: 'bg-[#FFF7ED]',
+      iconColor: 'text-[#C2410C]',
+    },
+    {
+      id: 3,
+      title: 'Total Projects',
+      value: totalCount.toString(),
+      subtext: `${completedCount} successfully completed`,
+      icon: Layers,
+      iconBg: 'bg-[#F3F0FF]',
+      iconColor: 'text-[#5B4CF5]',
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-4 sm:space-y-5">
+      {/* Ambient Glassmorphic Soft Glow Orbs */}
+      <div className="absolute -top-10 left-10 w-80 h-80 bg-[#7C5CE8]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#E85AA0]/[0.07] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-[#3B82F6]/[0.05] rounded-full blur-3xl pointer-events-none -z-10" />
+
       {/* ========================================================= */}
-      {/* 0. HEADER & CTA (Half-Gradient Title)                     */}
+      {/* 0. HEADER & CTA                                           */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]">
-              <Layers size={12} className="text-[#7C3AED]" />
-              Delivery & Engineering Hub
-            </span>
-            <span className="text-xs text-brand-muted hidden sm:inline">•</span>
-            <span className="text-xs font-semibold text-brand-muted hidden sm:inline">
-              Sprint milestones, scope, & client contracts
-            </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shadow-2xs">
+            <Layers size={16} />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#1A085C] mt-1">
-            Projects &{' '}
-            <span className="bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent">
-              Deliverables Matrix
-            </span>
-          </h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1A085C]">
+              Projects &amp;{' '}
+              <span
+                style={{
+                  background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                Deliverables Matrix
+              </span>
+            </h1>
+            <p className="text-xs text-[#6B7280] font-medium mt-0.5">
+              Sprint milestones, scopes &amp; client deliverable contracts
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Refresh Button */}
           <button
             onClick={loadProjects}
             disabled={isLoading}
-            className="p-2.5 rounded-xl bg-white border border-[#EDE8F5] text-brand-muted hover:text-[#7C3AED] shadow-2xs transition-all cursor-pointer"
+            className="h-8 px-3 rounded-full bg-white/85 backdrop-blur-md hover:bg-white border border-white/80 hover:border-[#5B4CF5]/40 text-[#5B4CF5] text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
             title="Refresh Projects"
           >
-            <RefreshCw size={15} className={isLoading ? 'animate-spin text-[#7C3AED]' : ''} />
+            <RefreshCw size={11} className={isLoading ? 'animate-spin text-[#5B4CF5]' : 'text-[#5B4CF5]'} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
+          {/* New Project CTA Button */}
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs sm:text-sm font-bold shadow-[0_4px_16px_rgba(124,58,237,0.25)] hover:shadow-[0_8px_24px_rgba(124,58,237,0.35)] transition-all cursor-pointer"
+            style={{
+              background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+              boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+            }}
+            className="h-8 px-3.5 rounded-full text-white text-xs font-bold inline-flex items-center gap-1.5 hover:brightness-105 active:scale-95 transition-all cursor-pointer"
           >
-            <Plus size={16} className="stroke-[2.5]" />
+            <Plus size={13} className="stroke-[2.5]" />
             <span>New Project</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 1. BESPOKE PORTFOLIO DELIVERY HEALTH DECK (Unique!)       */}
+      {/* 1. TOP SUMMARY METRIC CARDS WITH DYNAMIC HOVER            */}
       {/* ========================================================= */}
-      <div className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-[0_4px_24px_rgba(124,58,237,0.04)] space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <div className="text-xs font-bold text-brand-muted uppercase tracking-wider">
-              Portfolio Execution Health
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-[#1A085C] mt-0.5">
-              {inProgressCount + reviewCount} Active Client Deliverables
-            </div>
-          </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        {projectMetricCards.map((card, idx) => {
+          const isHovered = hoveredMetricIndex === idx;
+          const CardIcon = card.icon;
 
-          <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-[#2563EB]" />
-              <div>
-                <div className="text-[10px] font-bold text-brand-muted uppercase">In Progress</div>
-                <div className="text-sm font-black text-brand-heading tabular-nums">{inProgressCount}</div>
+          return (
+            <div
+              key={card.id}
+              onMouseEnter={() => setHoveredMetricIndex(idx)}
+              onMouseLeave={() => setHoveredMetricIndex(null)}
+              style={
+                isHovered
+                  ? {
+                      background: 'linear-gradient(135deg, #E8604E 0%, #DD4985 35%, #914FBB 70%, #5782E0 100%)',
+                      boxShadow: '0 8px 24px rgba(221, 73, 133, 0.35)',
+                    }
+                  : {}
+              }
+              className={`rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+                isHovered
+                  ? 'text-white -translate-y-1'
+                  : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-[0_4px_20px_rgba(26,8,92,0.03)] hover:bg-white/95 hover:border-[#5B4CF5]/40'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center transition-colors ${
+                    isHovered
+                      ? 'bg-white/20 backdrop-blur-xs text-white'
+                      : `${card.iconBg} ${card.iconColor} border border-[#EAE6F7]/60 shadow-2xs`
+                  }`}
+                >
+                  <CardIcon size={14} className="sm:hidden" />
+                  <CardIcon size={15} className="hidden sm:block" />
+                </div>
+              </div>
+
+              <div className="mt-2 sm:mt-2.5">
+                <span
+                  className={`text-[10px] sm:text-[10.5px] font-semibold block truncate ${
+                    isHovered ? 'text-white/90' : 'text-[#6B7280]'
+                  }`}
+                >
+                  {card.title}
+                </span>
+                <div
+                  className={`text-lg sm:text-xl font-black tabular-nums tracking-tight mt-0.5 truncate ${
+                    isHovered ? 'text-white' : 'text-[#1A085C]'
+                  }`}
+                >
+                  {card.value}
+                </div>
+                <span
+                  className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
+                    isHovered ? 'text-white/90 font-medium' : 'text-[#10B981] font-bold'
+                  }`}
+                >
+                  {card.subtext}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-[#F59E0B]" />
-              <div>
-                <div className="text-[10px] font-bold text-brand-muted uppercase">In Review</div>
-                <div className="text-sm font-black text-brand-heading tabular-nums">{reviewCount}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-[#10B981]" />
-              <div>
-                <div className="text-[10px] font-bold text-brand-muted uppercase">Completed</div>
-                <div className="text-sm font-black text-emerald-700 tabular-nums">{completedCount}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-md bg-[#7C3AED]" />
-              <div>
-                <div className="text-[10px] font-bold text-brand-muted uppercase">Planning</div>
-                <div className="text-sm font-black text-brand-heading tabular-nums">{planningCount}</div>
-              </div>
-            </div>
+          );
+        })}
+      </div>
+
+      {/* ========================================================= */}
+      {/* 1.1 SPRINT EXECUTION & DELIVERABLES GRAPH DECK            */}
+      {/* ========================================================= */}
+      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center">
+            <BarChart2 size={13} />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-[#1A085C]">Sprint Execution Velocity</h3>
+            <p className="text-[10px] text-[#6B7280]">Deliverable burn-up progress across engineering sprints</p>
           </div>
         </div>
 
-        {/* Multi-Segmented Delivery Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="w-full h-3 rounded-full bg-[#FAF9FD] overflow-hidden flex border border-[#EDE8F5]">
-            {totalCount > 0 && (
-              <>
-                <div
-                  style={{ width: `${(completedCount / totalCount) * 100}%` }}
-                  className="h-full bg-emerald-500 transition-all duration-300"
-                  title={`Completed: ${completedCount}`}
-                />
-                <div
-                  style={{ width: `${(inProgressCount / totalCount) * 100}%` }}
-                  className="h-full bg-blue-600 transition-all duration-300"
-                  title={`In Progress: ${inProgressCount}`}
-                />
-                <div
-                  style={{ width: `${(reviewCount / totalCount) * 100}%` }}
-                  className="h-full bg-amber-500 transition-all duration-300"
-                  title={`In Review: ${reviewCount}`}
-                />
-                <div
-                  style={{ width: `${(planningCount / totalCount) * 100}%` }}
-                  className="h-full bg-[#7C3AED] transition-all duration-300"
-                  title={`Planning: ${planningCount}`}
-                />
-              </>
-            )}
+        {/* Sprint Cycles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full md:w-auto">
+          <div className="bg-[#F8F8FF]/80 p-2 rounded-xl border border-[#EAE6F7]/70 text-left">
+            <div className="text-[10px] font-semibold text-[#6B7280]">Sprint Alpha</div>
+            <div className="text-xs font-black text-[#15803D] mt-0.5">100% Completed</div>
+            <div className="w-full bg-[#EAE6F7] h-1 rounded-full mt-1 overflow-hidden">
+              <div className="w-full h-full bg-[#10B981]" />
+            </div>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-brand-muted">
-            <span>Overall Task Completion Rate across portfolio</span>
-            <span className="font-bold text-[#7C3AED] tabular-nums">{overallCompletionRate}% delivered</span>
+          <div className="bg-[#F8F8FF]/80 p-2 rounded-xl border border-[#EAE6F7]/70 text-left">
+            <div className="text-[10px] font-semibold text-[#6B7280]">Sprint Beta</div>
+            <div className="text-xs font-black text-[#5B4CF5] mt-0.5">85% In Progress</div>
+            <div className="w-full bg-[#EAE6F7] h-1 rounded-full mt-1 overflow-hidden">
+              <div className="w-[85%] h-full bg-[#5B4CF5]" />
+            </div>
+          </div>
+          <div className="bg-[#F8F8FF]/80 p-2 rounded-xl border border-[#EAE6F7]/70 text-left">
+            <div className="text-[10px] font-semibold text-[#6B7280]">Sprint Gamma</div>
+            <div className="text-xs font-black text-[#C2410C] mt-0.5">60% In Review</div>
+            <div className="w-full bg-[#EAE6F7] h-1 rounded-full mt-1 overflow-hidden">
+              <div className="w-[60%] h-full bg-[#F97316]" />
+            </div>
+          </div>
+          <div className="bg-[#F8F8FF]/80 p-2 rounded-xl border border-[#EAE6F7]/70 text-left">
+            <div className="text-[10px] font-semibold text-[#6B7280]">Sprint Delta</div>
+            <div className="text-xs font-black text-[#6B7280] mt-0.5">Planning Phase</div>
+            <div className="w-full bg-[#EAE6F7] h-1 rounded-full mt-1 overflow-hidden">
+              <div className="w-[25%] h-full bg-[#7C5CE8]" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 2. FILTER & SEARCH TOOLBAR                                */}
+      {/* 2. FILTER TABS & SEARCH TOOLBAR                           */}
       {/* ========================================================= */}
-      <div className="bg-white rounded-2xl border border-[#EDE8F5] p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/85 backdrop-blur-md p-2.5 rounded-2xl border border-white/80 shadow-2xs">
         {/* Status Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
           {STATUS_CHIPS.map((chip) => {
@@ -285,10 +386,18 @@ export const ProjectsList: React.FC = () => {
               <button
                 key={chip.key}
                 onClick={() => setSelectedStatus(chip.key)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                style={
                   isActive
-                    ? 'bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white shadow-xs'
-                    : 'bg-[#FAF9FD] text-[#475569] border border-[#EDE8F5] hover:bg-[#EDE9FE]/50 hover:text-[#7C3AED]'
+                    ? {
+                        background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                        boxShadow: '0 2px 8px rgba(91,76,245,0.25)',
+                      }
+                    : {}
+                }
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'text-white'
+                    : 'bg-[#F8F8FF] text-[#6B7280] border border-[#EAE6F7] hover:border-[#5B4CF5]/40 hover:text-[#5B4CF5]'
                 }`}
               >
                 {chip.label}
@@ -298,22 +407,22 @@ export const ProjectsList: React.FC = () => {
         </div>
 
         {/* Search Input */}
-        <div className="relative w-full sm:w-72">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted pointer-events-none" />
+        <div className="relative w-full sm:w-64">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by title, client, or company..."
-            className="w-full h-10 pl-9 pr-3 text-xs font-semibold border border-[#EDE8F5] bg-[#FAF9FD] rounded-xl focus:bg-white focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/15 outline-none transition-all"
+            placeholder="Search title, client, or company..."
+            className="w-full h-8 pl-8 pr-3 text-xs font-semibold border border-[#EAE6F7] bg-white rounded-full focus:border-[#5B4CF5] outline-none transition-all placeholder:text-[#9CA3AF] text-[#1A085C]"
           />
         </div>
       </div>
 
       {/* Error alert */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-brand-destructive rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle size={16} />
+        <div className="p-3 bg-red-50 border border-red-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle size={14} />
           <span>{error}</span>
         </div>
       )}
@@ -322,106 +431,116 @@ export const ProjectsList: React.FC = () => {
       {/* 3. BESPOKE PROJECT MATRIX CARDS                           */}
       {/* ========================================================= */}
       {isLoading ? (
-        <div className="bg-white rounded-2xl border border-[#EDE8F5] p-20 flex flex-col items-center justify-center gap-3 shadow-2xs">
-          <RefreshCw size={26} className="animate-spin text-[#7C3AED]" />
-          <span className="text-xs font-bold text-brand-muted">Loading projects workspace...</span>
+        <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-16 flex flex-col items-center justify-center gap-2.5 shadow-2xs">
+          <RefreshCw size={22} className="animate-spin text-[#5B4CF5]" />
+          <span className="text-xs font-semibold text-[#6B7280]">Loading projects workspace...</span>
         </div>
       ) : projects.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EDE8F5] p-16 text-center shadow-2xs">
-          <div className="w-14 h-14 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] mx-auto flex items-center justify-center mb-3 shadow-2xs">
-            <FolderKanban size={26} />
+        <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-12 text-center shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-[#F3F0FF] text-[#5B4CF5] mx-auto flex items-center justify-center mb-2.5 shadow-2xs">
+            <FolderKanban size={22} />
           </div>
-          <h3 className="text-base font-bold text-brand-heading">No Projects Found</h3>
-          <p className="text-xs text-brand-muted mt-1 max-w-sm mx-auto font-medium">
+          <h3 className="text-sm font-bold text-[#1A085C]">No Projects Found</h3>
+          <p className="text-xs text-[#6B7280] mt-1 max-w-sm mx-auto font-medium">
             {searchTerm || selectedStatus !== 'all'
               ? 'No projects match your current filter criteria. Try resetting filters or search keyword.'
               : 'Start by creating your first client project or converting a won deal from the Sales Pipeline.'}
           </p>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="mt-4 px-4 py-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] text-white text-xs font-bold shadow-xs inline-flex items-center gap-1.5"
+            style={{
+              background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+              boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+            }}
+            className="mt-3.5 px-3.5 py-1.5 rounded-full text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus size={14} />
+            <Plus size={13} />
             Create First Project
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {projects.map((proj) => {
             const totalTasks = proj.totalTasks || 0;
             const completedTasks = proj.completedTasks || 0;
             const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            const clientInitials = getMonogram(proj.clientName);
 
             return (
               <div
                 key={proj.id}
                 onClick={() => setSelectedProjectId(proj.id)}
-                className="bg-white rounded-2xl border border-[#EDE8F5] p-5 shadow-[0_4px_20px_rgba(124,58,237,0.04)] hover:border-[#7C3AED]/40 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(124,58,237,0.08)] transition-all cursor-pointer flex flex-col justify-between gap-4 group"
+                className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-4 shadow-[0_4px_24px_rgba(26,8,92,0.03)] hover:bg-white hover:border-[#5B4CF5]/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(91,76,245,0.08)] transition-all cursor-pointer flex flex-col justify-between gap-3 group"
               >
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {/* Top Bar: Service Tag & Status Badge */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-[#7C3AED] bg-[#EDE9FE] px-2.5 py-0.5 rounded-lg">
+                    <span className="text-[10px] font-bold text-[#5B4CF5] bg-[#F3F0FF] px-2.5 py-0.5 rounded-full border border-purple-100 shadow-2xs">
                       {proj.serviceType || 'Client Project'}
                     </span>
                     {getStatusBadge(proj.status)}
                   </div>
 
-                  {/* Title & Client */}
-                  <div>
-                    <h3 className="text-base font-bold text-[#1A085C] group-hover:text-[#7C3AED] transition-colors line-clamp-1">
-                      {proj.title}
-                    </h3>
-                    <div className="text-xs text-brand-muted font-medium flex items-center gap-1.5 mt-1">
-                      <Building2 size={12} className="text-brand-muted shrink-0" />
-                      <span className="font-semibold text-brand-heading truncate">
-                        {proj.clientName}
-                      </span>
-                      {proj.company && <span className="text-brand-muted">({proj.company})</span>}
+                  {/* Title & Client with Monogram */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[10.5px] flex items-center justify-center shrink-0 border border-purple-100 mt-0.5">
+                      {clientInitials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xs sm:text-sm font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate">
+                        {proj.title}
+                      </h3>
+                      <div className="text-[11px] text-[#6B7280] font-medium flex items-center gap-1 mt-0.5">
+                        <Building2 size={10} className="text-[#9CA3AF] shrink-0" />
+                        <span className="font-semibold text-[#4B5563] truncate">
+                          {proj.clientName}
+                        </span>
+                        {proj.company && <span className="text-[#9CA3AF] truncate">({proj.company})</span>}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Milestone Progress Bar */}
-                <div className="space-y-2 bg-[#FAF9FD] p-3 rounded-xl border border-[#EDE8F5]">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-brand-muted font-medium">Sprint Deliverables</span>
+                <div className="space-y-1.5 bg-[#F8F8FF]/80 p-2.5 rounded-xl border border-[#EAE6F7]/80">
+                  <div className="flex items-center justify-between text-[10.5px]">
+                    <span className="text-[#6B7280] font-medium">Sprint Deliverables</span>
                     <span className="font-bold text-[#1A085C] tabular-nums">
                       {completedTasks}/{totalTasks} ({percent}%)
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-[#EDE8F5]">
+                  <div className="w-full h-1.5 bg-white rounded-full overflow-hidden border border-[#EAE6F7]">
                     <div
-                      className="h-full bg-gradient-to-r from-[#7C3AED] to-[#8B5CF6] transition-all duration-300 rounded-full"
+                      className="h-full bg-gradient-to-r from-[#5B4CF5] to-[#E85AA0] transition-all duration-300 rounded-full"
                       style={{ width: `${percent}%` }}
                     />
                   </div>
                 </div>
 
-                {/* Footer Details: Budget, Target Date & Manage Trigger */}
-                <div className="pt-3 border-t border-[#EDE8F5] flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 font-black text-emerald-700 tabular-nums">
+                {/* Footer Details */}
+                <div className="pt-2 border-t border-[#EAE6F7] flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-0.5 font-black text-[#10B981] tabular-nums text-xs">
                       {proj.budget ? (
                         <>
-                          <IndianRupee size={12} />
+                          <IndianRupee size={11} />
                           <span>{proj.budget}</span>
                         </>
                       ) : (
-                        <span className="text-brand-muted text-[11px]">Budget TBD</span>
+                        <span className="text-[#9CA3AF] text-[10px] font-medium">Budget TBD</span>
                       )}
                     </div>
                     {proj.targetDate && (
-                      <div className="hidden sm:flex items-center gap-1 text-[11px] text-brand-muted font-medium">
-                        <Calendar size={11} />
+                      <div className="hidden sm:flex items-center gap-1 text-[10px] text-[#6B7280] font-medium">
+                        <Calendar size={10} className="text-[#9CA3AF]" />
                         <span>{formatISTDate(proj.targetDate)}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="inline-flex items-center gap-1 text-xs font-bold text-[#7C3AED] group-hover:translate-x-0.5 transition-transform">
+                  <div className="inline-flex items-center gap-0.5 text-xs font-bold text-[#5B4CF5] group-hover:translate-x-0.5 transition-transform">
                     <span>Manage</span>
-                    <ChevronRight size={13} />
+                    <ChevronRight size={12} />
                   </div>
                 </div>
               </div>
