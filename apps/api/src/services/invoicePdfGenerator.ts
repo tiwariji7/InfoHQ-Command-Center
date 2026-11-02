@@ -34,6 +34,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   // Exact Brand Colors from CRM_design.md
   const colorNavy = rgb(26 / 255, 8 / 255, 92 / 255);       // #1A085C (Headings)
+  const colorOrange = rgb(232 / 255, 96 / 255, 78 / 255);    // #E8604E (Website Coral-Orange Brand)
   const colorPurple = rgb(124 / 255, 92 / 255, 232 / 255);   // #7C5CE8 (HQ Signature)
   const colorViolet = rgb(91 / 255, 76 / 255, 245 / 255);    // #5B4CF5 (Action Brand)
   const colorBody = rgb(75 / 255, 85 / 255, 99 / 255);       // #4B5563 (Body Text)
@@ -45,10 +46,10 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   let y = height - 52;
 
-  // 1. Header: InfoHQ Pvt Ltd
-  page.drawText('Info', { x: 50, y, size: 24, font: fontBold, color: colorNavy });
+  // 1. Header: InfoHQ Pvt Ltd (Info in Coral-Orange, HQ in Violet)
+  page.drawText('Info', { x: 50, y, size: 24, font: fontBold, color: colorOrange });
   const infoWidth = fontBold.widthOfTextAtSize('Info', 24);
-  page.drawText('HQ', { x: 50 + infoWidth, y, size: 24, font: fontBold, color: colorPurple });
+  page.drawText('HQ', { x: 50 + infoWidth, y, size: 24, font: fontBold, color: colorViolet });
   const hqWidth = fontBold.widthOfTextAtSize('HQ', 24);
   page.drawText(' Pvt Ltd', { x: 50 + infoWidth + hqWidth, y, size: 18, font: fontBold, color: colorNavy });
 
@@ -174,7 +175,6 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   y -= 30;
   // Payment Terms & Notes (Left) & Summary (Right)
   const notesW = 250;
-  const is100Pct = data.isFullPayment || (data.totalProjectCost && data.amount >= data.totalProjectCost);
 
   page.drawRectangle({
     x: tableX,
@@ -188,20 +188,26 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   page.drawText('Payment Terms & Notes', { x: tableX + 12, y: y - 2, size: 10, font: fontBold, color: colorNavy });
 
-  // Custom or milestone description
-  if (data.notes && data.notes.trim().length > 0) {
-    const customNote = data.notes.trim();
-    const truncatedNote = customNote.length > 50 ? customNote.substring(0, 48) + '...' : customNote;
-    page.drawText(`• ${truncatedNote}`, { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
-  } else if (is100Pct) {
-    page.drawText('• 100% full project payment completed successfully.', { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
-  } else {
-    page.drawText(`• Invoice covers ${milestoneClean} settlement`, { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
+  // Only display user-entered Milestone Title / Description and Terms & Notes
+  let noteCursorY = y - 18;
+  if (data.milestoneTitle && data.milestoneTitle.trim().length > 0) {
+    page.drawText('Milestone / Description:', { x: tableX + 12, y: noteCursorY, size: 8, font: fontBold, color: colorNavy });
+    noteCursorY -= 12;
+    const cleanMilestone = data.milestoneTitle.trim();
+    const truncatedMilestone = cleanMilestone.length > 52 ? cleanMilestone.substring(0, 50) + '...' : cleanMilestone;
+    page.drawText(truncatedMilestone, { x: tableX + 12, y: noteCursorY, size: 8, font: fontRegular, color: colorBody });
+    noteCursorY -= 16;
   }
 
-  page.drawText(`• Project: "${(data.projectTitle || 'System Implementation').slice(0, 32)}"`, { x: tableX + 12, y: y - 30, size: 8, font: fontRegular, color: colorBody });
-  page.drawText(`• Verified settlement via ${paymentModeText}.`, { x: tableX + 12, y: y - 42, size: 8, font: fontBold, color: colorNavy });
-  page.drawText('• Non-refundable, adjusted against total contracted scope.', { x: tableX + 12, y: y - 54, size: 7.5, font: fontRegular, color: colorMuted });
+  if (data.notes && data.notes.trim().length > 0) {
+    page.drawText('Terms & Notes:', { x: tableX + 12, y: noteCursorY, size: 8, font: fontBold, color: colorNavy });
+    noteCursorY -= 12;
+    const customNote = data.notes.trim();
+    const truncatedNote = customNote.length > 52 ? customNote.substring(0, 50) + '...' : customNote;
+    page.drawText(truncatedNote, { x: tableX + 12, y: noteCursorY, size: 8, font: fontRegular, color: colorBody });
+  } else if (!data.milestoneTitle || data.milestoneTitle.trim().length === 0) {
+    page.drawText('No specific payment terms or notes provided.', { x: tableX + 12, y: noteCursorY, size: 7.5, font: fontRegular, color: colorMuted });
+  }
 
   // Summary Table (Right)
   const sumX = 350;
