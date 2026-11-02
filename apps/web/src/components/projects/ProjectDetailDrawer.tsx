@@ -64,7 +64,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
   // Drawer Tabs: Overview, Tasks, Invoices, Team
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const { position, handlePointerDown, resetPosition } = useDraggable('project_detail_drawer');
+  const { cardRef, position, handlePointerDown, resetPosition } = useDraggable('project_detail_drawer');
 
   // Tasks state
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -404,21 +404,41 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
         data-lenis-prevent="true"
         onClick={onClose}
       >
-        {/* Floating Popup Card (Compact popup feel, rounded-3xl, not full page height, draggable anywhere) */}
+        {/* Floating Popup Card (Compact popup feel, rounded-3xl, draggable from all 4 sides) */}
         <div
-          className="popup-card w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          ref={cardRef}
+          className="popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
           style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
           data-lenis-prevent="true"
           onClick={(e) => e.stopPropagation()}
         >
           {/* ========================================================= */}
-          {/* 1. TOP TITLE BAR (Pinned at top & Draggable Handle)       */}
+          {/* 4-SIDE DRAG GRIPS (Left & Right Edge Drag Strips)         */}
           {/* ========================================================= */}
           <div
             onPointerDown={handlePointerDown}
             onDoubleClick={resetPosition}
+            className="absolute left-0 top-12 bottom-8 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
+            style={{ touchAction: 'none' }}
+            title="Drag left border to move card"
+          />
+          <div
+            onPointerDown={handlePointerDown}
+            onDoubleClick={resetPosition}
+            className="absolute right-0 top-12 bottom-8 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
+            style={{ touchAction: 'none' }}
+            title="Drag right border to move card"
+          />
+
+          {/* ========================================================= */}
+          {/* 1. TOP TITLE BAR (Pinned at top & Top Drag Handle)        */}
+          {/* ========================================================= */}
+          <div
+            onPointerDown={handlePointerDown}
+            onDoubleClick={resetPosition}
+            style={{ touchAction: 'none' }}
             className="px-4 py-3 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20 cursor-grab active:cursor-grabbing select-none"
-            title="Click and drag to move card anywhere • Double-click to reset position"
+            title="Click and drag from any edge to move • Double-click to reset position"
           >
             <div className="flex items-center gap-2 text-[#1A085C]">
               <button
@@ -435,7 +455,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
             {/* Drag Handle Indicator */}
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3F0FF]/80 text-[#7C5CE8] text-[10px] font-semibold"
-              title="Drag to move card"
+              title="Drag from 4 sides or header to move"
             >
               <GripHorizontal size={14} />
               <span className="hidden sm:inline">Move</span>
@@ -456,6 +476,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
           {/* ========================================================= */}
           <div
             className="flex-1 min-h-0 overflow-y-auto popup-scroll flex flex-col focus:outline-none"
+            style={{ touchAction: 'pan-y' }}
             data-lenis-prevent="true"
             tabIndex={0}
           >
@@ -1063,6 +1084,19 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
           >
             Done
           </button>
+        </div>
+
+        {/* ========================================================= */}
+        {/* BOTTOM DRAG GRIP BAR (4th Side Bottom Drag Handle)        */}
+        {/* ========================================================= */}
+        <div
+          onPointerDown={handlePointerDown}
+          onDoubleClick={resetPosition}
+          style={{ touchAction: 'none' }}
+          className="w-full py-2 bg-gradient-to-t from-[#F8F7FC] to-white border-t border-[#E5E1F0] flex items-center justify-center cursor-grab active:cursor-grabbing select-none shrink-0 hover:bg-[#F3F0FF] transition-colors"
+          title="Drag bottom border to move card • Double-click to reset"
+        >
+          <div className="w-12 h-1 bg-[#D1D5DB] hover:bg-[#7C5CE8] rounded-full transition-colors" />
         </div>
       </div>
       </div>
