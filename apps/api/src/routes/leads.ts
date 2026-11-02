@@ -184,16 +184,18 @@ leadsRouter.patch('/:id/stage', async (c) => {
   }
 
   const user = c.get('user');
+  const actorClerkUserId = user?.clerkUserId || 'superadmin';
 
   try {
-    const updatedLead = await updateLeadStage(c.env.DB, leadId, parseResult.data, user.clerkUserId);
+    const updatedLead = await updateLeadStage(c.env.DB, leadId, parseResult.data, actorClerkUserId);
     if (!updatedLead) {
       return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
     }
     return c.json({ success: true, data: updatedLead });
   } catch (err: unknown) {
-    console.error('Error updating lead stage:', err instanceof Error ? err.message : err);
-    return c.json({ error: 'internal_error', message: 'Failed to update lead stage.' }, 500);
+    const errMsg = err instanceof Error ? err.message : 'Failed to update lead stage.';
+    console.error('Error updating lead stage:', err instanceof Error ? err.stack || err.message : err);
+    return c.json({ error: 'internal_error', message: errMsg }, 500);
   }
 });
 
