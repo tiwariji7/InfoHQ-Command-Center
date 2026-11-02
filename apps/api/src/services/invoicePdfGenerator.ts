@@ -203,7 +203,25 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   page.drawText(`• Verified settlement via ${paymentModeText}.`, { x: tableX + 12, y: y - 42, size: 8, font: fontBold, color: colorNavy });
   page.drawText('• Non-refundable, adjusted against total contracted scope.', { x: tableX + 12, y: y - 54, size: 7.5, font: fontRegular, color: colorMuted });
 
-  // 4-Status Stamp on the LEFT (Below Terms, never touches Summary Numbers)
+  // Summary Table (Right)
+  const sumX = 350;
+  let sumY = y;
+  const drawSummaryRow = (lbl: string, val: string, isBold = false, isGreen = false) => {
+    page.drawText(lbl, { x: sumX, y: sumY, size: 9.5, font: isBold ? fontBold : fontRegular, color: isGreen ? colorSuccess : colorBody });
+    page.drawText(val, { x: sumX + 90, y: sumY, size: 9.5, font: isBold ? fontBold : fontRegular, color: isGreen ? colorSuccess : colorNavy });
+    sumY -= 16;
+  };
+
+  const isPaidState = (data.status || (data.paymentDate ? 'paid' : 'unpaid')).toLowerCase().includes('paid') ||
+    (data.status || '').toLowerCase().includes('received');
+
+  drawSummaryRow('Subtotal', formattedAmt);
+  drawSummaryRow('Tax / GST', 'Nil / Exempt');
+  drawSummaryRow('Total Amount', formattedAmt, true);
+  drawSummaryRow('Total Settled', isPaidState ? formattedAmt : 'INR 0', true);
+  drawSummaryRow('Balance Due', isPaidState ? 'INR 0.00' : formattedAmt, true, isPaidState);
+
+  // 4-Status Stamp in Summary Section: shifted left so it never overlaps the amounts on the right
   const statusStr = (data.status || (data.paymentDate ? 'paid' : 'unpaid')).toLowerCase();
   let stampText = 'PAID';
   let stampColor = colorSuccess;
@@ -223,11 +241,14 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     stampBg = rgb(254 / 255, 243 / 255, 199 / 255);
   }
 
-  const stampWidth = 90;
+  const stampWidth = 75;
   const stampHeight = 22;
+  const stampX = sumX - 5; // Left of the numbers (numbers are at sumX + 90)
+  const stampY = sumY - 4;
+
   page.drawRectangle({
-    x: tableX + 12,
-    y: y - 98,
+    x: stampX,
+    y: stampY,
     width: stampWidth,
     height: stampHeight,
     borderColor: stampColor,
@@ -236,28 +257,12 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   });
   const textW = fontBold.widthOfTextAtSize(stampText, 10);
   page.drawText(stampText, {
-    x: tableX + 12 + (stampWidth - textW) / 2,
-    y: y - 92,
+    x: stampX + (stampWidth - textW) / 2,
+    y: stampY + 6,
     size: 10,
     font: fontBold,
     color: stampColor,
   });
-
-  // Summary Table (Right)
-  const sumX = 350;
-  let sumY = y;
-  const drawSummaryRow = (lbl: string, val: string, isBold = false, isGreen = false) => {
-    page.drawText(lbl, { x: sumX, y: sumY, size: 9.5, font: isBold ? fontBold : fontRegular, color: isGreen ? colorSuccess : colorBody });
-    page.drawText(val, { x: sumX + 90, y: sumY, size: 9.5, font: isBold ? fontBold : fontRegular, color: isGreen ? colorSuccess : colorNavy });
-    sumY -= 16;
-  };
-
-  const isPaidState = statusStr.includes('paid') || statusStr.includes('received');
-  drawSummaryRow('Subtotal', formattedAmt);
-  drawSummaryRow('Tax / GST', 'Nil / Exempt');
-  drawSummaryRow('Total Amount', formattedAmt, true);
-  drawSummaryRow('Total Settled', isPaidState ? formattedAmt : 'INR 0', true);
-  drawSummaryRow('Balance Due', isPaidState ? 'INR 0.00' : formattedAmt, true, isPaidState);
 
   // Footer (Bottom of Page - Pinned cleanly)
   const footerY = 48;

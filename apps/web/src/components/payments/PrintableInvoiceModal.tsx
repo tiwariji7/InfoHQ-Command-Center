@@ -8,10 +8,6 @@ import {
   ExternalLink,
   Loader2,
   GripHorizontal,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  RotateCcw,
 } from 'lucide-react';
 import { useDraggable } from '../../lib/useDraggable';
 
@@ -49,7 +45,6 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 }) => {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [zoomMode, setZoomMode] = useState<'fit' | 'actual'>('fit');
 
   // Draggable window state matching Client Profile & Create Payment modals
   const { cardRef, position, handlePointerDown, resetPosition } = useDraggable('printable_invoice_modal');
@@ -195,7 +190,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
       );
     } else if (isFailed) {
       list.push(
-        `Payment transaction could not be completed. Please regenerate a new payment link or retry.`
+        `Payment transaction could not be completed. Please retry or regenerate payment link.`
       );
     } else {
       list.push(
@@ -212,20 +207,19 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
   const termsAndNotes = getTermsAndNotes();
 
-  // Robust Download PDF handler with guaranteed Invoice Number visibility
+  // Clean Download PDF using original authentic single-page structure
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
     try {
       const html2pdf = await loadHtml2Pdf();
       const element = document.getElementById('invoice-container') || invoiceRef.current;
       if (!element) {
-        handlePrintOnly();
+        window.print();
         return;
       }
 
-      // Clone element cleanly or configure html2pdf with explicit rendering parameters
       const opt = {
-        margin: [6, 6, 6, 6],
+        margin: [8, 8, 8, 8],
         filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -233,111 +227,22 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           useCORS: true,
           logging: false,
           backgroundColor: '#FFFFFF',
-          letterRendering: true,
-          windowWidth: 1024,
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
 
       await html2pdf().set(opt).from(element).save();
     } catch (err) {
-      console.warn('[html2pdf fallback to clean iframe print]:', err);
-      handlePrintOnly();
+      console.warn('[html2pdf fallback to native print]:', err);
+      window.print();
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Bulletproof print using isolated iframe (fixes blank print bug permanently)
+  // Clean print handler
   const handlePrintOnly = () => {
-    const element = document.getElementById('invoice-container') || invoiceRef.current;
-    if (!element) {
-      window.print();
-      return;
-    }
-
-    // Create an isolated hidden iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.zIndex = '-9999';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      window.print();
-      return;
-    }
-
-    // Collect all head stylesheets and styles from parent
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map((el) => el.outerHTML)
-      .join('\n');
-
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${invoiceCode} - ${clientName}</title>
-          ${styles}
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 8mm;
-            }
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              background: #FFFFFF !important;
-              color: #1A085C !important;
-              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            }
-            #invoice-container {
-              width: 100% !important;
-              max-width: 100% !important;
-              min-height: 100vh !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 4mm 2mm !important;
-              margin: 0 auto !important;
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: space-between !important;
-            }
-          </style>
-        </head>
-        <body>
-          ${element.outerHTML}
-        </body>
-      </html>
-    `);
-    doc.close();
-
-    setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (e) {
-        console.error('Iframe print error:', e);
-        window.print();
-      } finally {
-        setTimeout(() => {
-          if (iframe.parentNode) {
-            iframe.parentNode.removeChild(iframe);
-          }
-        }, 3000);
-      }
-    }, 350);
+    window.print();
   };
 
   const paidAmount = isPaid ? payment.amount : 0;
@@ -346,16 +251,69 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   return (
     <div
       data-lenis-prevent="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
+      className="printable-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
+      {/* Print-specific style ensuring 100% clean rendering and no blank pages */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm;
+          }
+          html, body {
+            background: #FFFFFF !important;
+            color: #1A085C !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+          body > *:not(.printable-modal-overlay) {
+            display: none !important;
+          }
+          .printable-modal-overlay {
+            position: static !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #FFFFFF !important;
+            overflow: visible !important;
+            backdrop-filter: none !important;
+          }
+          .popup-card {
+            position: static !important;
+            transform: none !important;
+            max-width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+            box-shadow: none !important;
+            border: none !important;
+            overflow: visible !important;
+            background: #FFFFFF !important;
+          }
+          .print-hidden-control {
+            display: none !important;
+          }
+          #invoice-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 6mm 4mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: #FFFFFF !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
+
       {/* Moveable Modal Container matching other CRM cards */}
       <div
         ref={cardRef}
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
-        className="popup-card relative w-full max-w-[860px] h-[calc(100vh-2.5rem)] max-h-[94vh] bg-[#F8F7FF] rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.35)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="popup-card relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
@@ -364,26 +322,26 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
         <div
           onPointerDown={handlePointerDown}
           onDoubleClick={resetPosition}
-          className="absolute left-0 top-12 bottom-4 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
+          className="print-hidden-control absolute left-0 top-12 bottom-4 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
           style={{ touchAction: 'none' }}
           title="Drag left border to move card"
         />
         <div
           onPointerDown={handlePointerDown}
           onDoubleClick={resetPosition}
-          className="absolute right-0 top-12 bottom-4 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
+          className="print-hidden-control absolute right-0 top-12 bottom-4 w-3.5 z-30 cursor-grab active:cursor-grabbing hover:bg-purple-500/10 transition-colors"
           style={{ touchAction: 'none' }}
           title="Drag right border to move card"
         />
 
         {/* ========================================================= */}
-        {/* TOP TITLE & CONTROL BAR (Pinned at top & Top Drag Handle) */}
+        {/* TOP TITLE & CONTROL BAR (Hidden on print)                 */}
         {/* ========================================================= */}
         <div
           onPointerDown={handlePointerDown}
           onDoubleClick={resetPosition}
           style={{ touchAction: 'none' }}
-          className="h-14 px-4 sm:px-6 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0 z-20 cursor-grab active:cursor-grabbing select-none"
+          className="print-hidden-control h-13 px-4 sm:px-6 border-b border-slate-200 flex items-center justify-between bg-[#F8F7FF] shrink-0 z-20 cursor-grab active:cursor-grabbing select-none"
           title="Click and drag from header or edges to move • Double-click to reset position"
         >
           {/* Left: Document Info */}
@@ -391,21 +349,21 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             <span className="text-xs font-black text-[#1A085C] uppercase tracking-wider">
               Official Invoice
             </span>
-            <span className="text-xs font-mono font-extrabold text-[#5B4CF5]">
+            <span className="text-xs font-mono font-bold text-[#5B4CF5]">
               {invoiceCode}
             </span>
           </div>
 
           {/* Center: Draggable grip indicator */}
           <div
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F3F0FF] text-[#7C5CE8] text-[11px] font-semibold"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F3F0FF] text-[#7C5CE8] text-[11px] font-semibold"
             title="Drag from 4 sides or header to move"
           >
             <GripHorizontal size={14} />
             <span>Move</span>
           </div>
 
-          {/* Right: Icon-only Action Controls (Eye, Download, Print, Close) */}
+          {/* Right: Icon-only Action Controls */}
           <div className="flex items-center gap-2" data-no-drag="true">
             {payment.razorpayPaymentLinkUrl && !isPaid && (
               <a
@@ -420,18 +378,13 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
               </a>
             )}
 
-            {/* 1. Eye Icon: Toggle Fit / Zoom Preview */}
-            <button
-              onClick={() => setZoomMode((prev) => (prev === 'fit' ? 'actual' : 'fit'))}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
-                zoomMode === 'actual'
-                  ? 'bg-[#5B4CF5] text-white border-[#5B4CF5] shadow-xs'
-                  : 'bg-white text-[#1A085C] border-[#E5E1F0] hover:text-[#5B4CF5] hover:border-[#5B4CF5] hover:bg-purple-50/50'
-              }`}
-              title={zoomMode === 'actual' ? 'Viewing 100% A4 Scale (Click to fit)' : 'Viewing Fit-to-screen (Click for 100% scale)'}
+            {/* 1. Eye Icon: Official View Indicator */}
+            <div
+              className="w-8 h-8 rounded-full bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200 flex items-center justify-center shadow-2xs"
+              title="Official Verified Invoice View"
             >
               <Eye size={15} />
-            </button>
+            </div>
 
             {/* 2. Download Icon: High Quality PDF Export */}
             <button
@@ -439,32 +392,32 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
               disabled={isGenerating}
               style={{
                 background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
-                boxShadow: '0 2px 8px rgba(91, 76, 245, 0.35)',
+                boxShadow: '0 2px 10px rgba(91, 76, 245, 0.35)',
               }}
-              className="w-8 h-8 rounded-full text-white flex items-center justify-center transition-all hover:brightness-110 cursor-pointer disabled:opacity-60"
-              title="Download clean A4 PDF"
+              className="w-8 h-8 rounded-full text-white flex items-center justify-center transition-all hover:brightness-110 cursor-pointer disabled:opacity-60 shadow-2xs"
+              title="Download Clean Invoice PDF"
             >
               {isGenerating ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2 size={14} className="animate-spin" />
               ) : (
-                <Download size={15} />
+                <Download size={14} />
               )}
             </button>
 
-            {/* 3. Print Icon: Direct Clean Iframe Print */}
+            {/* 3. Print Icon: Native Clean Print */}
             <button
               onClick={handlePrintOnly}
-              className="w-8 h-8 rounded-full bg-white border border-[#E5E1F0] text-[#1A085C] hover:text-[#5B4CF5] hover:border-[#5B4CF5] hover:bg-purple-50/50 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+              className="w-8 h-8 rounded-full bg-white border border-[#E5E1F0] text-[#1A085C] hover:bg-slate-50 hover:text-[#5B4CF5] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
               title="Print Invoice"
             >
-              <Printer size={15} className="text-[#5B4CF5]" />
+              <Printer size={14} className="text-[#5B4CF5]" />
             </button>
 
             {/* 4. Close Icon */}
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-[#F3F0FF] flex items-center justify-center transition-colors cursor-pointer ml-1"
-              title="Close Invoice"
+              className="w-8 h-8 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-purple-100/60 flex items-center justify-center transition-colors cursor-pointer ml-1"
+              title="Close"
             >
               <X size={16} />
             </button>
@@ -472,323 +425,294 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* SCROLLABLE VIEWPORT FOR TRUE A4 CANVAS                    */}
+        {/* Printable Invoice Sheet Container: id="invoice-container" */}
+        {/* Exactly preserves the original authentic layout & margins */}
         {/* ========================================================= */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 md:p-8 bg-slate-100/70"
-          data-lenis-prevent="true"
+          ref={invoiceRef}
+          id="invoice-container"
+          style={{ backgroundColor: '#FFFFFF' }}
+          className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 bg-white font-sans text-slate-900 space-y-6"
         >
           {/* ========================================================= */}
-          {/* TRUE A4 INVOICE SHEET: id="invoice-container"             */}
-          {/* Max Width 794px, Min Height 1123px (A4 Ratio)             */}
+          {/* 1. BRAND HEADER: Info (#1A085C), HQ (#5B4CF5)             */}
           {/* ========================================================= */}
-          <div
-            ref={invoiceRef}
-            id="invoice-container"
-            style={{
-              backgroundColor: '#FFFFFF',
-              width: zoomMode === 'actual' ? '794px' : '100%',
-              maxWidth: '794px',
-              minHeight: '1123px',
-            }}
-            className="mx-auto bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8 sm:p-12 md:p-14 font-sans text-slate-900 flex flex-col justify-between transition-all"
-          >
-            {/* Top & Main Body Section */}
-            <div className="space-y-7">
-              {/* ========================================================= */}
-              {/* 1. BRAND HEADER: Info (Navy #1A085C), HQ (Violet #5B4CF5) */}
-              {/* ========================================================= */}
-              <div className="space-y-3">
-                <div>
-                  <h1 className="text-2xl sm:text-[28px] font-black tracking-tight leading-none">
-                    <span className="text-[#1A085C]">Info</span>
-                    <span className="text-[#5B4CF5]">HQ</span>{' '}
-                    <span className="text-[#1A085C]">Pvt Ltd</span>
-                  </h1>
-                  <p className="text-xs sm:text-[13px] font-semibold text-[#4B5563] mt-1 tracking-tight">
-                    Engineering Studio for AI, SaaS &amp; Digital Systems
-                  </p>
-                </div>
-
-                {/* Brand Purple Gradient Accent Bar */}
-                <div
-                  className="w-full h-[2.5px] rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
-                  }}
-                />
-              </div>
-
-              {/* ========================================================= */}
-              {/* 2. INVOICE TITLE & INVOICE NUMBER (NO PILL BACKGROUND)    */}
-              {/* ========================================================= */}
-              <div className="space-y-1 pt-1">
-                <h2 className="text-2xl sm:text-3xl font-black text-[#1A085C] tracking-tight uppercase">
-                  INVOICE
-                </h2>
-
-                {/* Clean Plain Typography (Zero Pill Box) */}
-                <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#6B7280]">
-                  <span>Invoice No.</span>
-                  <span
-                    id="invoice-number-text"
-                    style={{ color: '#5B4CF5' }}
-                    className="font-extrabold font-mono text-sm sm:text-base tracking-wide"
-                  >
-                    {invoiceCode}
-                  </span>
-                </div>
-              </div>
-
-              {/* ========================================================= */}
-              {/* 3. TWO-COLUMN METADATA SECTION                            */}
-              {/* ========================================================= */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-1">
-                {/* Left Column: Bill To (Clean Plain Account ID) */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-[#6B7280] tracking-wide block uppercase">
-                    Bill To
-                  </span>
-                  <h3 className="text-base sm:text-lg font-black text-[#1A085C] tracking-tight leading-snug">
-                    {clientName}
-                  </h3>
-                  {clientEmail !== '—' && (
-                    <div className="text-xs font-medium text-[#374151]">{clientEmail}</div>
-                  )}
-                  {clientPhone !== '—' && (
-                    <div className="text-xs font-medium text-[#374151]">{clientPhone}</div>
-                  )}
-
-                  {/* Clean Account ID text without pill background */}
-                  <div className="pt-1.5 text-xs">
-                    <span className="text-[#6B7280] font-semibold mr-1.5">Account ID:</span>
-                    <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
-                  </div>
-                </div>
-
-                {/* Right Column: Key-Value Meta Aligned with Colon */}
-                <div className="text-xs font-medium space-y-1.5 sm:pl-4">
-                  <div className="grid grid-cols-[110px_12px_1fr] items-center">
-                    <span className="text-[#6B7280] font-semibold">Client ID</span>
-                    <span className="text-[#9CA3AF] font-bold">:</span>
-                    <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
-                  </div>
-
-                  <div className="grid grid-cols-[110px_12px_1fr] items-center">
-                    <span className="text-[#6B7280] font-semibold">Issue Date</span>
-                    <span className="text-[#9CA3AF] font-bold">:</span>
-                    <span className="font-bold text-[#1A085C]">{formatISTDate(payment.createdAt)}</span>
-                  </div>
-
-                  <div className="grid grid-cols-[110px_12px_1fr] items-center">
-                    <span className="text-[#6B7280] font-semibold">Payment Date</span>
-                    <span className="text-[#9CA3AF] font-bold">:</span>
-                    <span className="font-bold text-[#1A085C]">
-                      {isPaid ? formatISTDate(payment.paidAt || payment.createdAt) : 'Pending'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-[110px_12px_1fr] items-center">
-                    <span className="text-[#6B7280] font-semibold">Payment Mode</span>
-                    <span className="text-[#9CA3AF] font-bold">:</span>
-                    <span className="font-bold text-[#1A085C]">{paymentMode}</span>
-                  </div>
-
-                  <div className="grid grid-cols-[110px_12px_1fr] items-center">
-                    <span className="text-[#6B7280] font-semibold">Transaction Ref.</span>
-                    <span className="text-[#9CA3AF] font-bold">:</span>
-                    <span
-                      className="font-mono font-bold text-[#1A085C] text-[11px] truncate"
-                      title={transactionRef}
-                    >
-                      {transactionRef}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ========================================================= */}
-              {/* 4. ITEMS TABLE (Royal Purple Header #5B4CF5)              */}
-              {/* ========================================================= */}
-              <div className="rounded-xl overflow-hidden border border-[#E9D5FF] shadow-2xs">
-                <table className="w-full text-left text-xs">
-                  <thead
-                    style={{
-                      background: 'linear-gradient(90deg, #5B4CF5 0%, #6938EF 100%)',
-                    }}
-                    className="text-white text-[11px] font-bold tracking-wide"
-                  >
-                    <tr>
-                      <th className="py-2.5 px-3.5 w-10 text-center font-black">#</th>
-                      <th className="py-2.5 px-4 font-black">Description</th>
-                      <th className="py-2.5 px-3 text-center w-14 font-black">Qty</th>
-                      <th className="py-2.5 px-4 text-right w-28 font-black">Unit Price</th>
-                      <th className="py-2.5 px-4 text-right w-28 font-black">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#F0EDF9] bg-white">
-                    {items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#FAF9FF]/60 transition-colors">
-                        <td className="py-3 px-3.5 text-center font-bold text-[#1A085C]">
-                          {item.num}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-[#1A085C] leading-snug">
-                          {item.desc}
-                        </td>
-                        <td className="py-3 px-3 text-center tabular-nums font-semibold text-[#374151]">
-                          {item.qty}
-                        </td>
-                        <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#374151]">
-                          {formatCurrency(item.rate)}
-                        </td>
-                        <td className="py-3 px-4 text-right tabular-nums font-black text-[#1A085C]">
-                          {formatCurrency(item.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ========================================================= */}
-              {/* 5. PAYMENT TERMS & TOTALS CALCULATION WITH LEFT STAMP     */}
-              {/* ========================================================= */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start pt-1">
-                {/* Left Box: Payment Terms & Notes + Authentic Status Stamp */}
-                <div className="p-4 sm:p-5 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] flex flex-col justify-between space-y-4">
-                  <div className="space-y-2.5">
-                    <h4 className="text-xs sm:text-[13px] font-extrabold text-[#1A085C] tracking-tight">
-                      Payment Terms &amp; Notes
-                    </h4>
-                    <ul className="space-y-1.5 text-[11px] leading-relaxed text-[#4B5563]">
-                      {termsAndNotes.map((note, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5] mt-1 shrink-0" />
-                          <span>{note}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Stamp Container on the LEFT (Never overlaps amounts/totals) */}
-                  <div className="pt-2 flex items-center justify-start select-none pointer-events-none">
-                    {isPaid && (
-                      <div
-                        style={{
-                          transform: 'rotate(-8deg)',
-                          boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)',
-                        }}
-                        className="border-[2.5px] border-emerald-600 text-emerald-600 bg-emerald-50/90 font-black tracking-widest text-base sm:text-lg px-4 py-1 rounded-lg uppercase font-mono inline-flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>PAID</span>
-                      </div>
-                    )}
-
-                    {isUnpaid && (
-                      <div
-                        style={{
-                          transform: 'rotate(-8deg)',
-                          boxShadow: '0 2px 8px rgba(217, 119, 6, 0.15)',
-                        }}
-                        className="border-[2.5px] border-amber-600 text-amber-600 bg-amber-50/90 font-black tracking-widest text-base sm:text-lg px-4 py-1 rounded-lg uppercase font-mono inline-flex items-center gap-1.5"
-                      >
-                        <Clock size={16} />
-                        <span>UNPAID</span>
-                      </div>
-                    )}
-
-                    {isRefunded && (
-                      <div
-                        style={{
-                          transform: 'rotate(-8deg)',
-                          boxShadow: '0 2px 8px rgba(124, 92, 232, 0.15)',
-                        }}
-                        className="border-[2.5px] border-[#7C5CE8] text-[#7C5CE8] bg-purple-50/90 font-black tracking-widest text-base sm:text-lg px-4 py-1 rounded-lg uppercase font-mono inline-flex items-center gap-1.5"
-                      >
-                        <RotateCcw size={16} />
-                        <span>REFUNDED</span>
-                      </div>
-                    )}
-
-                    {isFailed && (
-                      <div
-                        style={{
-                          transform: 'rotate(-8deg)',
-                          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.15)',
-                        }}
-                        className="border-[2.5px] border-rose-600 text-rose-600 bg-rose-50/90 font-black tracking-widest text-base sm:text-lg px-4 py-1 rounded-lg uppercase font-mono inline-flex items-center gap-1.5"
-                      >
-                        <AlertCircle size={16} />
-                        <span>FAILED</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Box: Clean Totals Calculation (Free from any overlapping stamps) */}
-                <div className="p-4 sm:p-5 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2.5 text-xs">
-                  {/* Subtotal */}
-                  <div className="flex justify-between items-center text-[#4B5563]">
-                    <span className="font-medium">Subtotal</span>
-                    <span className="font-bold text-[#1A085C] tabular-nums">
-                      {formatCurrency(payment.amount)}
-                    </span>
-                  </div>
-
-                  {/* Tax / GST */}
-                  <div className="flex justify-between items-center text-[#4B5563]">
-                    <span className="font-medium">Tax / GST</span>
-                    <span className="font-semibold text-[#1A085C]">Nil / Exempt</span>
-                  </div>
-
-                  {/* Total Amount in Brand Purple */}
-                  <div className="flex justify-between items-center py-2 border-y border-[#E9D5FF] text-sm sm:text-base font-black text-[#5B4CF5]">
-                    <span>Total Amount</span>
-                    <span className="tabular-nums font-black">
-                      {formatCurrency(payment.amount)}
-                    </span>
-                  </div>
-
-                  {/* Total Settled */}
-                  <div className="flex justify-between items-center text-[#4B5563] pt-0.5">
-                    <span className="font-medium">Total Settled</span>
-                    <span className="font-bold text-[#1A085C] tabular-nums">
-                      {formatCurrency(paidAmount)}
-                    </span>
-                  </div>
-
-                  {/* Balance Due */}
-                  <div className="flex justify-between items-center pt-1.5 border-t border-[#E9D5FF] text-xs">
-                    <span className="font-bold text-[#15803D]">Balance Due</span>
-                    <span
-                      className={`font-black text-sm tabular-nums ${
-                        isPaid ? 'text-[#15803D]' : 'text-rose-600'
-                      }`}
-                    >
-                      {isPaid ? '₹0.00' : formatCurrency(balanceDue)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ========================================================= */}
-            {/* 6. PINNED FOOTER SIGN-OFF (Strictly at Bottom of A4)      */}
-            {/* ========================================================= */}
-            <div className="mt-auto pt-8 border-t border-[#E5E7EB] text-center text-xs space-y-1">
-              <p className="font-bold text-[#1A085C] text-xs sm:text-sm">
+          <div className="space-y-3">
+            <div>
+              <h1 className="text-2xl sm:text-[26px] font-black tracking-tight leading-none">
                 <span className="text-[#1A085C]">Info</span>
                 <span className="text-[#5B4CF5]">HQ</span>{' '}
-                <span className="text-[#1A085C]">Pvt Ltd</span> &nbsp;•&nbsp; Prayagraj, Uttar Pradesh, India
-              </p>
-              <p className="text-[11px] font-medium text-[#4B5563]">
-                billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; infohq.in
-              </p>
-              <p className="text-[10px] text-[#9CA3AF] pt-1">
-                This is a computer-generated tax invoice verified by InfoHQ Command Center.
+                <span className="text-[#1A085C]">Pvt Ltd</span>
+              </h1>
+              <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1 tracking-tight">
+                Engineering Studio for AI, SaaS &amp; Digital Systems
               </p>
             </div>
+
+            {/* Brand Purple Gradient Accent Bar */}
+            <div
+              className="w-full h-[2.5px] rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+              }}
+            />
+          </div>
+
+          {/* ========================================================= */}
+          {/* 2. INVOICE TITLE & INVOICE NUMBER (NO PILL BOX)           */}
+          {/* ========================================================= */}
+          <div className="space-y-1.5 pt-1">
+            <h2 className="text-2xl sm:text-3xl font-black text-[#1A085C] tracking-tight uppercase">
+              INVOICE
+            </h2>
+
+            {/* Clean plain typography - no pill background */}
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#6B7280]">
+              <span>Invoice No.</span>
+              <span
+                style={{ color: '#5B4CF5' }}
+                className="font-extrabold font-mono text-sm sm:text-base tracking-wide"
+              >
+                {invoiceCode}
+              </span>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 3. TWO-COLUMN METADATA SECTION                            */}
+          {/* ========================================================= */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-1">
+            {/* Left Column: Bill To */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-[#6B7280] tracking-wide block uppercase">
+                Bill To
+              </span>
+              <h3 className="text-base sm:text-lg font-black text-[#1A085C] tracking-tight leading-snug">
+                {clientName}
+              </h3>
+              {clientEmail !== '—' && (
+                <div className="text-xs font-medium text-[#374151]">{clientEmail}</div>
+              )}
+              {clientPhone !== '—' && (
+                <div className="text-xs font-medium text-[#374151]">{clientPhone}</div>
+              )}
+
+              {/* Clean Account ID text without pill background */}
+              <div className="pt-1.5 text-xs">
+                <span className="text-[#6B7280] font-semibold mr-1.5">Account ID:</span>
+                <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
+              </div>
+            </div>
+
+            {/* Right Column: Key-Value Meta Aligned with Colon */}
+            <div className="text-xs font-medium space-y-1.5 sm:pl-4">
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Client ID</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Issue Date</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">{formatISTDate(payment.createdAt)}</span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Payment Date</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">
+                  {isPaid ? formatISTDate(payment.paidAt || payment.createdAt) : 'Pending'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Payment Mode</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">{paymentMode}</span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Transaction Ref.</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-mono font-bold text-[#1A085C] text-[11px] truncate" title={transactionRef}>
+                  {transactionRef}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 4. ITEMS TABLE (Royal Purple Header)                      */}
+          {/* ========================================================= */}
+          <div className="rounded-xl overflow-hidden border border-[#E9D5FF] shadow-2xs">
+            <table className="w-full text-left text-xs">
+              <thead
+                style={{
+                  background: 'linear-gradient(90deg, #5B4CF5 0%, #6938EF 100%)',
+                }}
+                className="text-white text-[11px] font-bold tracking-wide"
+              >
+                <tr>
+                  <th className="py-2.5 px-3.5 w-10 text-center font-black">#</th>
+                  <th className="py-2.5 px-4 font-black">Description</th>
+                  <th className="py-2.5 px-3 text-center w-14 font-black">Qty</th>
+                  <th className="py-2.5 px-4 text-right w-24 font-black">Unit Price</th>
+                  <th className="py-2.5 px-4 text-right w-28 font-black">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F0EDF9] bg-white">
+                {items.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-[#FAF9FF]/60 transition-colors">
+                    <td className="py-3 px-3.5 text-center font-bold text-[#1A085C]">
+                      {item.num}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-[#1A085C] leading-snug">
+                      {item.desc}
+                    </td>
+                    <td className="py-3 px-3 text-center tabular-nums font-semibold text-[#374151]">
+                      {item.qty}
+                    </td>
+                    <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#374151]">
+                      {formatCurrency(item.rate)}
+                    </td>
+                    <td className="py-3 px-4 text-right tabular-nums font-black text-[#1A085C]">
+                      {formatCurrency(item.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 5. PAYMENT TERMS & TOTALS CALCULATION WITH LEFT-SHIFTED STAMP */}
+          {/* ========================================================= */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start pt-1">
+            {/* Left Box: Payment Terms & Notes (Dynamic) */}
+            <div className="p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2.5">
+              <h4 className="text-xs sm:text-[13px] font-extrabold text-[#1A085C] tracking-tight">
+                Payment Terms &amp; Notes
+              </h4>
+              <ul className="space-y-1.5 text-[11px] leading-relaxed text-[#4B5563]">
+                {termsAndNotes.map((note, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5] mt-1 shrink-0" />
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Right Box: Totals & Authentic Stamp (Shifted Left to avoid amount numbers) */}
+            <div className="relative p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2 text-xs">
+              {/* Authentic Rotated Stamp: Located inside totals box, shifted to left so amount values are 100% visible */}
+              <div className="absolute left-8 sm:left-14 bottom-3 pointer-events-none select-none z-10">
+                {isPaid && (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.2)',
+                    }}
+                    className="border-[2.5px] border-emerald-600/90 text-emerald-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    PAID
+                  </div>
+                )}
+                {isUnpaid && (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(245, 158, 11, 0.2)',
+                    }}
+                    className="border-[2.5px] border-amber-600/90 text-amber-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    UNPAID
+                  </div>
+                )}
+                {isRefunded && (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(124, 92, 232, 0.2)',
+                    }}
+                    className="border-[2.5px] border-[#7C5CE8] text-[#7C5CE8] font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    REFUNDED
+                  </div>
+                )}
+                {isFailed && (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(220, 38, 38, 0.2)',
+                    }}
+                    className="border-[2.5px] border-rose-600 text-rose-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    FAILED
+                  </div>
+                )}
+              </div>
+
+              {/* Subtotal */}
+              <div className="flex justify-between items-center text-[#4B5563]">
+                <span className="font-medium">Subtotal</span>
+                <span className="font-bold text-[#1A085C] tabular-nums">
+                  {formatCurrency(payment.amount)}
+                </span>
+              </div>
+
+              {/* Tax / GST */}
+              <div className="flex justify-between items-center text-[#4B5563]">
+                <span className="font-medium">Tax / GST</span>
+                <span className="font-semibold text-[#1A085C]">Nil / Exempt</span>
+              </div>
+
+              {/* Total Amount in Brand Purple */}
+              <div className="flex justify-between items-center py-1.5 border-y border-[#E9D5FF] text-sm sm:text-base font-black text-[#5B4CF5]">
+                <span>Total Amount</span>
+                <span className="tabular-nums font-black">
+                  {formatCurrency(payment.amount)}
+                </span>
+              </div>
+
+              {/* Total Settled */}
+              <div className="flex justify-between items-center text-[#4B5563] pt-0.5">
+                <span className="font-medium">Total Settled</span>
+                <span className="font-bold text-[#1A085C] tabular-nums">
+                  {formatCurrency(paidAmount)}
+                </span>
+              </div>
+
+              {/* Balance Due */}
+              <div className="flex justify-between items-center pt-1 border-t border-[#E9D5FF] text-xs">
+                <span className="font-bold text-[#15803D]">Balance Due</span>
+                <span
+                  className={`font-black text-sm tabular-nums ${
+                    isPaid ? 'text-[#15803D]' : 'text-rose-600'
+                  }`}
+                >
+                  {isPaid ? '₹0.00' : formatCurrency(balanceDue)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 6. FOOTER SIGN-OFF                                        */}
+          {/* ========================================================= */}
+          <div className="pt-6 border-t border-[#E5E7EB] text-center text-xs space-y-1">
+            <p className="font-bold text-[#1A085C] text-xs sm:text-sm">
+              <span className="text-[#1A085C]">Info</span>
+              <span className="text-[#5B4CF5]">HQ</span>{' '}
+              <span className="text-[#1A085C]">Pvt Ltd</span> &nbsp;•&nbsp; Prayagraj, Uttar Pradesh, India
+            </p>
+            <p className="text-[11px] font-medium text-[#4B5563]">
+              billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; infohq.in
+            </p>
+            <p className="text-[10px] text-[#9CA3AF] pt-1">
+              This is a computer-generated tax invoice verified by InfoHQ Command Center.
+            </p>
           </div>
         </div>
       </div>
