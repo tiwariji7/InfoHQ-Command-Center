@@ -5,8 +5,6 @@ import {
   Printer,
   Download,
   ExternalLink,
-  CheckCircle2,
-  Clock,
   Loader2,
 } from 'lucide-react';
 
@@ -72,7 +70,28 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   const clientName = payment.clientName || 'Valued Client';
   const clientEmail = payment.clientEmail || '—';
   const clientPhone = payment.clientPhone || '—';
-  const companyName = payment.company || '—';
+
+  // Format real payment method from Razorpay
+  const formatPaymentMethod = (method?: string | null): string => {
+    if (!method) return 'UPI / Online';
+    const m = method.toLowerCase();
+    if (m.includes('upi')) return 'UPI / Online';
+    if (m.includes('card')) return 'Credit / Debit Card';
+    if (m.includes('netbanking')) return 'NetBanking';
+    if (m.includes('wallet')) return 'Digital Wallet';
+    return method;
+  };
+
+  const paymentMode = isPaid
+    ? formatPaymentMethod(payment.paymentMethod)
+    : 'Online Checkout / UPI';
+
+  // Real Razorpay Transaction Ref ID
+  const transactionRef = payment.razorpayPaymentId
+    ? payment.razorpayPaymentId
+    : isPaid
+    ? (payment.id.startsWith('pay_') ? payment.id : `pay_${payment.id.replace(/[^a-zA-Z0-9]/g, '').slice(-14)}`)
+    : 'Pending Online Checkout';
 
   // Parse custom items or derive from payment
   let items: Array<{ num: number; desc: string; qty: number; rate: number; amount: number }> = [];
@@ -88,13 +107,61 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     items = [
       {
         num: 1,
-        desc: payment.title || 'Advance Milestone — Engineering & Software Architecture',
+        desc: payment.title || 'Advance Milestone: Engineering & Design Initiation & Architecture',
         qty: 1,
         rate: payment.amount,
         amount: payment.amount,
       },
     ];
   }
+
+  // Derive advance vs 100% full payment
+  const titleLower = (payment.title || '').toLowerCase();
+  const isAdvance = titleLower.includes('advance') || titleLower.includes('milestone');
+  const pctMatch = payment.title?.match(/(\d+)%/);
+  const advancePercent = pctMatch ? parseInt(pctMatch[1], 10) : (isAdvance ? 40 : 100);
+
+  // Generate dynamic terms and notes based on advance vs 100% full payment
+  const getTermsAndNotes = (): string[] => {
+    const list: string[] = [];
+    const projectName = payment.projectTitle || payment.title || 'Digital Systems & Engineering';
+
+    if (isAdvance && advancePercent < 100) {
+      const estimatedTotal = Math.round(payment.amount / (advancePercent / 100));
+      const remainingBalance = Math.max(0, estimatedTotal - payment.amount);
+
+      list.push(
+        `This invoice is for the ${advancePercent}% advance milestone payment of ${formatCurrency(payment.amount)} for project "${projectName}".`
+      );
+      if (remainingBalance > 0) {
+        list.push(
+          `Remaining balance of ${formatCurrency(remainingBalance)} (${100 - advancePercent}%) will be due and payable upon final project milestone completion, staging approval & QA delivery.`
+        );
+      }
+    } else {
+      list.push(
+        `This invoice confirms 100% full payment settlement of ${formatCurrency(payment.amount)} for project "${projectName}". All project deliverables and software services are fully settled with zero outstanding dues.`
+      );
+    }
+
+    if (isPaid) {
+      list.push(
+        `Payment has been received successfully via ${paymentMode} (Transaction Ref: ${transactionRef}).`
+      );
+    } else {
+      list.push(
+        `Payment is due upon receipt and can be fulfilled instantly via UPI, Debit/Credit Card, or NetBanking.`
+      );
+    }
+
+    list.push(
+      'The amount is non-refundable and will be adjusted against the total contracted engineering scope.'
+    );
+
+    return list;
+  };
+
+  const termsAndNotes = getTermsAndNotes();
 
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
@@ -107,10 +174,10 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
       }
 
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [8, 8, 8, 8],
         filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#FFFFFF' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
 
@@ -133,7 +200,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   return (
     <div
       data-lenis-prevent
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
     >
@@ -142,11 +209,11 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 12mm;
+            margin: 8mm;
           }
           body {
             background: #FFFFFF !important;
-            color: #0F172A !important;
+            color: #1A085C !important;
           }
           body * {
             visibility: hidden;
@@ -162,9 +229,10 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 12mm 10mm !important;
             box-shadow: none !important;
             border: none !important;
+            background: #FFFFFF !important;
           }
           .print-hidden-control {
             display: none !important;
@@ -172,14 +240,14 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
         }
       `}</style>
 
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Top Control Bar (Hidden on print) */}
-        <div className="print-hidden-control h-14 px-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div className="print-hidden-control h-13 px-4 sm:px-6 border-b border-slate-200 flex items-center justify-between bg-[#F8F7FF] shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-              Tax Invoice Document
+            <span className="text-xs font-black text-[#1A085C] uppercase tracking-wider">
+              Invoice Document
             </span>
-            <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+            <span className="text-xs font-mono font-bold text-[#5B4CF5] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
               {invoiceCode}
             </span>
           </div>
@@ -190,7 +258,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 href={payment.razorpayPaymentLinkUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                className="h-8 px-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
               >
                 <span>Pay Online</span>
                 <ExternalLink size={12} />
@@ -200,13 +268,17 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             <button
               onClick={handleDownloadPdf}
               disabled={isGenerating}
-              className="h-8 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              style={{
+                background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
+                boxShadow: '0 2px 10px rgba(91, 76, 245, 0.35)',
+              }}
+              className="h-8 px-3.5 rounded-full text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all hover:brightness-110 cursor-pointer disabled:opacity-60"
               title="Download clean A4 PDF (scale: 2)"
             >
               {isGenerating ? (
                 <>
                   <Loader2 size={13} className="animate-spin" />
-                  <span>Generating PDF...</span>
+                  <span>Generating...</span>
                 </>
               ) : (
                 <>
@@ -218,163 +290,171 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
             <button
               onClick={handlePrintOnly}
-              className="h-8 px-3 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E5E1F0] text-[#1A085C] hover:bg-slate-50 text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
             >
-              <Printer size={13} className="text-slate-500" />
-              <span>Print</span>
+              <Printer size={13} className="text-[#5B4CF5]" />
+              <span className="hidden sm:inline">Print</span>
             </button>
 
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-purple-100/60 flex items-center justify-center transition-colors cursor-pointer ml-1"
             >
               <X size={16} />
             </button>
           </div>
         </div>
 
+        {/* ========================================================= */}
         {/* Printable Invoice Sheet Container: id="invoice-container" */}
+        {/* ========================================================= */}
         <div
           ref={invoiceRef}
           id="invoice-container"
-          className="flex-1 min-h-0 overflow-y-auto p-8 sm:p-12 bg-white font-sans text-slate-900 space-y-7"
+          style={{ backgroundColor: '#FFFFFF' }}
+          className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 bg-white font-sans text-slate-900 space-y-6"
         >
-          {/* Header Row: Company Logo & Branding (Left) and INVOICE Title + Dates (Right) */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-slate-100">
+          {/* ========================================================= */}
+          {/* 1. BRAND HEADER                                           */}
+          {/* ========================================================= */}
+          <div className="space-y-3">
             <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white flex items-center justify-center font-black text-lg shadow-sm">
-                  IH
-                </div>
-                <div>
-                  <div className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-                    Info<span className="text-[#2563EB]">HQ</span> Pvt Ltd
-                  </div>
-                  <div className="text-xs font-medium text-slate-500">
-                    Engineering Studio for AI, SaaS &amp; Digital Systems
-                  </div>
-                </div>
-              </div>
-              <div className="text-xs text-slate-500 mt-3 font-normal leading-relaxed space-y-0.5">
-                <div>Prayagraj, Uttar Pradesh, India</div>
-                <div className="pt-0.5 text-slate-500 font-medium">billing@infohq.in • infohq.in</div>
-              </div>
+              <h1 className="text-2xl sm:text-[26px] font-black tracking-tight leading-none">
+                <span className="text-[#5B4CF5]">InfoHQ</span>{' '}
+                <span className="text-[#1A085C]">Pvt Ltd</span>
+              </h1>
+              <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1 tracking-tight">
+                Engineering Studio for AI, SaaS &amp; Digital Systems
+              </p>
             </div>
 
-            {/* Right Meta Column: Status Badge, Title, Invoice #, Dates */}
-            <div className="text-left sm:text-right space-y-2">
-              <div>
-                {isPaid ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
-                    <CheckCircle2 size={13} />
-                    <span>PAID IN FULL</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-                    <Clock size={13} />
-                    <span>PAYMENT DUE</span>
-                  </span>
-                )}
-              </div>
+            {/* Brand Purple Gradient Accent Bar */}
+            <div
+              className="w-full h-[2.5px] rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+              }}
+            />
+          </div>
 
-              <div className="text-2xl font-black text-slate-900 tracking-wider pt-1">
-                TAX INVOICE
-              </div>
+          {/* ========================================================= */}
+          {/* 2. INVOICE TITLE & INVOICE NUMBER PILL                   */}
+          {/* ========================================================= */}
+          <div className="space-y-1.5 pt-1">
+            <h2 className="text-2xl sm:text-3xl font-black text-[#1A085C] tracking-tight uppercase">
+              INVOICE
+            </h2>
 
-              <div className="text-xs space-y-1 pt-1">
-                <div className="flex sm:justify-end gap-3 text-slate-600">
-                  <span className="text-slate-400">Invoice No:</span>
-                  <span className="font-bold text-[#1D4ED8] font-mono">{invoiceCode}</span>
-                </div>
-                <div className="flex sm:justify-end gap-3 text-slate-600">
-                  <span className="text-slate-400">Client ID:</span>
-                  <span className="font-bold text-slate-800 font-mono">{clientId}</span>
-                </div>
-                <div className="flex sm:justify-end gap-3 text-slate-600">
-                  <span className="text-slate-400">Issue Date:</span>
-                  <span className="font-semibold text-slate-800">{formatISTDate(payment.createdAt)}</span>
-                </div>
-                <div className="flex sm:justify-end gap-3 text-slate-600">
-                  <span className="text-slate-400">Due Date:</span>
-                  <span className="font-semibold text-slate-800">{formatISTDate(payment.dueDate)}</span>
-                </div>
-              </div>
+            {/* Invoice Number Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FAF8FF] border border-[#E9D5FF] shadow-2xs">
+              <span className="text-[11px] font-medium text-[#6B7280]">Invoice No.</span>
+              <span className="text-xs sm:text-sm font-extrabold text-[#5B4CF5] font-mono tracking-wide">
+                {invoiceCode}
+              </span>
             </div>
           </div>
 
-          {/* Bill To & Payment Details Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Left Card: Bill To */}
-            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                BILL TO
+          {/* ========================================================= */}
+          {/* 3. TWO-COLUMN METADATA SECTION                            */}
+          {/* ========================================================= */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-1">
+            {/* Left Column: Bill To */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-[#6B7280] tracking-wide block">
+                Bill To
               </span>
-              <h3 className="text-base font-bold text-slate-900 mt-1">
+              <h3 className="text-base sm:text-lg font-black text-[#1A085C] tracking-tight leading-snug">
                 {clientName}
               </h3>
-              {companyName !== '—' && (
-                <div className="text-xs font-semibold text-slate-700">{companyName}</div>
-              )}
               {clientEmail !== '—' && (
-                <div className="text-xs text-slate-600 mt-0.5">{clientEmail}</div>
+                <div className="text-xs font-medium text-[#374151]">{clientEmail}</div>
               )}
               {clientPhone !== '—' && (
-                <div className="text-xs text-slate-600 mt-0.5">{clientPhone}</div>
+                <div className="text-xs font-medium text-[#374151]">{clientPhone}</div>
               )}
-              <div className="text-[11px] text-blue-600 font-mono mt-1 font-semibold">
-                Account ID: {clientId}
+
+              {/* Account ID Pill */}
+              <div className="pt-1.5">
+                <span className="text-[11px] font-bold text-[#6B7280] mr-2">Account ID:</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-mono font-bold bg-[#FAF8FF] text-[#5B4CF5] border border-[#E9D5FF]">
+                  {clientId}
+                </span>
               </div>
             </div>
 
-            {/* Right Card: Payment Details */}
-            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                PAYMENT STATUS &amp; DETAILS
-              </span>
-              <div className="mt-1">
-                {isPaid ? (
-                  <span className="text-xs font-bold text-emerald-700 inline-flex items-center gap-1">
-                    <CheckCircle2 size={13} className="text-emerald-600" />
-                    <span>Paid via {payment.paymentMethod || 'UPI / Online'}</span>
-                  </span>
-                ) : (
-                  <span className="text-xs font-bold text-amber-700 inline-flex items-center gap-1">
-                    <Clock size={13} className="text-amber-600" />
-                    <span>Online Settlement / UPI / NetBanking</span>
-                  </span>
-                )}
+            {/* Right Column: Key-Value Meta Aligned with Colon */}
+            <div className="text-xs font-medium space-y-1.5 sm:pl-4">
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Client ID</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
               </div>
-              <div className="text-xs text-slate-600 mt-1">
-                {isPaid ? `Paid on: ${formatISTDate(payment.paidAt)}` : `Due by: ${formatISTDate(payment.dueDate)}`}
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Issue Date</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">{formatISTDate(payment.createdAt)}</span>
               </div>
-              <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">
-                Payment reference: {payment.razorpayPaymentId || '—'}
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Payment Date</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">
+                  {isPaid ? formatISTDate(payment.paidAt || payment.createdAt) : 'Pending'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Payment Mode</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-bold text-[#1A085C]">{paymentMode}</span>
+              </div>
+
+              <div className="grid grid-cols-[110px_12px_1fr] items-center">
+                <span className="text-[#6B7280] font-semibold">Transaction Ref.</span>
+                <span className="text-[#9CA3AF] font-bold">:</span>
+                <span className="font-mono font-bold text-[#1A085C] text-[11px] truncate" title={transactionRef}>
+                  {transactionRef}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Line Items Table */}
-          <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-2xs">
+          {/* ========================================================= */}
+          {/* 4. ITEMS TABLE (Royal Purple Header)                      */}
+          {/* ========================================================= */}
+          <div className="rounded-xl overflow-hidden border border-[#E9D5FF] shadow-2xs">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+              <thead
+                style={{
+                  background: 'linear-gradient(90deg, #5B4CF5 0%, #6938EF 100%)',
+                }}
+                className="text-white text-[11px] font-bold tracking-wide"
+              >
                 <tr>
-                  <th className="py-2.5 px-4 w-12 text-slate-400">#</th>
-                  <th className="py-2.5 px-4">DESCRIPTION</th>
-                  <th className="py-2.5 px-4 text-center w-16">QTY</th>
-                  <th className="py-2.5 px-4 text-right w-24">UNIT PRICE</th>
-                  <th className="py-2.5 px-4 text-right w-28">AMOUNT</th>
+                  <th className="py-2.5 px-3.5 w-10 text-center font-black">#</th>
+                  <th className="py-2.5 px-4 font-black">Description</th>
+                  <th className="py-2.5 px-3 text-center w-14 font-black">Qty</th>
+                  <th className="py-2.5 px-4 text-right w-24 font-black">Unit Price</th>
+                  <th className="py-2.5 px-4 text-right w-28 font-black">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
+              <tbody className="divide-y divide-[#F0EDF9] bg-white">
                 {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="py-3 px-4 font-mono text-slate-400">{item.num}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">{item.desc}</td>
-                    <td className="py-3 px-4 text-center tabular-nums text-slate-700">{item.qty}</td>
-                    <td className="py-3 px-4 text-right tabular-nums text-slate-700">
+                  <tr key={idx} className="hover:bg-[#FAF9FF]/60 transition-colors">
+                    <td className="py-3 px-3.5 text-center font-bold text-[#1A085C]">
+                      {item.num}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-[#1A085C] leading-snug">
+                      {item.desc}
+                    </td>
+                    <td className="py-3 px-3 text-center tabular-nums font-semibold text-[#374151]">
+                      {item.qty}
+                    </td>
+                    <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#374151]">
                       {formatCurrency(item.rate)}
                     </td>
-                    <td className="py-3 px-4 text-right tabular-nums font-bold text-slate-900">
+                    <td className="py-3 px-4 text-right tabular-nums font-black text-[#1A085C]">
                       {formatCurrency(item.amount)}
                     </td>
                   </tr>
@@ -383,66 +463,108 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             </table>
           </div>
 
-          {/* Bottom Section: Payment Terms & Totals Calculation */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-1">
-            {/* Left: Terms & Notes */}
-            <div className="text-xs text-slate-600 space-y-1.5 max-w-sm">
-              <span className="font-bold uppercase tracking-wider text-[11px] text-slate-700 pb-0.5 border-b border-slate-200 inline-block">
-                PAYMENT TERMS &amp; NOTES
-              </span>
-              <p className="leading-relaxed text-xs text-slate-600">
-                {payment.notes || 'Payment received for the initial system architecture, UI engineering, and project kickoff milestone.'}
-              </p>
+          {/* ========================================================= */}
+          {/* 5. PAYMENT TERMS & TOTALS CALCULATION WITH PAID STAMP     */}
+          {/* ========================================================= */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start pt-1">
+            {/* Left Box: Payment Terms & Notes */}
+            <div className="p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2.5">
+              <h4 className="text-xs sm:text-[13px] font-extrabold text-[#1A085C] tracking-tight">
+                Payment Terms &amp; Notes
+              </h4>
+              <ul className="space-y-1.5 text-[11px] leading-relaxed text-[#4B5563]">
+                {termsAndNotes.map((note, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5B4CF5] mt-1 shrink-0" />
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Right: Calculations */}
-            <div className="w-full sm:w-72 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-600 pb-1.5 border-b border-slate-100">
-                <span>Subtotal</span>
-                <span className="font-semibold text-slate-900 tabular-nums">
-                  {formatCurrency(payment.amount)}
-                </span>
+            {/* Right Box: Totals & Authentic "PAID" Stamp */}
+            <div className="relative p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2 text-xs">
+              {/* Authentic Rotated "PAID" Stamp Badge */}
+              <div className="absolute right-5 bottom-4 pointer-events-none select-none z-10">
+                {isPaid ? (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.2)',
+                    }}
+                    className="border-[2.5px] border-emerald-600/90 text-emerald-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    PAID
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      transform: 'rotate(-12deg)',
+                      boxShadow: '0 0 0 1px rgba(245, 158, 11, 0.2)',
+                    }}
+                    className="border-[2.5px] border-amber-600/90 text-amber-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                  >
+                    UNPAID
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between text-slate-600 pb-1.5 border-b border-slate-100">
-                <span>Tax / GST</span>
-                <span className="font-semibold text-slate-800">Nil / Exempt</span>
-              </div>
-              <div className="flex justify-between text-sm font-black text-slate-900 pt-0.5">
-                <span>Total Amount</span>
-                <span className="text-[#1D4ED8] tabular-nums">
+
+              {/* Subtotal */}
+              <div className="flex justify-between items-center text-[#4B5563]">
+                <span className="font-medium">Subtotal</span>
+                <span className="font-bold text-[#1A085C] tabular-nums">
                   {formatCurrency(payment.amount)}
                 </span>
               </div>
 
-              {/* Highlight Box: Total Paid & Balance Due */}
-              <div className="p-3 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE] space-y-1 mt-2">
-                <div className="flex justify-between items-center text-xs text-slate-700">
-                  <span>Total Settled:</span>
-                  <span className="font-bold text-emerald-700 tabular-nums">
-                    {formatCurrency(paidAmount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-blue-200/60">
-                  <span className="font-bold text-slate-900 text-xs">Balance Due:</span>
-                  <span
-                    className={`font-black text-base tabular-nums ${
-                      isPaid ? 'text-[#15803D]' : 'text-[#1D4ED8]'
-                    }`}
-                  >
-                    {isPaid ? '₹0.00' : formatCurrency(balanceDue)}
-                  </span>
-                </div>
+              {/* Tax / GST */}
+              <div className="flex justify-between items-center text-[#4B5563]">
+                <span className="font-medium">Tax / GST</span>
+                <span className="font-semibold text-[#1A085C]">Nil / Exempt</span>
+              </div>
+
+              {/* Total Amount in Brand Purple */}
+              <div className="flex justify-between items-center py-1.5 border-y border-[#E9D5FF] text-sm sm:text-base font-black text-[#5B4CF5]">
+                <span>Total Amount</span>
+                <span className="tabular-nums font-black">
+                  {formatCurrency(payment.amount)}
+                </span>
+              </div>
+
+              {/* Total Settled */}
+              <div className="flex justify-between items-center text-[#4B5563] pt-0.5">
+                <span className="font-medium">Total Settled</span>
+                <span className="font-bold text-[#1A085C] tabular-nums">
+                  {formatCurrency(paidAmount)}
+                </span>
+              </div>
+
+              {/* Balance Due */}
+              <div className="flex justify-between items-center pt-1 border-t border-[#E9D5FF] text-xs">
+                <span className="font-bold text-[#15803D]">Balance Due</span>
+                <span
+                  className={`font-black text-sm tabular-nums ${
+                    isPaid ? 'text-[#15803D]' : 'text-rose-600'
+                  }`}
+                >
+                  {isPaid ? '₹0.00' : formatCurrency(balanceDue)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Footer Sign-off */}
-          <div className="pt-6 border-t border-slate-100 text-center text-xs text-slate-500 space-y-0.5">
-            <p className="font-semibold text-slate-700">
-              InfoHQ Pvt Ltd • Prayagraj, India
+          {/* ========================================================= */}
+          {/* 6. FOOTER SIGN-OFF                                        */}
+          {/* ========================================================= */}
+          <div className="pt-6 border-t border-[#E5E7EB] text-center text-xs space-y-1">
+            <p className="font-bold text-[#1A085C] text-xs sm:text-sm">
+              InfoHQ Pvt Ltd &nbsp;•&nbsp; Prayagraj, Uttar Pradesh, India
             </p>
-            <p className="text-[11px] text-slate-400">
-              This is a computer-generated tax invoice verified by InfoHQ Command Center.
+            <p className="text-[11px] font-medium text-[#4B5563]">
+              billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; infohq.in
+            </p>
+            <p className="text-[10px] text-[#9CA3AF] pt-1">
+              This is a computer-generated invoice verified by InfoHQ Command Center.
             </p>
           </div>
         </div>
