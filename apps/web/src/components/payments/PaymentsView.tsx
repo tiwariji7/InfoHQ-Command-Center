@@ -119,8 +119,13 @@ export const PaymentsView: React.FC = () => {
     setSyncingId(paymentId);
     try {
       const res = await syncRazorpayPaymentApi(getToken, paymentId);
-      alert(res.message || 'Payment status updated.');
-      loadPayments();
+      if (res.payment) {
+        setPayments((prev) =>
+          prev.map((p) => (p.id === paymentId ? res.payment! : p))
+        );
+      }
+      loadPayments(true);
+      alert(res.message || 'Payment status updated directly from Razorpay.');
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to sync with Razorpay.');
     } finally {

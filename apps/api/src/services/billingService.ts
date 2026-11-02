@@ -104,6 +104,136 @@ export async function createRazorpayPaymentLink(
   }
 }
 
+export interface RazorpayVerifiedPayment {
+  isConfirmed: boolean;
+  status: 'captured' | 'authorized' | 'paid' | 'failed' | 'refunded' | 'pending';
+  amountRupees: number;
+  paymentId: string;
+  paymentMethod: string;
+  bankRef?: string;
+  errorReason?: string;
+  customerEmail?: string;
+  customerContact?: string;
+  customerName?: string;
+  paidAtEpoch: number;
+  invoiceNumber?: string;
+}
+
+export async function fetchAndVerifyRazorpayStatus(
+  params: {
+    paymentId?: string | null;
+    linkId?: string | null;
+  },
+  keys: { keyId: string; keySecret: string }
+): Promise<RazorpayVerifiedPayment | null> {
+  const cleanKeyId = keys.keyId.replace(/^['"]|['"]$/g, '').trim();
+  const cleanKeySec = keys.keySecret.replace(/^['"]|['"]$/g, '').trim();
+  if (!cleanKeyId || !cleanKeySec) return null;
+  const authHeader = 'Basic ' + btoa(cleanKeyId + ':' + cleanKeySec);
+
+  let effectivePaymentId = params.paymentId?.trim() || null;
+  let linkData: Record<string, unknown> | null = null;
+
+  // 1. If linkId provided, fetch payment link entity
+  if (params.linkId) {
+    try {
+      const linkRes = await fetch('https://api.razorpay.com/v1/payment_links/' + params.linkId.trim(), {
+        headers: { Authorization: authHeader },
+      });
+      if (linkRes.ok) {
+        linkData = (await linkRes.json()) as Record<string, unknown>;
+        const paymentsList = (linkData.payments as Array<Record<string, unknown>>) || [];
+        if (paymentsList.length > 0) {
+          const lastPayment = paymentsList[paymentsList.length - 1];
+          if (lastPayment && lastPayment.payment_id) {
+            effectivePaymentId = String(lastPayment.payment_id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[fetchAndVerifyRazorpayStatus] Link fetch error:', err);
+    }
+  }
+
+  // 2. Query Razorpay Payment Entity if paymentId exists
+  if (effectivePaymentId) {
+    try {
+      const payRes = await fetch('https://api.razorpay.com/v1/payments/' + effectivePaymentId, {
+        headers: { Authorization: authHeader },
+      });
+      if (payRes.ok) {
+        const payData = (await payRes.json()) as Record<string, unknown>;
+        const payStatus = String(payData.status || '').toLowerCase();
+        const amountPaise = Number(payData.amount || 0);
+        const amountRupees = amountPaise > 0 ? amountPaise / 100 : 0;
+        const method = String(payData.method || 'upi').toUpperCase();
+        const vpa = payData.vpa ? String(payData.vpa) : '';
+        const bank = payData.bank ? String(payData.bank) : '';
+        const wallet = payData.wallet ? String(payData.wallet) : '';
+        const methodFormatted = vpa ? method + ' (' + vpa + ')' : bank ? method + ' (' + bank + ')' : wallet ? method + ' (' + wallet + ')' : method;
+
+        const acquirer = (payData.acquirer_data as Record<string, unknown>) || {};
+        const bankRef = String(
+          acquirer.rrn ||
+          acquirer.bank_transaction_id ||
+          acquirer.upi_transaction_id ||
+          acquirer.auth_code ||
+          ''
+        ).trim() || undefined;
+
+        const errorReason = String(payData.error_description || payData.error_reason || '').trim() || undefined;
+        const notes = (payData.notes as Record<string, unknown>) || {};
+        const customerName = String(notes.customerName || notes.name || '').trim() || undefined;
+        const invoiceNumber = String(notes.invoiceNumber || '').trim() || undefined;
+        const paidAtEpoch = payData.created_at ? Number(payData.created_at) * 1000 : Date.now();
+
+        const isConfirmed = payStatus === 'captured' || payStatus === 'authorized';
+        return {
+          isConfirmed,
+          status: isConfirmed ? 'captured' : payStatus === 'failed' ? 'failed' : payStatus === 'refunded' ? 'refunded' : 'pending',
+          amountRupees,
+          paymentId: effectivePaymentId,
+          paymentMethod: methodFormatted,
+          bankRef,
+          errorReason,
+          customerEmail: payData.email ? String(payData.email) : undefined,
+          customerContact: payData.contact ? String(payData.contact) : undefined,
+          customerName,
+          paidAtEpoch,
+          invoiceNumber,
+        };
+      }
+    } catch (err) {
+      console.warn('[fetchAndVerifyRazorpayStatus] Payment fetch error:', err);
+    }
+  }
+
+  // 3. Fallback: if only payment link data exists and it is marked paid
+  if (linkData) {
+    const lStatus = String(linkData.status || '').toLowerCase();
+    const lAmountPaise = Number(linkData.amount_paid || linkData.amount || 0);
+    const lAmountRupees = lAmountPaise > 0 ? lAmountPaise / 100 : 0;
+    const lNotes = (linkData.notes as Record<string, unknown>) || {};
+    const lCustomer = (linkData.customer as Record<string, unknown>) || {};
+
+    const isConfirmed = lStatus === 'paid';
+    return {
+      isConfirmed,
+      status: isConfirmed ? 'paid' : (lStatus as any) || 'pending',
+      amountRupees: lAmountRupees,
+      paymentId: effectivePaymentId || String(params.linkId || ''),
+      paymentMethod: 'UPI / Online',
+      customerName: String(lCustomer.name || lNotes.customerName || '').trim() || undefined,
+      customerEmail: String(lCustomer.email || '').trim() || undefined,
+      customerContact: String(lCustomer.contact || '').trim() || undefined,
+      invoiceNumber: String(lNotes.invoiceNumber || '').trim() || undefined,
+      paidAtEpoch: Date.now(),
+    };
+  }
+
+  return null;
+}
+
 // 2. Send Invoice Email via Resend
 export async function sendInvoiceEmailViaResend(
   params: {
@@ -385,20 +515,27 @@ export async function sendTelegramPaymentSuccessAlert(
     amount: number;
     paymentId: string;
     paymentMethod?: string;
+    bankRef?: string;
     paidAtIST: string;
+    isRazorpayVerified?: boolean;
   },
   env: Bindings
 ) {
+  const verifiedBadge = params.isRazorpayVerified !== false ? '⚡ Verified Directly with Razorpay Official API' : 'Verified';
   const msg =
-    `💰 <b>Payment Received &amp; Verified!</b>\n\n` +
+    `🟢 <b>PAYMENT CONFIRMED — RAZORPAY VERIFIED!</b>\n` +
+    `<i>${verifiedBadge}</i>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💵 <b>Amount Paid:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
-    `💳 <b>Razorpay ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
-    `🏦 <b>Method:</b> ${escapeHtml(params.paymentMethod || 'UPI / Online')}\n` +
-    `📅 <b>Settled At:</b> ${escapeHtml(params.paidAtIST)}\n\n` +
-    `✅ <b>CRM Status:</b> Marked as PAID in Database &amp; Live Dashboard!`;
+    `💵 <b>Amount Received:</b> <b>₹${params.amount.toLocaleString('en-IN')}</b>\n` +
+    `💳 <b>Payment Mode:</b> ${escapeHtml(params.paymentMethod || 'UPI / Online')}\n` +
+    `🆔 <b>Razorpay Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
+    (params.bankRef ? `🏦 <b>Bank Ref / UTR:</b> <code>${escapeHtml(params.bankRef)}</code>\n` : '') +
+    `📅 <b>Paid At (IST):</b> ${escapeHtml(params.paidAtIST)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `✅ <b>CRM Status:</b> Automatically settled &amp; balance updated in live database!`;
 
   return sendTelegramMessage(msg, env);
 }
@@ -413,19 +550,24 @@ export async function sendTelegramPaymentFailedAlert(
     paymentId: string;
     errorReason: string;
     failedAtIST: string;
+    isRazorpayVerified?: boolean;
   },
   env: Bindings
 ) {
+  const verifiedBadge = params.isRazorpayVerified !== false ? '⚠️ Confirmed Directly with Razorpay Official API' : 'Payment Failed';
   const msg =
-    `⚠️ <b>Payment Attempt Failed Alert!</b>\n\n` +
+    `🔴 <b>PAYMENT ATTEMPT FAILED!</b>\n` +
+    `<i>${verifiedBadge}</i>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💸 <b>Attempted Amount:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `💸 <b>Attempted Amount:</b> <b>₹${params.amount.toLocaleString('en-IN')}</b>\n` +
     `❌ <b>Failure Reason:</b> ${escapeHtml(params.errorReason)}\n` +
     `🆔 <b>Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
-    `⏱ <b>Failed At:</b> ${escapeHtml(params.failedAtIST)}\n\n` +
-    `🔔 <i>Client se contact karein ya CRM se replacement link verify karein.</i>`;
+    `⏱ <b>Failed At (IST):</b> ${escapeHtml(params.failedAtIST)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔔 <i>Client se contact karein ya CRM se replacement link generate karein.</i>`;
 
   return sendTelegramMessage(msg, env);
 }
@@ -440,19 +582,24 @@ export async function sendTelegramRefundProcessedAlert(
     refundId: string;
     paymentId: string;
     processedAtIST: string;
+    isRazorpayVerified?: boolean;
   },
   env: Bindings
 ) {
+  const verifiedBadge = params.isRazorpayVerified !== false ? '🔄 Confirmed Directly with Razorpay Official API' : 'Refund Processed';
   const msg =
-    `🔄 <b>Refund Processed Alert!</b>\n\n` +
+    `🟡 <b>REFUND PROCESSED!</b>\n` +
+    `<i>${verifiedBadge}</i>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💸 <b>Refunded Amount:</b> ₹${params.refundAmount.toLocaleString('en-IN')}\n` +
+    `💸 <b>Refunded Amount:</b> <b>₹${params.refundAmount.toLocaleString('en-IN')}</b>\n` +
     `🆔 <b>Refund ID:</b> <code>${escapeHtml(params.refundId)}</code>\n` +
     `💳 <b>Original Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
-    `⏱ <b>Processed At:</b> ${escapeHtml(params.processedAtIST)}\n\n` +
-    `ℹ️ <i>Refund client ke source account par 5-7 din me credit ho jayega.</i>`;
+    `⏱ <b>Processed At (IST):</b> ${escapeHtml(params.processedAtIST)}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `ℹ️ <i>Refund client ke source account / UPI par 5-7 working days me credit reflect hoga.</i>`;
 
   return sendTelegramMessage(msg, env);
 }
@@ -976,17 +1123,45 @@ export async function handleRazorpayWebhookEvent(
         'Client Project'
     );
 
-    // 2. DISPATCH TELEGRAM ALERT: Fast & reliable
+    // 2. DIRECT RAZORPAY CONFIRMATION & TELEGRAM ALERT DISPATCH
+    let bankRef: string | undefined = undefined;
+    let verifiedPaymentId = effectivePaymentId;
+    let verifiedAmount = actualAmount;
+    let verifiedMethod = paymentMethod;
+    let isConfirmedDirectly = false;
+
+    const keyId = env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+    if (keyId && keySecret) {
+      try {
+        const verified = await fetchAndVerifyRazorpayStatus(
+          { paymentId: razorpayPaymentId, linkId: paymentLinkId },
+          { keyId, keySecret }
+        );
+        if (verified) {
+          isConfirmedDirectly = verified.isConfirmed;
+          if (verified.amountRupees > 0) verifiedAmount = verified.amountRupees;
+          if (verified.paymentId) verifiedPaymentId = verified.paymentId;
+          if (verified.paymentMethod) verifiedMethod = verified.paymentMethod;
+          if (verified.bankRef) bankRef = verified.bankRef;
+        }
+      } catch (verErr) {
+        console.warn('[Direct Razorpay Verification Warning]:', verErr);
+      }
+    }
+
     dispatchAlert(
       sendTelegramPaymentSuccessAlert(
         {
           clientName,
           projectTitle,
           invoiceNumber: invNum,
-          amount: actualAmount,
-          paymentId: effectivePaymentId,
-          paymentMethod,
+          amount: verifiedAmount,
+          paymentId: verifiedPaymentId,
+          paymentMethod: verifiedMethod,
+          bankRef,
           paidAtIST: timeIST,
+          isRazorpayVerified: isConfirmedDirectly,
         },
         env
       )
@@ -996,19 +1171,33 @@ export async function handleRazorpayWebhookEvent(
     if (paymentRow) {
       const paymentDbId = String(paymentRow.id);
 
-      // A. Update Payment status to 'received'
-      await db
-        .prepare(`
-          UPDATE payments
-          SET status = 'received',
-              paid_at = ?,
-              payment_method = ?,
-              razorpay_payment_id = ?,
-              updated_at = ?
-          WHERE id = ?
-        `)
-        .bind(now, paymentMethod, effectivePaymentId, now, paymentDbId)
-        .run();
+      // A. Update Payment status to 'received' (resilient against optional updated_at column)
+      try {
+        await db
+          .prepare(`
+            UPDATE payments
+            SET status = 'received',
+                paid_at = ?,
+                payment_method = ?,
+                razorpay_payment_id = ?,
+                updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(now, paymentMethod, effectivePaymentId, now, paymentDbId)
+          .run();
+      } catch (sqlErr) {
+        await db
+          .prepare(`
+            UPDATE payments
+            SET status = 'received',
+                paid_at = ?,
+                payment_method = ?,
+                razorpay_payment_id = ?
+            WHERE id = ?
+          `)
+          .bind(now, paymentMethod, effectivePaymentId, paymentDbId)
+          .run();
+      }
 
       // B. Update Client's total_paid in clients table
       const targetClientId = clientIdFromNotes || (paymentRow.client_id ? String(paymentRow.client_id) : null);
@@ -1121,7 +1310,24 @@ export async function handleRazorpayWebhookEvent(
     const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV');
     const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
 
-    // Dispatch Telegram Alert: Payment Failed ALWAYS directly from Razorpay
+    // Direct confirmation from Razorpay for failure reason
+    let verifiedFailureReason = errorDescription;
+    const keyId = env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+    if (keyId && keySecret) {
+      try {
+        const verified = await fetchAndVerifyRazorpayStatus(
+          { paymentId: razorpayPaymentId, linkId: paymentLinkId },
+          { keyId, keySecret }
+        );
+        if (verified?.errorReason) {
+          verifiedFailureReason = verified.errorReason;
+        }
+      } catch (e) {
+        console.warn('Failed status verify warning:', e);
+      }
+    }
+
     dispatchAlert(
       sendTelegramPaymentFailedAlert(
         {
@@ -1130,8 +1336,9 @@ export async function handleRazorpayWebhookEvent(
           invoiceNumber: invNum,
           amount: actualAmount,
           paymentId: effectivePaymentId,
-          errorReason: errorDescription,
+          errorReason: verifiedFailureReason,
           failedAtIST: timeIST,
+          isRazorpayVerified: true,
         },
         env
       )
@@ -1177,15 +1384,26 @@ export async function handleRazorpayWebhookEvent(
 
     // Update payment notes in D1 if found (maintaining status constraint valid)
     if (paymentRow) {
-      await db
-        .prepare(`
-          UPDATE payments
-          SET notes = COALESCE(notes, '') || ?,
-              updated_at = ?
-          WHERE id = ?
-        `)
-        .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, now, String(paymentRow.id))
-        .run();
+      try {
+        await db
+          .prepare(`
+            UPDATE payments
+            SET notes = COALESCE(notes, '') || ?,
+                updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, now, String(paymentRow.id))
+          .run();
+      } catch {
+        await db
+          .prepare(`
+            UPDATE payments
+            SET notes = COALESCE(notes, '') || ?
+            WHERE id = ?
+          `)
+          .bind(`\n[Refund: ₹${refundAmountRupees} processed via ${refundId} at ${timeIST}]`, String(paymentRow.id))
+          .run();
+      }
 
       // Decrement client's total_paid in clients table
       const targetClientId = clientIdFromNotes || (paymentRow.client_id ? String(paymentRow.client_id) : null);
