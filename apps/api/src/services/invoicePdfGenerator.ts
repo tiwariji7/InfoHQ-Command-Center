@@ -15,6 +15,8 @@ export interface InvoicePdfOptions {
   issueDate?: string;
   paymentDate?: string;
   isFullPayment?: boolean;
+  status?: string;
+  notes?: string;
 }
 
 /**
@@ -171,14 +173,14 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   y -= 30;
   // Payment Terms & Notes (Left) & Summary (Right)
-  const notesW = 240;
+  const notesW = 250;
   const is100Pct = data.isFullPayment || (data.totalProjectCost && data.amount >= data.totalProjectCost);
 
   page.drawRectangle({
     x: tableX,
-    y: y - 85,
+    y: y - 110,
     width: notesW,
-    height: 95,
+    height: 120,
     color: colorBgLight,
     borderColor: colorBorder,
     borderWidth: 1,
@@ -186,17 +188,60 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   page.drawText('Payment Terms & Notes', { x: tableX + 12, y: y - 2, size: 10, font: fontBold, color: colorNavy });
 
-  if (is100Pct) {
-    page.drawText('• 100% full project payment completed successfully.', { x: tableX + 12, y: y - 20, size: 8.5, font: fontRegular, color: colorBody });
-    page.drawText('• All milestones for this project are fully settled.', { x: tableX + 12, y: y - 32, size: 8.5, font: fontRegular, color: colorBody });
-    page.drawText(`• Verified settlement via ${paymentModeText}.`, { x: tableX + 12, y: y - 44, size: 8.5, font: fontBold, color: colorNavy });
-    page.drawText('• Thank you for your partnership with InfoHQ!', { x: tableX + 12, y: y - 58, size: 8.5, font: fontRegular, color: colorBody });
+  // Custom or milestone description
+  if (data.notes && data.notes.trim().length > 0) {
+    const customNote = data.notes.trim();
+    const truncatedNote = customNote.length > 50 ? customNote.substring(0, 48) + '...' : customNote;
+    page.drawText(`• ${truncatedNote}`, { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
+  } else if (is100Pct) {
+    page.drawText('• 100% full project payment completed successfully.', { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
   } else {
-    page.drawText(`• This invoice confirms the ${milestoneClean} settlement`, { x: tableX + 12, y: y - 20, size: 8.5, font: fontRegular, color: colorBody });
-    page.drawText(`  for project "${data.projectTitle || 'System Development'}".`, { x: tableX + 12, y: y - 32, size: 8.5, font: fontRegular, color: colorBody });
-    page.drawText(`• Verified settlement via ${paymentModeText}.`, { x: tableX + 12, y: y - 44, size: 8.5, font: fontBold, color: colorNavy });
-    page.drawText('• Remaining project balance to be cleared per milestones.', { x: tableX + 12, y: y - 58, size: 8.5, font: fontRegular, color: colorBody });
+    page.drawText(`• Invoice covers ${milestoneClean} settlement`, { x: tableX + 12, y: y - 18, size: 8, font: fontRegular, color: colorBody });
   }
+
+  page.drawText(`• Project: "${(data.projectTitle || 'System Implementation').slice(0, 32)}"`, { x: tableX + 12, y: y - 30, size: 8, font: fontRegular, color: colorBody });
+  page.drawText(`• Verified settlement via ${paymentModeText}.`, { x: tableX + 12, y: y - 42, size: 8, font: fontBold, color: colorNavy });
+  page.drawText('• Non-refundable, adjusted against total contracted scope.', { x: tableX + 12, y: y - 54, size: 7.5, font: fontRegular, color: colorMuted });
+
+  // 4-Status Stamp on the LEFT (Below Terms, never touches Summary Numbers)
+  const statusStr = (data.status || (data.paymentDate ? 'paid' : 'unpaid')).toLowerCase();
+  let stampText = 'PAID';
+  let stampColor = colorSuccess;
+  let stampBg = rgb(240 / 255, 253 / 255, 244 / 255);
+
+  if (statusStr.includes('refund')) {
+    stampText = 'REFUNDED';
+    stampColor = rgb(124 / 255, 92 / 255, 232 / 255);
+    stampBg = rgb(245 / 255, 243 / 255, 255 / 255);
+  } else if (statusStr.includes('fail')) {
+    stampText = 'FAILED';
+    stampColor = rgb(220 / 255, 38 / 255, 38 / 255);
+    stampBg = rgb(254 / 255, 242 / 255, 242 / 255);
+  } else if (!data.paymentDate || statusStr.includes('unpaid') || statusStr.includes('pending')) {
+    stampText = 'UNPAID';
+    stampColor = rgb(217 / 255, 119 / 255, 6 / 255);
+    stampBg = rgb(254 / 255, 243 / 255, 199 / 255);
+  }
+
+  const stampWidth = 90;
+  const stampHeight = 22;
+  page.drawRectangle({
+    x: tableX + 12,
+    y: y - 98,
+    width: stampWidth,
+    height: stampHeight,
+    borderColor: stampColor,
+    borderWidth: 1.5,
+    color: stampBg,
+  });
+  const textW = fontBold.widthOfTextAtSize(stampText, 10);
+  page.drawText(stampText, {
+    x: tableX + 12 + (stampWidth - textW) / 2,
+    y: y - 92,
+    size: 10,
+    font: fontBold,
+    color: stampColor,
+  });
 
   // Summary Table (Right)
   const sumX = 350;
@@ -207,32 +252,15 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     sumY -= 16;
   };
 
+  const isPaidState = statusStr.includes('paid') || statusStr.includes('received');
   drawSummaryRow('Subtotal', formattedAmt);
   drawSummaryRow('Tax / GST', 'Nil / Exempt');
   drawSummaryRow('Total Amount', formattedAmt, true);
-  drawSummaryRow('Total Settled', formattedAmt, true);
-  drawSummaryRow('Balance Due', 'INR 0.00', true, true);
+  drawSummaryRow('Total Settled', isPaidState ? formattedAmt : 'INR 0', true);
+  drawSummaryRow('Balance Due', isPaidState ? 'INR 0.00' : formattedAmt, true, isPaidState);
 
-  // PAID Stamp Box (as in template)
-  page.drawRectangle({
-    x: sumX + 50,
-    y: sumY - 14,
-    width: 75,
-    height: 26,
-    borderColor: colorSuccess,
-    borderWidth: 2,
-    color: rgb(240 / 255, 253 / 255, 244 / 255),
-  });
-  page.drawText('PAID', {
-    x: sumX + 68,
-    y: sumY - 6,
-    size: 14,
-    font: fontBold,
-    color: colorSuccess,
-  });
-
-  // Footer (Bottom of Page)
-  const footerY = 50;
+  // Footer (Bottom of Page - Pinned cleanly)
+  const footerY = 48;
   page.drawLine({
     start: { x: 50, y: footerY + 25 },
     end: { x: width - 50, y: footerY + 25 },
@@ -262,3 +290,4 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   return await pdfDoc.save();
 }
+
