@@ -1,37 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { CreatePaymentInput, Payment, Project } from '@infohq/shared';
-import { createPaymentApi, fetchProjects } from '../../lib/api.js';
-import { X, Plus, Loader2 } from 'lucide-react';
+import { createPaymentApi, fetchProjects, generateRazorpayPaymentLinkApi } from '../../lib/api.js';
+import {
+  X,
+  Loader2,
+  Copy,
+  Check,
+  MessageCircle,
+  FileText,
+  CheckCircle2,
+  Zap,
+  AlertCircle,
+} from 'lucide-react';
+
+export type MilestoneType = 'advance' | 'part' | 'final' | 'full';
 
 interface CreatePaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (payment: Payment) => void;
+  onOpenInvoice?: (payment: Payment) => void;
   preSelectedProjectId?: string;
   preSelectedProjectTitle?: string;
+  clientName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  projectTotalCost?: number;
+  alreadyReceived?: number;
+  remainingBalance?: number;
 }
 
 export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  onOpenInvoice,
   preSelectedProjectId,
   preSelectedProjectTitle,
+  clientName: initialClientName,
+  clientPhone: initialClientPhone,
+  clientEmail: _initialClientEmail,
+  projectTotalCost: initialTotalCost = 0,
+  alreadyReceived: initialReceived = 0,
+  remainingBalance: initialRemaining,
 }) => {
   const { getToken } = useAuth();
 
   const [projectId, setProjectId] = useState(preSelectedProjectId || '');
   const [projectsList, setProjectsList] = useState<Project[]>([]);
-  const [title, setTitle] = useState('');
+  const [milestoneType, setMilestoneType] = useState<MilestoneType>('advance');
+  const [title, setTitle] = useState('Advance Payment — Project Initiation');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('INR');
+  const [percentage, setPercentage] = useState('30');
+  const currency = 'INR';
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [dueDateStr, setDueDateStr] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Selected project details (if picked from dropdown)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  // Flow & State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Link Generated Success State
+  const [generatedPayment, setGeneratedPayment] = useState<Payment | null>(null);
+  const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Load projects if not pre-selected
   useEffect(() => {
@@ -43,36 +80,190 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
           setProjectsList(res.projects);
           if (res.projects.length > 0 && !projectId) {
             setProjectId(res.projects[0].id);
+            setSelectedProject(res.projects[0]);
           }
         })
         .catch((err) => console.error('Failed to load projects list:', err));
     }
-  }, [isOpen, preSelectedProjectId, getToken]);
+  }, [isOpen, preSelectedProjectId, getToken, projectId]);
 
+  // Update selected project when dropdown changes
+  useEffect(() => {
+    if (projectId && projectsList.length > 0) {
+      const found = projectsList.find((p) => p.id === projectId);
+      if (found) setSelectedProject(found);
+    }
+  }, [projectId, projectsList]);
+
+  // Financial calculations
+  const effectiveTotalCost = useMemo(() => {
+    if (initialTotalCost > 0) return initialTotalCost;
+    if (selectedProject?.budget) {
+      const parsed = parseInt(selectedProject.budget.replace(/[^\d]/g, ''), 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+  }, [initialTotalCost, selectedProject]);
+
+  const effectiveReceived = initialReceived;
+  const effectiveRemaining = useMemo(() => {
+    if (typeof initialRemaining === 'number') return initialRemaining;
+    return Math.max(0, effectiveTotalCost - effectiveReceived);
+  }, [initialRemaining, effectiveTotalCost, effectiveReceived]);
+
+  const effectiveClientName =
+    initialClientName || selectedProject?.clientName || 'Valued Client';
+  const effectiveClientPhone = initialClientPhone || selectedProject?.clientPhone || '';
+  const effectiveProjectTitle =
+    preSelectedProjectTitle || selectedProject?.title || 'Website Development';
+
+  // Format currency helper
+  const formatRupees = useCallback((amt: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amt);
+  }, []);
+
+  // Handle milestone type change & auto calculation
+  const applyMilestoneType = useCallback(
+    (type: MilestoneType) => {
+      setMilestoneType(type);
+      setError(null);
+
+      if (type === 'final') {
+        // Auto calculate: Exact Remaining Balance
+        const finalAmt = effectiveRemaining > 0 ? effectiveRemaining : Math.round(effectiveTotalCost * 0.4);
+        setAmount(finalAmt > 0 ? String(finalAmt) : '');
+        if (effectiveTotalCost > 0) {
+          const pct = Math.min(100, Math.round((finalAmt / effectiveTotalCost) * 100));
+          setPercentage(String(pct));
+        } else {
+          setPercentage('100');
+        }
+        setTitle(`Final Payment — Project Completion & Handover`);
+      } else if (type === 'full') {
+        // Auto calculate: 100% Full Project Cost
+        const fullAmt = effectiveTotalCost > 0 ? effectiveTotalCost : effectiveRemaining;
+        setAmount(fullAmt > 0 ? String(fullAmt) : '');
+        setPercentage('100');
+        setTitle(`Full Payment — Complete Project Settlement`);
+      } else if (type === 'advance') {
+        // Advance Payment: default ~30% or custom
+        const advPct = 30;
+        setPercentage(String(advPct));
+        if (effectiveTotalCost > 0) {
+          const advAmt = Math.round((effectiveTotalCost * advPct) / 100);
+          setAmount(String(advAmt));
+        }
+        setTitle(`Advance Payment — Project Initiation & Architecture`);
+      } else if (type === 'part') {
+        // Part Payment: default ~30%
+        const partPct = 30;
+        setPercentage(String(partPct));
+        if (effectiveTotalCost > 0) {
+          const partAmt = Math.round((effectiveTotalCost * partPct) / 100);
+          setAmount(String(partAmt));
+        }
+        setTitle(`Part Payment — Mid-Sprint Milestone Delivery`);
+      }
+    },
+    [effectiveRemaining, effectiveTotalCost]
+  );
+
+  // Initialize defaults on open
   useEffect(() => {
     if (isOpen) {
-      setTitle('');
-      setAmount('');
-      setInvoiceNumber('');
-      setDueDateStr('');
-      setNotes('');
+      setGeneratedPayment(null);
+      setGeneratedLinkUrl(null);
+      setCopiedLink(false);
       setError(null);
-    }
-  }, [isOpen]);
 
-  // Handle Escape key
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
+      // Default due date: +3 days from today
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      setDueDateStr(d.toISOString().split('T')[0]);
+
+      // If project has no payments received yet, default to Advance
+      // If there's an ongoing balance, suggest based on remaining
+      if (effectiveReceived > 0 && effectiveRemaining > 0) {
+        applyMilestoneType('final');
+      } else {
+        applyMilestoneType('advance');
       }
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, applyMilestoneType, effectiveReceived, effectiveRemaining]);
 
-  if (!isOpen) return null;
+  // Handle Amount change from input
+  const handleAmountChange = (val: string) => {
+    setAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0 && effectiveTotalCost > 0) {
+      const calcPct = Math.min(100, Math.round((num / effectiveTotalCost) * 100));
+      setPercentage(String(calcPct));
+    }
+  };
 
+  // Handle Percentage change from input
+  const handlePercentageChange = (val: string) => {
+    setPercentage(val);
+    const numPct = parseFloat(val);
+    if (!isNaN(numPct) && numPct > 0 && effectiveTotalCost > 0) {
+      const calcAmt = Math.round((effectiveTotalCost * numPct) / 100);
+      setAmount(String(calcAmt));
+    }
+  };
+
+  // Quick Percentage Chips
+  const handleChipClick = (pct: number) => {
+    setPercentage(String(pct));
+    if (effectiveTotalCost > 0) {
+      const calcAmt = Math.round((effectiveTotalCost * pct) / 100);
+      setAmount(String(calcAmt));
+    }
+  };
+
+  // Remaining Chip Click
+  const handleRemainingChipClick = () => {
+    if (effectiveRemaining > 0) {
+      setAmount(String(effectiveRemaining));
+      if (effectiveTotalCost > 0) {
+        const pct = Math.min(100, Math.round((effectiveRemaining / effectiveTotalCost) * 100));
+        setPercentage(String(pct));
+      }
+      setMilestoneType('final');
+      setTitle(`Final Payment — Remaining Project Settlement`);
+    }
+  };
+
+  // Copy Link Handler
+  const handleCopyLink = () => {
+    if (!generatedLinkUrl) return;
+    navigator.clipboard.writeText(generatedLinkUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  // Generate WhatsApp Share URL
+  const waShareUrl = useMemo(() => {
+    if (!generatedLinkUrl || !generatedPayment) return null;
+    const cleanPhone = effectiveClientPhone.replace(/\D/g, '');
+    const phoneParam = cleanPhone.length >= 10
+      ? cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`
+      : '';
+    const message = `Hello ${effectiveClientName} ji,\n\nHere is the payment link for *${generatedPayment.title}* on your project *${effectiveProjectTitle}*:\n\n💳 *Amount:* ${formatRupees(generatedPayment.amount)}\n📄 *Invoice No:* ${generatedPayment.invoiceNumber || 'INV-2026'}\n🔗 *Pay Securely Online:* ${generatedLinkUrl}\n\nPlease let us know once paid so our system records it immediately.\n\nThank you,\n*InfoHQ Command Center*`;
+    return `https://wa.me/${phoneParam}?text=${encodeURIComponent(message)}`;
+  }, [
+    generatedLinkUrl,
+    generatedPayment,
+    effectiveClientName,
+    effectiveClientPhone,
+    effectiveProjectTitle,
+    formatRupees,
+  ]);
+
+  // Handle Form Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -82,7 +273,7 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
       return;
     }
     if (!title.trim()) {
-      setError('Milestone title is required.');
+      setError('Payment title or milestone description is required.');
       return;
     }
 
@@ -113,8 +304,29 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
       };
 
       const res = await createPaymentApi(getToken, payload);
-      onSuccess(res.payment);
-      onClose();
+      const createdPayment = res.payment;
+      onSuccess(createdPayment);
+
+      // Check if Razorpay Link was created automatically by backend
+      if (createdPayment.razorpayPaymentLinkUrl) {
+        setGeneratedPayment(createdPayment);
+        setGeneratedLinkUrl(createdPayment.razorpayPaymentLinkUrl);
+      } else {
+        // Fallback: actively generate link if not generated by default
+        try {
+          const linkRes = await generateRazorpayPaymentLinkApi(getToken, createdPayment.id);
+          if (linkRes.success && linkRes.paymentLinkUrl) {
+            createdPayment.razorpayPaymentLinkUrl = linkRes.paymentLinkUrl;
+            setGeneratedPayment(createdPayment);
+            setGeneratedLinkUrl(linkRes.paymentLinkUrl);
+          } else {
+            setGeneratedPayment(createdPayment);
+          }
+        } catch (linkErr) {
+          console.warn('Fallback link generation:', linkErr);
+          setGeneratedPayment(createdPayment);
+        }
+      }
     } catch (err: unknown) {
       console.error('Failed to create payment milestone:', err);
       setError(err instanceof Error ? err.message : 'Failed to create payment.');
@@ -123,181 +335,474 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
+      onClick={onClose}
     >
-      <div className="bg-white rounded-card shadow-modal max-w-md w-full border border-brand-border my-6 overflow-hidden flex flex-col">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-white shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-brand-heading">
-              Create Payment Milestone
-            </h2>
-            <p className="text-xs text-brand-muted mt-0.5">
-              {preSelectedProjectTitle
-                ? `Add milestone for ${preSelectedProjectTitle}`
-                : 'Add a new client milestone invoice'}
-            </p>
+      <div
+        className="bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.35)] max-w-lg w-full border border-[#E5E1F0] my-6 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ========================================================= */}
+        {/* 1. MODAL HEADER                                           */}
+        {/* ========================================================= */}
+        <div className="px-5 py-4 border-b border-[#E5E1F0] flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#5B4CF5] to-[#7C5CE8] text-white flex items-center justify-center shadow-xs">
+              <Zap size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-[#1A085C] tracking-tight">
+                Create Payment Link
+              </h2>
+              <p className="text-[11px] text-[#6B7280] font-medium">
+                Project: <span className="font-semibold text-[#1A085C]">{effectiveProjectTitle}</span>
+                {effectiveClientName && (
+                  <> • Client: <span className="text-[#5B4CF5] font-semibold">{effectiveClientName}</span></>
+                )}
+              </p>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-1.5 text-brand-muted hover:text-brand-heading rounded hover:bg-brand-section transition-colors"
+            className="w-7 h-7 rounded-lg text-[#6B7280] hover:text-[#1A085C] hover:bg-[#F3F0FF] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close modal"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          {error && (
-            <div className="p-3 bg-red-50 text-brand-destructive rounded-control border border-red-200">
-              {error}
+        {/* ========================================================= */}
+        {/* SUCCESS VIEW: LINK GENERATED                              */}
+        {/* ========================================================= */}
+        {generatedPayment ? (
+          <div className="p-6 space-y-5 text-center">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200 mx-auto flex items-center justify-center shadow-xs">
+              <CheckCircle2 size={32} />
             </div>
-          )}
 
-          {/* Project Selection (if not preselected) */}
-          {!preSelectedProjectId && (
             <div>
-              <label className="block font-semibold text-brand-heading mb-1">
-                Project <span className="text-brand-destructive">*</span>
+              <h3 className="text-base font-black text-[#1A085C]">
+                Payment Link Generated Successfully!
+              </h3>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Amount: <span className="font-black text-[#1A085C]">{formatRupees(generatedPayment.amount)}</span>
+                {' • '}
+                Invoice: <span className="font-mono font-bold text-[#5B4CF5]">{generatedPayment.invoiceNumber || 'INV-2026'}</span>
+              </p>
+            </div>
+
+            {/* Generated Link URL Box */}
+            {generatedLinkUrl ? (
+              <div className="p-3 bg-[#FAF9FD] rounded-2xl border border-[#E5E1F0] space-y-2.5 text-left">
+                <span className="text-[10.5px] uppercase font-bold tracking-wider text-[#6B7280] block">
+                  Razorpay Live Short Link
+                </span>
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-[#E5E1F0]">
+                  <span className="font-mono text-xs text-[#1A085C] font-semibold truncate flex-1 select-all">
+                    {generatedLinkUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="px-2.5 py-1 rounded-lg bg-[#5B4CF5] hover:bg-[#4C3DE0] text-white text-[11px] font-bold flex items-center gap-1 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                  >
+                    {copiedLink ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedLink ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800 text-left">
+                Milestone created. Razorpay keys are processing or offline. You can record payments manually or view invoice below.
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              {waShareUrl ? (
+                <a
+                  href={waShareUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-10 px-3 rounded-xl bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                >
+                  <MessageCircle size={14} />
+                  <span>Send on WhatsApp</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="h-10 px-3 rounded-xl bg-[#5B4CF5] hover:bg-[#4C3DE0] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                >
+                  <Copy size={14} />
+                  <span>Copy Payment Link</span>
+                </button>
+              )}
+
+              {onOpenInvoice ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenInvoice(generatedPayment);
+                    onClose();
+                  }}
+                  className="h-10 px-3 rounded-xl bg-white hover:bg-purple-50 border border-[#5B4CF5] text-[#5B4CF5] text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <FileText size={14} />
+                  <span>View Branded Invoice</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-10 px-3 rounded-xl bg-[#1A085C] hover:bg-[#2A1078] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span>Done</span>
+                </button>
+              )}
+            </div>
+
+            <div className="text-[11px] text-[#6B7280]">
+              🔔 Telegram &amp; CRM notification dispatched automatically.
+            </div>
+          </div>
+        ) : (
+          /* ========================================================= */
+          /* CREATE PAYMENT FORM                                       */
+          /* ========================================================= */
+          <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+            {error && (
+              <div className="p-3 bg-red-50 text-rose-600 rounded-xl border border-red-200 text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* FINANCIAL SUMMARY STRIP (Total Cost | Received | Remaining)*/}
+            {/* ========================================================= */}
+            <div className="grid grid-cols-3 gap-2 p-2.5 rounded-2xl bg-[#FBFBFE] border border-[#E5E1F0]">
+              <div className="p-2 rounded-xl bg-white border border-[#E5E1F0]/80">
+                <span className="text-[10px] text-[#6B7280] font-semibold block">Total Cost</span>
+                <span className="text-xs sm:text-sm font-black text-[#1A085C] mt-0.5 block truncate">
+                  {effectiveTotalCost > 0 ? formatRupees(effectiveTotalCost) : '₹0'}
+                </span>
+              </div>
+
+              <div className="p-2 rounded-xl bg-white border border-[#E5E1F0]/80">
+                <span className="text-[10px] text-[#16A34A] font-semibold block">Received</span>
+                <span className="text-xs sm:text-sm font-black text-[#16A34A] mt-0.5 block truncate">
+                  {formatRupees(effectiveReceived)}
+                </span>
+              </div>
+
+              <div className="p-2 rounded-xl bg-white border border-[#E5E1F0]/80">
+                <span className="text-[10px] text-[#D97706] font-semibold block">Remaining</span>
+                <span className="text-xs sm:text-sm font-black text-[#D97706] mt-0.5 block truncate">
+                  {formatRupees(effectiveRemaining)}
+                </span>
+              </div>
+            </div>
+
+            {/* Project Selection (if not preselected) */}
+            {!preSelectedProjectId && (
+              <div>
+                <label className="block font-bold text-[#1A085C] mb-1">
+                  Select Project <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-full h-9 px-3 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none bg-white text-xs font-semibold text-[#1A085C]"
+                >
+                  <option value="">Choose Project</option>
+                  {projectsList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} ({p.clientName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* QUESTION 1: Client ko kis cheez ka payment karna hai?       */}
+            {/* ========================================================= */}
+            <div>
+              <label className="block font-black text-[#1A085C] mb-2 text-xs">
+                Client ko kis cheez ka payment karna hai?
               </label>
-              <select
-                required
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none bg-white"
-              >
-                <option value="">Select Project</option>
-                {projectsList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} ({p.clientName})
-                  </option>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* Advance Payment */}
+                <button
+                  type="button"
+                  onClick={() => applyMilestoneType('advance')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    milestoneType === 'advance'
+                      ? 'border-[#5B4CF5] bg-[#F5F3FF] ring-2 ring-[#5B4CF5]/20'
+                      : 'border-[#E5E1F0] bg-white hover:border-[#5B4CF5]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#1A085C]">Advance Payment</span>
+                    {milestoneType === 'advance' && (
+                      <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[#6B7280] mt-0.5 block">
+                    shuru mein payment
+                  </span>
+                </button>
+
+                {/* Part Payment */}
+                <button
+                  type="button"
+                  onClick={() => applyMilestoneType('part')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    milestoneType === 'part'
+                      ? 'border-[#5B4CF5] bg-[#F5F3FF] ring-2 ring-[#5B4CF5]/20'
+                      : 'border-[#E5E1F0] bg-white hover:border-[#5B4CF5]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#1A085C]">Part Payment</span>
+                    {milestoneType === 'part' && (
+                      <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[#6B7280] mt-0.5 block">
+                    beech mein payment
+                  </span>
+                </button>
+
+                {/* Final Payment */}
+                <button
+                  type="button"
+                  onClick={() => applyMilestoneType('final')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    milestoneType === 'final'
+                      ? 'border-[#5B4CF5] bg-[#F5F3FF] ring-2 ring-[#5B4CF5]/20'
+                      : 'border-[#E5E1F0] bg-white hover:border-[#5B4CF5]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#1A085C]">Final Payment</span>
+                    {milestoneType === 'final' && (
+                      <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[#16A34A] font-semibold mt-0.5 block truncate">
+                    aakhir mein bacha hua paisa ({formatRupees(effectiveRemaining)})
+                  </span>
+                </button>
+
+                {/* Full Payment */}
+                <button
+                  type="button"
+                  onClick={() => applyMilestoneType('full')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    milestoneType === 'full'
+                      ? 'border-[#5B4CF5] bg-[#F5F3FF] ring-2 ring-[#5B4CF5]/20'
+                      : 'border-[#E5E1F0] bg-white hover:border-[#5B4CF5]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#1A085C]">Full Payment</span>
+                    {milestoneType === 'full' && (
+                      <span className="w-2 h-2 rounded-full bg-[#5B4CF5]" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[#6B7280] mt-0.5 block truncate">
+                    poora paisa ek saath ({formatRupees(effectiveTotalCost)})
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* QUESTION 2: Kitna payment lena hai? (Amount & Percentage)   */}
+            {/* ========================================================= */}
+            <div className="space-y-2">
+              <label className="block font-black text-[#1A085C] text-xs">
+                Kitna payment lena hai?
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* Amount ₹ */}
+                <div>
+                  <span className="text-[10.5px] font-semibold text-[#6B7280] block mb-1">
+                    Amount (₹)
+                  </span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-[#6B7280] font-bold text-xs">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={amount}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      placeholder="e.g. 15000"
+                      className="w-full h-9 pl-7 pr-3 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none font-bold text-xs text-[#1A085C]"
+                    />
+                  </div>
+                </div>
+
+                {/* Percentage % */}
+                <div>
+                  <span className="text-[10.5px] font-semibold text-[#6B7280] block mb-1">
+                    Percentage (%)
+                  </span>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={percentage}
+                      onChange={(e) => handlePercentageChange(e.target.value)}
+                      placeholder="30"
+                      className="w-full h-9 px-3 pr-7 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none font-bold text-xs text-[#1A085C]"
+                    />
+                    <span className="absolute right-3 top-2.5 text-[#6B7280] font-bold text-xs">
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Percentage Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                {[20, 30, 50, 75, 100].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handleChipClick(p)}
+                    className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                      percentage === String(p)
+                        ? 'bg-[#5B4CF5] text-white border-[#5B4CF5]'
+                        : 'bg-white text-[#6B7280] border-[#E5E1F0] hover:text-[#1A085C]'
+                    }`}
+                  >
+                    {p}%
+                  </button>
                 ))}
-              </select>
-            </div>
-          )}
 
-          {/* Milestone Title */}
-          <div>
-            <label className="block font-semibold text-brand-heading mb-1">
-              Milestone / Invoice Title <span className="text-brand-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 50% Advance Token / Milestone 1 Delivery"
-              className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none"
-            />
-          </div>
+                {effectiveRemaining > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRemainingChipClick}
+                    className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                  >
+                    Remaining ({formatRupees(effectiveRemaining)})
+                  </button>
+                )}
+              </div>
 
-          {/* Amount & Currency */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className="block font-semibold text-brand-heading mb-1">
-                Amount <span className="text-brand-destructive">*</span>
-              </label>
-              <input
-                type="number"
-                step="any"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="75000"
-                className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none font-semibold text-brand-heading"
-              />
+              <p className="text-[10px] text-[#6B7280] italic">
+                * Payment amount manually enter karo ya percentage chip chuno.
+              </p>
             </div>
+
+            {/* ========================================================= */}
+            {/* PAYMENT DESCRIPTION                                       */}
+            {/* ========================================================= */}
             <div>
-              <label className="block font-semibold text-brand-heading mb-1">
-                Currency
-              </label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none bg-white font-semibold"
-              >
-                <option value="INR">INR (₹)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Invoice Number & Due Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-brand-heading mb-1">
-                Invoice Number
+              <label className="block font-black text-[#1A085C] mb-1 text-xs">
+                Payment Description / Milestone Title <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="INV-2026-001"
-                className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none font-mono"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Advance Payment — Project Initiation"
+                className="w-full h-9 px-3 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none text-xs font-semibold text-[#1A085C]"
               />
             </div>
+
+            {/* Due Date & Invoice Number (Compact row) */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="block font-semibold text-[#6B7280] text-[10.5px] mb-1">
+                  Payment Due Date
+                </label>
+                <input
+                  type="date"
+                  value={dueDateStr}
+                  onChange={(e) => setDueDateStr(e.target.value)}
+                  className="w-full h-8 px-2 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none text-[11px] text-[#1A085C]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#6B7280] text-[10.5px] mb-1">
+                  Invoice Number
+                </label>
+                <input
+                  type="text"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="Auto (INV-2026-XXXX)"
+                  className="w-full h-8 px-2 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none font-mono text-[11px] text-[#1A085C]"
+                />
+              </div>
+            </div>
+
+            {/* Internal Notes / Terms */}
             <div>
-              <label className="block font-semibold text-brand-heading mb-1">
-                Payment Due Date
+              <label className="block font-semibold text-[#6B7280] text-[10.5px] mb-1">
+                Terms / Notes (Optional)
               </label>
-              <input
-                type="date"
-                value={dueDateStr}
-                onChange={(e) => setDueDateStr(e.target.value)}
-                className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none"
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. 50% advance milestone payable before initiation..."
+                className="w-full px-2.5 py-1.5 border border-[#E5E1F0] rounded-xl focus:border-[#5B4CF5] focus:outline-none text-[11px] text-[#1A085C] resize-none"
               />
             </div>
-          </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block font-semibold text-brand-heading mb-1">
-              Internal Notes / Terms
-            </label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Due before staging deployment..."
-              className="w-full px-3 py-2 border border-brand-border rounded-control focus:border-brand-primary focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-brand-border">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-brand-border rounded-control font-semibold text-brand-body hover:bg-brand-section transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="hq-btn-primary flex items-center gap-1.5"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus size={14} />
-                  Add Milestone
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+            {/* Actions */}
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-[#E5E1F0]">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-4 py-2 border border-[#E5E1F0] rounded-xl font-bold text-[#6B7280] hover:bg-[#FAF9FD] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !amount || parseFloat(amount) <= 0}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#5B4CF5] to-[#7C5CE8] hover:from-[#4C3DE0] hover:to-[#6B4BE0] text-white text-xs font-black flex items-center gap-2 shadow-[0_4px_14px_rgba(91,76,245,0.35)] transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Generating Link...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    <span>Generate Payment Link</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

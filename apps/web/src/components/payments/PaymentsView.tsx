@@ -612,6 +612,7 @@ export const PaymentsView: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handlePaymentCreated}
+        onOpenInvoice={(py) => setSelectedInvoiceForPrint(py)}
       />
 
       {/* Record Payment Modal */}
