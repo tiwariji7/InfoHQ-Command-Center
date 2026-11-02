@@ -10,10 +10,12 @@ import {
   createRazorpayPaymentLink,
   sendTelegramPaymentLinkAlert,
   sendInvoiceEmailViaResend,
+  sendPaymentReceiptEmailViaResend,
   handleRazorpayWebhookEvent,
   fetchAndVerifyRazorpayStatus,
   sendTelegramPaymentSuccessAlert,
 } from '../services/billingService.js';
+import { generateInvoicePdf } from '../services/invoicePdfGenerator.js';
 import {
   getPayments,
   getPaymentById,
@@ -212,6 +214,78 @@ paymentsRouter.post('/:id/record-payment', async (c) => {
     if (!updated) {
       return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
     }
+
+    const now = Date.now();
+    const timeIST = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(now));
+
+    // Generate Invoice PDF
+    let pdfBytes: Uint8Array | undefined = undefined;
+    try {
+      pdfBytes = await generateInvoicePdf({
+        invoiceNumber: updated.invoiceNumber || 'INV-2026',
+        clientId: updated.clientId || undefined,
+        clientName: updated.clientName || 'Valued Client',
+        clientEmail: updated.clientEmail || undefined,
+        clientPhone: updated.clientPhone || undefined,
+        projectTitle: updated.projectTitle || updated.title || 'Client Project',
+        milestoneTitle: updated.title || 'Milestone Delivery',
+        amount: updated.amount,
+        paymentMode: updated.paymentMethod || parseResult.data.paymentMethod || 'Manual Record',
+        transactionRef: updated.razorpayPaymentId || updated.id || 'Manual Record',
+        issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(updated.createdAt || now)),
+        paymentDate: timeIST,
+      });
+    } catch (pdfErr) {
+      console.warn('[Record Payment PDF Generation Warning]:', pdfErr);
+    }
+
+    // Telegram Alert with PDF attachment
+    c.executionCtx.waitUntil(
+      sendTelegramPaymentSuccessAlert(
+        {
+          clientName: updated.clientName || 'Valued Client',
+          projectTitle: updated.projectTitle || updated.title || 'Client Project',
+          invoiceNumber: updated.invoiceNumber || 'INV-2026',
+          milestoneTitle: updated.title || 'Payment',
+          amount: updated.amount,
+          paymentId: updated.razorpayPaymentId || updated.id || 'Manual Record',
+          paymentMethod: updated.paymentMethod || parseResult.data.paymentMethod || 'Manual Record',
+          paidAtIST: timeIST,
+          pdfBytes,
+        },
+        c.env
+      )
+    );
+
+    // Resend Payment Receipt Email with PDF attachment
+    if (updated.clientEmail && c.env.RESEND_API_KEY) {
+      c.executionCtx.waitUntil(
+        sendPaymentReceiptEmailViaResend(
+          {
+            clientName: updated.clientName || 'Valued Client',
+            clientEmail: updated.clientEmail,
+            invoiceNumber: updated.invoiceNumber || 'INV-2026',
+            projectTitle: updated.projectTitle || updated.title || 'Client Project',
+            milestoneTitle: updated.title || 'Payment',
+            amount: updated.amount,
+            paymentMode: updated.paymentMethod || parseResult.data.paymentMethod || 'Manual Record',
+            paymentId: updated.razorpayPaymentId || updated.id || 'Manual Record',
+            paidAtFormatted: timeIST,
+            pdfBytes,
+          },
+          c.env.RESEND_API_KEY
+        )
+      );
+    }
+
     return c.json({ payment: updated });
   } catch (err: unknown) {
     console.error('Error recording payment:', err instanceof Error ? err.message : err);
@@ -495,23 +569,68 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
         }
       }
 
-      // 4. DISPATCH TELEGRAM ALERT: Directly verified from Razorpay!
+      // Generate Invoice PDF
+      let pdfBytes: Uint8Array | undefined = undefined;
+      try {
+        pdfBytes = await generateInvoicePdf({
+          invoiceNumber: verified.invoiceNumber || payment.invoiceNumber || 'INV-2026',
+          clientId: payment.clientId || undefined,
+          clientName: verified.customerName || payment.clientName || 'Valued Client',
+          clientEmail: verified.customerEmail || payment.clientEmail || undefined,
+          clientPhone: verified.customerContact || payment.clientPhone || undefined,
+          projectTitle: payment.projectTitle || payment.title || 'Client Project',
+          milestoneTitle: payment.title || 'Milestone Delivery',
+          amount: verified.amountRupees || payment.amount,
+          paymentMode: verified.paymentMethod || 'UPI / Online',
+          transactionRef: verified.paymentId,
+          issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.createdAt || now)),
+          paymentDate: timeIST,
+        });
+      } catch (pdfErr) {
+        console.warn('[Sync Razorpay PDF Generation Warning]:', pdfErr);
+      }
+
+      // 4. DISPATCH TELEGRAM ALERT WITH INVOICE PDF ATTACHED
       c.executionCtx.waitUntil(
         sendTelegramPaymentSuccessAlert(
           {
             clientName: verified.customerName || payment.clientName || 'Valued Client',
             projectTitle: payment.projectTitle || payment.title || 'Client Project',
             invoiceNumber: verified.invoiceNumber || payment.invoiceNumber || 'INV-2026',
+            milestoneTitle: payment.title || 'Advance Payment',
             amount: verified.amountRupees || payment.amount,
             paymentId: verified.paymentId,
             paymentMethod: verified.paymentMethod,
             bankRef: verified.bankRef,
             paidAtIST: timeIST,
             isRazorpayVerified: true,
+            pdfBytes,
           },
           c.env
         )
       );
+
+      // 5. DISPATCH RESEND PAYMENT CONFIRMATION RECEIPT WITH PDF ATTACHMENT
+      const targetClientEmail = verified.customerEmail || payment.clientEmail;
+      if (targetClientEmail && c.env.RESEND_API_KEY) {
+        c.executionCtx.waitUntil(
+          sendPaymentReceiptEmailViaResend(
+            {
+              clientName: verified.customerName || payment.clientName || 'Valued Client',
+              clientEmail: targetClientEmail,
+              invoiceNumber: verified.invoiceNumber || payment.invoiceNumber || 'INV-2026',
+              projectTitle: payment.projectTitle || payment.title || 'Client Project',
+              milestoneTitle: payment.title || 'Payment',
+              amount: verified.amountRupees || payment.amount,
+              paymentMode: verified.paymentMethod || 'UPI / Online',
+              paymentId: verified.paymentId,
+              paidAtFormatted: timeIST,
+              pdfBytes,
+            },
+            c.env.RESEND_API_KEY
+          )
+        );
+      }
 
       const updatedPayment = await getPaymentById(c.env.DB, paymentId);
       return c.json({

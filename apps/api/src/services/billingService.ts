@@ -1,3 +1,4 @@
+import { generateInvoicePdf } from './invoicePdfGenerator.js';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Bindings } from '../types/env.js';
 import type { AutoConvertWonLeadInput, Payment } from '@infohq/shared';
@@ -232,6 +233,17 @@ export async function fetchAndVerifyRazorpayStatus(
   }
 
   return null;
+}
+
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+  return btoa(binary);
 }
 
 // 2. Send Invoice Email via Resend
@@ -518,6 +530,290 @@ export async function sendTelegramMessage(text: string, env: Bindings): Promise<
   }
 }
 
+
+// 2.1 Send Payment Receipt Email via Resend with Attached Invoice PDF
+export async function sendPaymentReceiptEmailViaResend(
+  params: {
+    clientName: string;
+    clientEmail: string;
+    invoiceNumber: string;
+    projectTitle: string;
+    milestoneTitle?: string;
+    amount: number;
+    paymentMode?: string;
+    paymentId: string;
+    paidAtFormatted: string;
+    pdfBytes?: Uint8Array;
+  },
+  apiKey: string
+): Promise<boolean> {
+  const {
+    clientName,
+    clientEmail,
+    invoiceNumber,
+    projectTitle,
+    milestoneTitle,
+    amount,
+    paymentMode,
+    paymentId,
+    paidAtFormatted,
+    pdfBytes,
+  } = params;
+
+  const formattedAmount = '₹' + amount.toLocaleString('en-IN');
+
+  let cleanMilestone = (milestoneTitle || 'Advance Payment').trim();
+  if (cleanMilestone.includes('—')) cleanMilestone = cleanMilestone.split('—')[0].trim();
+  if (cleanMilestone.includes('-')) cleanMilestone = cleanMilestone.split('-')[0].trim();
+  if (!cleanMilestone.toLowerCase().includes('payment') && !cleanMilestone.toLowerCase().includes('milestone')) {
+    cleanMilestone = `${cleanMilestone} Payment`;
+  }
+
+  let mode = (paymentMode || 'UPI / Online').trim();
+  if (mode.toLowerCase().includes('upi')) mode = 'UPI';
+  else if (mode.toLowerCase().includes('card')) mode = 'Card';
+  else if (mode.toLowerCase().includes('bank') || mode.toLowerCase().includes('netbanking')) mode = 'NetBanking';
+
+  const subject = `Payment Confirmation & Receipt — ${cleanMilestone} for ${projectTitle} (${invoiceNumber})`;
+
+  const html = `
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(subject)}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F8F8FF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1A085C;
+    }
+    table {
+      border-collapse: collapse;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    td {
+      vertical-align: middle;
+    }
+    .email-container {
+      max-width: 580px;
+      width: 100%;
+      margin: 25px auto;
+      background-color: #FFFFFF;
+      border-radius: 24px;
+      border: 1px solid #EAE6F7;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(124, 92, 232, 0.04), 0 2px 6px rgba(15, 9, 38, 0.02);
+    }
+    @media only screen and (max-width: 620px) {
+      .email-container {
+        margin: 10px auto !important;
+        border-radius: 18px !important;
+      }
+      .inner-padding {
+        padding: 20px 18px !important;
+      }
+      .amount-display {
+        font-size: 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 20px 10px; background-color: #F8F8FF;">
+  <div class="email-container" style="max-width: 580px; width: 100%; margin: 25px auto; background-color: #FFFFFF; border-radius: 24px; border: 1px solid #EAE6F7; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="padding: 28px 32px 20px; border-bottom: 1px solid #EAE6F7;" class="inner-padding">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; color: #1A085C;">
+        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 18px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
+      </h1>
+      <div style="font-size: 13px; font-weight: 500; color: #6B7280; margin-top: 3px;">
+        Engineering Studio for AI, SaaS &amp; Digital Systems
+      </div>
+    </div>
+
+    <!-- Body Content -->
+    <div style="padding: 28px 32px 0;" class="inner-padding">
+      <div style="display: inline-block; padding: 5px 14px; background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 9999px; color: #16A34A; font-size: 12px; font-weight: 800; margin-bottom: 12px;">
+        &#x2705; PAYMENT CONFIRMED &amp; SETTLED
+      </div>
+
+      <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #1A085C; letter-spacing: -0.02em;">
+        Hello ${escapeHtml(clientName)},
+      </h2>
+      <p style="margin: 0 0 24px 0; font-size: 15px; color: #4B5563; line-height: 1.5;">
+        Thank you! We have received and confirmed your payment for <strong style="color: #1A085C;">${escapeHtml(projectTitle)}</strong>.
+      </p>
+
+      <!-- Receipt Details Box -->
+      <div style="background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 16px; padding: 20px 22px; margin-bottom: 24px;">
+        <div style="font-size: 15px; font-weight: 800; color: #1A085C; margin-bottom: 16px;">
+          Payment Receipt Details
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; width: 42%; white-space: nowrap;">Payment Type</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; width: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(cleanMilestone)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0; color: #6B7280; font-size: 14px; font-weight: 500;">Amount Received</td>
+            <td style="padding: 12px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 12px 0; color: #16A34A; font-size: 22px; font-weight: 900;" class="amount-display">${escapeHtml(formattedAmount)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Payment Mode</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(mode)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Payment ID</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(paymentId)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Paid At</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(paidAtFormatted)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Invoice Reference</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(invoiceNumber)}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Attachment Notice -->
+      <div style="margin: 24px 0 20px 0; padding: 14px 18px; background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 12px; font-size: 13px; color: #4B5563; line-height: 1.5;">
+        &#x1F4CE; <strong>Official Invoice Attached:</strong> Your tax invoice is attached as a PDF (<strong>Invoice-${escapeHtml(invoiceNumber)}.pdf</strong>) for your records.
+      </div>
+
+      <!-- Sign off -->
+      <p style="margin: 0 0 28px 0; font-size: 14px; color: #4B5563;">
+        Thank you for choosing <strong style="color: #1A085C;">Info<span style="color: #7C5CE8;">HQ</span></strong>.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="border-top: 1px solid #EAE6F7; padding: 22px 32px 28px; text-align: center; background-color: #FAFAFD;" class="inner-padding">
+      <div style="font-size: 14px; font-weight: 800; color: #1A085C; letter-spacing: -0.01em;">
+        Info<span style="color: #7C5CE8;">HQ</span> Pvt Ltd
+      </div>
+      <div style="font-size: 12px; color: #6B7280; margin-top: 3px;">
+        Engineering Studio for AI, SaaS &amp; Digital Systems
+      </div>
+      <div style="font-size: 11px; color: #9CA3AF; margin-top: 12px; line-height: 1.4;">
+        This is an automatically generated email. Please do not reply directly to this message.
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
+  `;
+
+  const payload: Record<string, unknown> = {
+    from: 'InfoHQ Billing <billing@infohq.in>',
+    to: [clientEmail],
+    reply_to: 'billing@infohq.in',
+    subject,
+    html,
+  };
+
+  if (pdfBytes && pdfBytes.length > 0) {
+    payload.attachments = [
+      {
+        filename: `Invoice-${invoiceNumber}.pdf`,
+        content: uint8ArrayToBase64(pdfBytes),
+      },
+    ];
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.error('[Resend Payment Receipt Email Failed]:', await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Resend Payment Receipt Email Exception]:', err);
+    return false;
+  }
+}
+
+// 2.2 Send Document (PDF) via Telegram Bot API
+export async function sendTelegramDocument(
+  fileBytes: Uint8Array,
+  fileName: string,
+  caption: string,
+  env: Bindings
+): Promise<boolean> {
+  const creds = getCleanTelegramCredentials(env);
+  if (!creds) {
+    console.warn('[Telegram Alert Warning]: Telegram bot token or chat ID not set.');
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', creds.chatId);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+    formData.append('document', new Blob([fileBytes], { type: 'application/pdf' }), fileName);
+
+    const res = await fetch(`https://api.telegram.org/bot${creds.token}/sendDocument`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.warn('[Telegram sendDocument Warning]: HTTP', res.status, await res.text());
+      return await sendTelegramMessage(caption, env);
+    }
+    return true;
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    console.error('[Telegram sendDocument Exception]:', err instanceof Error ? err.message : err);
+    return await sendTelegramMessage(caption, env);
+  }
+}
+
 // 3. Telegram Alert: Advance Payment Link Generated (Message 1)
 export async function sendTelegramPaymentLinkAlert(
   params: {
@@ -551,30 +847,47 @@ export async function sendTelegramPaymentSuccessAlert(
     clientName: string;
     projectTitle: string;
     invoiceNumber: string;
+    milestoneTitle?: string;
     amount: number;
     paymentId: string;
     paymentMethod?: string;
     bankRef?: string;
     paidAtIST: string;
     isRazorpayVerified?: boolean;
+    pdfBytes?: Uint8Array;
   },
   env: Bindings
 ) {
-  const verifiedBadge = params.isRazorpayVerified !== false ? '⚡ Verified Directly with Razorpay Official API' : 'Verified';
+  // Extract clean payment type (e.g. Advance, Part, Final, Full)
+  let cleanType = (params.milestoneTitle || 'Advance').trim();
+  if (cleanType.includes('—')) cleanType = cleanType.split('—')[0].trim();
+  if (cleanType.includes('-')) cleanType = cleanType.split('-')[0].trim();
+  if (cleanType.toLowerCase().includes('advance')) cleanType = 'Advance';
+  else if (cleanType.toLowerCase().includes('final')) cleanType = 'Final';
+  else if (cleanType.toLowerCase().includes('part')) cleanType = 'Part';
+  else if (cleanType.toLowerCase().includes('full')) cleanType = 'Full';
+
+  // Clean payment mode: UPI, Card, NetBanking
+  let mode = (params.paymentMethod || 'UPI').trim();
+  if (mode.toLowerCase().includes('upi')) mode = 'UPI';
+  else if (mode.toLowerCase().includes('card')) mode = 'Card';
+  else if (mode.toLowerCase().includes('bank') || mode.toLowerCase().includes('netbanking')) mode = 'NetBanking';
+
   const msg =
-    `🟢 <b>PAYMENT CONFIRMED — RAZORPAY VERIFIED!</b>\n` +
-    `<i>${verifiedBadge}</i>\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `✅ <b>Payment Confirmed &amp; Verified</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
     `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
-    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
-    `💵 <b>Amount Received:</b> <b>₹${params.amount.toLocaleString('en-IN')}</b>\n` +
-    `💳 <b>Payment Mode:</b> ${escapeHtml(params.paymentMethod || 'UPI / Online')}\n` +
-    `🆔 <b>Razorpay Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
-    (params.bankRef ? `🏦 <b>Bank Ref / UTR:</b> <code>${escapeHtml(params.bankRef)}</code>\n` : '') +
-    `📅 <b>Paid At (IST):</b> ${escapeHtml(params.paidAtIST)}\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `✅ <b>CRM Status:</b> Automatically settled &amp; balance updated in live database!`;
+    `💳 <b>Payment:</b> ${escapeHtml(cleanType)}\n` +
+    `🧾 <b>Invoice No:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💰 <b>Amount Received:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `⚡ <b>Payment Mode:</b> ${escapeHtml(mode)}\n` +
+    `🆔 <b>Payment ID:</b> <code>${escapeHtml(params.paymentId)}</code>\n` +
+    `🕒 <b>Paid At:</b> ${escapeHtml(params.paidAtIST)}`;
+
+  if (params.pdfBytes && params.pdfBytes.length > 0) {
+    const filename = `Invoice-${params.invoiceNumber}.pdf`;
+    return sendTelegramDocument(params.pdfBytes, filename, msg, env);
+  }
 
   return sendTelegramMessage(msg, env);
 }
@@ -1189,22 +1502,78 @@ export async function handleRazorpayWebhookEvent(
       }
     }
 
+    const effectiveEmail = String(
+      paymentRow?.client_email ||
+        (paymentLinkObj?.customer as Record<string, unknown>)?.email ||
+        paymentObj?.email ||
+        ''
+    ).trim();
+
+    const effectivePhone = String(
+      paymentRow?.client_phone ||
+        (paymentLinkObj?.customer as Record<string, unknown>)?.contact ||
+        paymentObj?.contact ||
+        ''
+    ).trim();
+
+    let pdfBytes: Uint8Array | undefined = undefined;
+    try {
+      pdfBytes = await generateInvoicePdf({
+        invoiceNumber: invNum,
+        clientId: (paymentRow?.client_id ? String(paymentRow.client_id) : undefined) || clientIdFromNotes || undefined,
+        clientName,
+        clientEmail: effectiveEmail || undefined,
+        clientPhone: effectivePhone || undefined,
+        projectTitle,
+        milestoneTitle: String(paymentRow?.title || 'Milestone Delivery'),
+        amount: verifiedAmount,
+        paymentMode: verifiedMethod,
+        transactionRef: verifiedPaymentId,
+        issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date((paymentRow?.created_at as number) || now)),
+        paymentDate: timeIST,
+      });
+    } catch (pdfErr) {
+      console.warn('[Invoice PDF Generation Warning]:', pdfErr);
+    }
+
     dispatchAlert(
       sendTelegramPaymentSuccessAlert(
         {
           clientName,
           projectTitle,
           invoiceNumber: invNum,
+          milestoneTitle: String(paymentRow?.title || 'Advance Payment'),
           amount: verifiedAmount,
           paymentId: verifiedPaymentId,
           paymentMethod: verifiedMethod,
           bankRef,
           paidAtIST: timeIST,
           isRazorpayVerified: isConfirmedDirectly,
+          pdfBytes,
         },
         env
       )
     );
+
+    if (effectiveEmail && env.RESEND_API_KEY) {
+      dispatchAlert(
+        sendPaymentReceiptEmailViaResend(
+          {
+            clientName,
+            clientEmail: effectiveEmail,
+            invoiceNumber: invNum,
+            projectTitle,
+            milestoneTitle: String(paymentRow?.title || 'Payment'),
+            amount: verifiedAmount,
+            paymentMode: verifiedMethod,
+            paymentId: verifiedPaymentId,
+            paidAtFormatted: timeIST,
+            pdfBytes,
+          },
+          env.RESEND_API_KEY
+        )
+      );
+    }
 
     // 3. Update CRM database if matching row is found
     if (paymentRow) {
