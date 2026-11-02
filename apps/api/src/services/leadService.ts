@@ -167,9 +167,25 @@ export async function createLead(
   const leadId = await generateLeadId(db);
   const activityId = `act_${crypto.randomUUID()}`;
 
+  let clientId: string | null = null;
+  if (input.stage === 'won') {
+    try {
+      const client = await createOrGetClient(db, {
+        name: input.name.trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        company: input.company?.trim() || null,
+        sourceLeadId: leadId,
+      });
+      clientId = client.id;
+    } catch (err) {
+      console.error('[createLead] Failed to create client for won lead:', err);
+    }
+  }
+
   const leadRow = {
     id: leadId,
-    client_id: null as string | null,
+    client_id: clientId,
     name: input.name.trim(),
     email: normalizedEmail,
     phone: normalizedPhone,
@@ -189,10 +205,11 @@ export async function createLead(
 
   const insertLeadStmt = db.prepare(`
     INSERT INTO leads (
-      id, name, email, phone, company, service_needed, budget, timeline, preferred_contact, message, source, stage, next_follow_up_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, client_id, name, email, phone, company, service_needed, budget, timeline, preferred_contact, message, source, stage, next_follow_up_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     leadRow.id,
+    leadRow.client_id,
     leadRow.name,
     leadRow.email,
     leadRow.phone,
@@ -211,6 +228,7 @@ export async function createLead(
 
   const afterJson = JSON.stringify({
     id: leadRow.id,
+    clientId: leadRow.client_id,
     name: leadRow.name,
     email: leadRow.email,
     phone: leadRow.phone,
@@ -227,14 +245,88 @@ export async function createLead(
     leadId,
     actorClerkUserId,
     'created',
-    `Lead ${leadId} created manually by Superadmin`,
+    `Lead ${leadId} created manually by Superadmin${leadRow.client_id ? ` [Client: ${leadRow.client_id}]` : ''}`,
     null,
     afterJson,
     now
   );
 
+  const batchStmts: any[] = [insertLeadStmt, insertActivityStmt];
+
+  // If created as Won, automatically instantiate Stage 1 (Planning) project
+  if (input.stage === 'won') {
+    const autoCreatedProjectId = `proj_${crypto.randomUUID()}`;
+    const serviceType = leadRow.service_needed || 'Web & System Development';
+    const projectTitle = `${leadRow.name} - ${serviceType}`;
+    const budget = leadRow.budget || '₹50,000';
+    const deadline = now + 30 * 24 * 60 * 60 * 1000;
+    const description = leadRow.message
+      ? `Auto-converted from Won Lead (${leadId}). Scope: ${leadRow.message}`
+      : `Auto-converted project placed in Stage 1 upon Won Deal status for lead ${leadId}.`;
+
+    batchStmts.push(
+      db.prepare(`
+        INSERT INTO projects (
+          id, client_id, lead_id, title, client_name, client_email, client_phone, company,
+          service_type, description, status, budget, start_date, deadline, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
+      `).bind(
+        autoCreatedProjectId,
+        clientId,
+        leadId,
+        projectTitle,
+        leadRow.name,
+        leadRow.email,
+        leadRow.phone,
+        leadRow.company,
+        serviceType,
+        description,
+        budget,
+        now,
+        deadline,
+        now,
+        now
+      )
+    );
+
+    const task1Id = `task_${crypto.randomUUID()}`;
+    const task2Id = `task_${crypto.randomUUID()}`;
+
+    batchStmts.push(
+      db.prepare(`
+        INSERT INTO tasks (
+          id, project_id, title, description, status, priority, due_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'in_progress', 'high', ?, ?, ?)
+      `).bind(
+        task1Id,
+        autoCreatedProjectId,
+        'Phase 1: Project kickoff, scope validation & requirements architecture',
+        'Validate deliverables with client, lock architectural wireframes and establish project baseline.',
+        now + 3 * 24 * 60 * 60 * 1000,
+        now,
+        now
+      )
+    );
+
+    batchStmts.push(
+      db.prepare(`
+        INSERT INTO tasks (
+          id, project_id, title, description, status, priority, due_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'todo', 'medium', ?, ?, ?)
+      `).bind(
+        task2Id,
+        autoCreatedProjectId,
+        'Phase 1: Dev environment provisioning, repository & milestone roadmap setup',
+        'Initialize codebase repositories, configure Cloudflare/Vercel staging pipelines, and align sprint milestones.',
+        now + 5 * 24 * 60 * 60 * 1000,
+        now,
+        now
+      )
+    );
+  }
+
   // Atomic batch execution
-  await db.batch([insertLeadStmt, insertActivityStmt]);
+  await db.batch(batchStmts);
 
   return mapDbRowToLead(leadRow);
 }
@@ -337,24 +429,128 @@ export async function updateLeadStage(
   const historyId = `lsh_${crypto.randomUUID()}`;
 
   let assignedClientId = leadRow.client_id ? String(leadRow.client_id) : null;
+  const batchStmts: any[] = [];
 
   // If newly converted to WON and has no client_id, auto-generate & link Client record
-  if (newStage === 'won' && !assignedClientId) {
+  let autoCreatedProjectId: string | null = null;
+  if (newStage === 'won') {
+    if (!assignedClientId) {
+      try {
+        const client = await createOrGetClient(db, {
+          name: String(leadRow.name),
+          email: leadRow.email ? String(leadRow.email) : null,
+          phone: leadRow.phone ? String(leadRow.phone) : null,
+          company: leadRow.company ? String(leadRow.company) : null,
+          sourceLeadId: leadId,
+        });
+        assignedClientId = client.id;
+      } catch (err) {
+        console.error('[updateLeadStage] Failed to create or link client:', err);
+      }
+    }
+
+    // Check if a project already exists for this won lead; if not, auto-create one in Stage 1 (Planning)
     try {
-      const client = await createOrGetClient(db, {
-        name: String(leadRow.name),
-        email: leadRow.email ? String(leadRow.email) : null,
-        phone: leadRow.phone ? String(leadRow.phone) : null,
-        company: leadRow.company ? String(leadRow.company) : null,
-        sourceLeadId: leadId,
-      });
-      assignedClientId = client.id;
-    } catch (err) {
-      console.error('[updateLeadStage] Failed to create or link client:', err);
+      const existingProj = await db
+        .prepare('SELECT id FROM projects WHERE lead_id = ?')
+        .bind(leadId)
+        .first<{ id: string }>();
+
+      if (!existingProj) {
+        autoCreatedProjectId = `proj_${crypto.randomUUID()}`;
+        const serviceType = leadRow.service_needed ? String(leadRow.service_needed) : 'Web & System Development';
+        const projectTitle = `${String(leadRow.name)} - ${serviceType}`;
+        const budget = leadRow.budget ? String(leadRow.budget) : '₹50,000';
+        const deadline = now + 30 * 24 * 60 * 60 * 1000;
+        const description = leadRow.message
+          ? `Auto-converted from Won Lead (${leadId}). Scope: ${String(leadRow.message)}`
+          : `Auto-converted project placed in Stage 1 upon Won Deal status for lead ${leadId}.`;
+
+        // Insert project in Stage 1: 'planning'
+        batchStmts.push(
+          db.prepare(`
+            INSERT INTO projects (
+              id, client_id, lead_id, title, client_name, client_email, client_phone, company,
+              service_type, description, status, budget, start_date, deadline, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?)
+          `).bind(
+            autoCreatedProjectId,
+            assignedClientId,
+            leadId,
+            projectTitle,
+            String(leadRow.name),
+            leadRow.email ? String(leadRow.email) : null,
+            leadRow.phone ? String(leadRow.phone) : null,
+            leadRow.company ? String(leadRow.company) : null,
+            serviceType,
+            description,
+            budget,
+            now,
+            deadline,
+            now,
+            now
+          )
+        );
+
+        // Insert Phase 1 Kickoff Tasks
+        const task1Id = `task_${crypto.randomUUID()}`;
+        const task2Id = `task_${crypto.randomUUID()}`;
+
+        batchStmts.push(
+          db.prepare(`
+            INSERT INTO tasks (
+              id, project_id, title, description, status, priority, due_date, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'in_progress', 'high', ?, ?, ?)
+          `).bind(
+            task1Id,
+            autoCreatedProjectId,
+            'Phase 1: Project kickoff, scope validation & requirements architecture',
+            'Validate deliverables with client, lock architectural wireframes and establish project baseline.',
+            now + 3 * 24 * 60 * 60 * 1000,
+            now,
+            now
+          )
+        );
+
+        batchStmts.push(
+          db.prepare(`
+            INSERT INTO tasks (
+              id, project_id, title, description, status, priority, due_date, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'todo', 'medium', ?, ?, ?)
+          `).bind(
+            task2Id,
+            autoCreatedProjectId,
+            'Phase 1: Dev environment provisioning, repository & milestone roadmap setup',
+            'Initialize codebase repositories, configure Cloudflare/Vercel staging pipelines, and align sprint milestones.',
+            now + 5 * 24 * 60 * 60 * 1000,
+            now,
+            now
+          )
+        );
+
+        // Optional alert entry
+        try {
+          const alertId = `alt_${crypto.randomUUID()}`;
+          batchStmts.push(
+            db.prepare(`
+              INSERT INTO automation_alerts (
+                id, alert_type, title, message, status, created_at
+              ) VALUES (?, 'lead_won_project_created', ?, ?, 'unread', ?)
+            `).bind(
+              alertId,
+              `Project Auto-Created (Stage 1): ${String(leadRow.name)}`,
+              `Lead ${leadId} was marked Won. Project "${projectTitle}" has been automatically created in Stage 1 (Planning) linked to Client ID ${assignedClientId || 'N/A'}.`,
+              now
+            )
+          );
+        } catch {
+          // Automation alerts table is optional
+        }
+      }
+    } catch (projErr) {
+      console.error('[updateLeadStage] Error checking/creating auto project:', projErr);
     }
   }
-
-  const batchStmts: any[] = [];
 
   // 1. Update lead with new stage, lost reason, and client_id
   batchStmts.push(
@@ -380,7 +576,9 @@ export async function updateLeadStage(
   // 3. Insert into lead_activities
   const summary = `Stage moved from "${previousStage}" to "${newStage}"${
     lostReason ? ` (Reason: ${lostReason})` : ''
-  }${assignedClientId ? ` [Linked Client: ${assignedClientId}]` : ''}`;
+  }${assignedClientId ? ` [Linked Client: ${assignedClientId}]` : ''}${
+    autoCreatedProjectId ? ` [Project auto-created: Stage 1 (Planning)]` : ''
+  }`;
 
   batchStmts.push(
     db.prepare(`
