@@ -28,6 +28,7 @@ import {
   Cpu,
   ArrowRight,
   Check,
+  GripVertical,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -186,6 +187,10 @@ export const ProjectsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
 
+  // Drag and drop state across stages
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<ProjectStatus | null>(null);
+
   // Modals & Drawers
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -268,6 +273,61 @@ export const ProjectsList: React.FC = () => {
       handleProjectUpdated(res.project);
     } catch (err) {
       console.error('Failed to quick-advance project stage:', err);
+    } finally {
+      setUpdatingProjectId(null);
+    }
+  };
+
+  // Drag and Drop handlers for project cards
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData('text/plain', projectId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedProjectId(projectId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedProjectId(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, stage: ProjectStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverStage !== stage) {
+      setDragOverStage(stage);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverStage(null);
+  };
+
+  const handleDropOnStage = async (e: React.DragEvent, targetStage: ProjectStatus) => {
+    e.preventDefault();
+    const projectId = e.dataTransfer.getData('text/plain') || draggedProjectId;
+    setDragOverStage(null);
+    setDraggedProjectId(null);
+
+    if (!projectId) return;
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || project.status === targetStage) return;
+
+    // Optimistic UI state update
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, status: targetStage } : p))
+    );
+
+    setUpdatingProjectId(projectId);
+    try {
+      const res = await updateProjectApi(getToken, projectId, { status: targetStage });
+      handleProjectUpdated(res.project);
+    } catch (err) {
+      console.error('Failed to update project stage on drag-and-drop:', err);
+      // Revert state on error
+      setProjects((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, status: project.status } : p))
+      );
     } finally {
       setUpdatingProjectId(null);
     }
@@ -451,13 +511,27 @@ export const ProjectsList: React.FC = () => {
     return (
       <div
         key={proj.id}
+        draggable={true}
+        onDragStart={(e) => handleDragStart(e, proj.id)}
+        onDragEnd={handleDragEnd}
         onClick={() => setSelectedProjectId(proj.id)}
-        className="bg-white rounded-2xl border border-[#E5E1F0] p-3.5 sm:p-4 shadow-[0_4px_20px_rgba(26,8,92,0.05)] hover:border-[#5B4CF5]/50 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(91,76,245,0.09)] transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 group relative"
+        className={`bg-white rounded-2xl border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 group relative select-none ${
+          draggedProjectId === proj.id
+            ? 'opacity-35 scale-95 border-2 border-dashed border-[#5B4CF5] shadow-none cursor-grabbing'
+            : 'border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.05)] hover:border-[#5B4CF5]/50 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(91,76,245,0.09)] cursor-grab active:cursor-grabbing'
+        }`}
       >
         {/* Top Badges: Category & Status */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
+              <div
+                className="p-0.5 -ml-1 text-gray-400 group-hover:text-[#5B4CF5] transition-colors cursor-grab active:cursor-grabbing rounded"
+                title="Drag project card across stages"
+              >
+                <GripVertical size={13} />
+              </div>
+
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-bold ${catMeta.bgColor} ${catMeta.textColor} border ${catMeta.borderColor} shadow-2xs whitespace-nowrap`}
               >
@@ -953,119 +1027,232 @@ export const ProjectsList: React.FC = () => {
         /* ========================================================= */
         /* VIEW 1: STAGE COLUMNS DECK (Stage 1 to Stage 4)           */
         /* ========================================================= */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-          {/* LANE 1: STAGE 1 - PLANNING (Won Leads Land Here) */}
-          <div className="bg-[#FAF5FF]/70 rounded-2xl border border-purple-200/80 p-3 space-y-3 shadow-2xs">
-            {/* Lane Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-purple-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#7C5CE8] shadow-[0_0_8px_rgba(124,92,232,0.6)]" />
-                <div>
-                  <h3 className="text-xs font-black text-[#1A085C]">Stage 1: Planning</h3>
-                  <p className="text-[10px] text-purple-700 font-medium">Auto-Won Deals &amp; Kickoff</p>
+        <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+            {/* LANE 1: STAGE 1 - PLANNING (Won Leads Land Here) */}
+            <div
+              onDragOver={(e) => handleDragOver(e, 'planning')}
+              onDragEnter={() => setDragOverStage('planning')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDropOnStage(e, 'planning')}
+              className={`rounded-2xl border p-3 space-y-3 shadow-2xs transition-all duration-200 min-h-[380px] flex flex-col ${
+                dragOverStage === 'planning'
+                  ? 'bg-[#FAF5FF] border-2 border-[#7C5CE8] shadow-[0_8px_24px_rgba(124,92,232,0.22)] scale-[1.01]'
+                  : 'bg-[#FAF5FF]/70 border-purple-200/80'
+              }`}
+            >
+              {/* Lane Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-purple-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#7C5CE8] shadow-[0_0_8px_rgba(124,92,232,0.6)]" />
+                  <div>
+                    <h3 className="text-xs font-black text-[#1A085C]">Stage 1: Planning</h3>
+                    <p className="text-[10px] text-purple-700 font-medium">Auto-Won Deals &amp; Kickoff</p>
+                  </div>
                 </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-purple-100 text-purple-800">
+                  {stagePartition.planning.length}
+                </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-black bg-purple-100 text-purple-800">
-                {stagePartition.planning.length}
-              </span>
+
+              {/* Drop Target Indicator */}
+              {dragOverStage === 'planning' && (
+                <div className="h-11 rounded-xl border-2 border-dashed border-[#7C5CE8] bg-purple-100/60 flex items-center justify-center text-xs font-bold text-[#7C5CE8] animate-pulse shrink-0">
+                  Drop here for Stage 1: Planning
+                </div>
+              )}
+
+              {/* Stage Projects Cards */}
+              <div className="space-y-3 flex-1">
+                {stagePartition.planning.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl border border-dashed border-purple-200 text-purple-400 text-xs">
+                    <span>No projects in Stage 1</span>
+                    <p className="text-[10px] mt-1 text-purple-300">Drag a project here or convert a lead</p>
+                  </div>
+                ) : (
+                  stagePartition.planning.map((p) => renderProjectCard(p, { showNextAction: true }))
+                )}
+              </div>
             </div>
 
-            {/* Stage Projects Cards */}
-            <div className="space-y-3">
-              {stagePartition.planning.length === 0 ? (
-                <div className="p-6 text-center rounded-xl border border-dashed border-purple-200 text-purple-400 text-xs">
-                  <span>No projects in Stage 1</span>
-                  <p className="text-[10px] mt-1 text-purple-300">Convert a lead to "Won" to auto-create here</p>
+            {/* LANE 2: STAGE 2 - IN PROGRESS & EXECUTION */}
+            <div
+              onDragOver={(e) => handleDragOver(e, 'in_progress')}
+              onDragEnter={() => setDragOverStage('in_progress')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDropOnStage(e, 'in_progress')}
+              className={`rounded-2xl border p-3 space-y-3 shadow-2xs transition-all duration-200 min-h-[380px] flex flex-col ${
+                dragOverStage === 'in_progress'
+                  ? 'bg-[#EFF6FF] border-2 border-[#3B82F6] shadow-[0_8px_24px_rgba(59,130,246,0.22)] scale-[1.01]'
+                  : 'bg-[#EFF6FF]/70 border-blue-200/80'
+              }`}
+            >
+              {/* Lane Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-blue-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse" />
+                  <div>
+                    <h3 className="text-xs font-black text-[#1A085C]">Stage 2: Execution</h3>
+                    <p className="text-[10px] text-blue-700 font-medium">Active Sprints &amp; Dev</p>
+                  </div>
                 </div>
-              ) : (
-                stagePartition.planning.map((p) => renderProjectCard(p, { showNextAction: true }))
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-800">
+                  {stagePartition.in_progress.length}
+                </span>
+              </div>
+
+              {/* Drop Target Indicator */}
+              {dragOverStage === 'in_progress' && (
+                <div className="h-11 rounded-xl border-2 border-dashed border-[#3B82F6] bg-blue-100/60 flex items-center justify-center text-xs font-bold text-[#3B82F6] animate-pulse shrink-0">
+                  Drop here for Stage 2: Execution
+                </div>
               )}
+
+              {/* Stage Projects Cards */}
+              <div className="space-y-3 flex-1">
+                {stagePartition.in_progress.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl border border-dashed border-blue-200 text-blue-400 text-xs">
+                    <span>No projects in active dev</span>
+                    <p className="text-[10px] mt-1 text-blue-300">Drag a project here to start development</p>
+                  </div>
+                ) : (
+                  stagePartition.in_progress.map((p) => renderProjectCard(p, { showNextAction: true }))
+                )}
+              </div>
+            </div>
+
+            {/* LANE 3: STAGE 3 - QA & CLIENT REVIEW */}
+            <div
+              onDragOver={(e) => handleDragOver(e, 'review')}
+              onDragEnter={() => setDragOverStage('review')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDropOnStage(e, 'review')}
+              className={`rounded-2xl border p-3 space-y-3 shadow-2xs transition-all duration-200 min-h-[380px] flex flex-col ${
+                dragOverStage === 'review'
+                  ? 'bg-[#FFF7ED] border-2 border-[#F97316] shadow-[0_8px_24px_rgba(249,115,22,0.22)] scale-[1.01]'
+                  : 'bg-[#FFF7ED]/70 border-orange-200/80'
+              }`}
+            >
+              {/* Lane Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-orange-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#F97316] shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                  <div>
+                    <h3 className="text-xs font-black text-[#1A085C]">Stage 3: Review</h3>
+                    <p className="text-[10px] text-orange-700 font-medium">Staging QA &amp; Audits</p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-orange-100 text-orange-800">
+                  {stagePartition.review.length}
+                </span>
+              </div>
+
+              {/* Drop Target Indicator */}
+              {dragOverStage === 'review' && (
+                <div className="h-11 rounded-xl border-2 border-dashed border-[#F97316] bg-orange-100/60 flex items-center justify-center text-xs font-bold text-[#F97316] animate-pulse shrink-0">
+                  Drop here for Stage 3: Review
+                </div>
+              )}
+
+              {/* Stage Projects Cards */}
+              <div className="space-y-3 flex-1">
+                {stagePartition.review.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl border border-dashed border-orange-200 text-orange-400 text-xs">
+                    <span>No projects in review</span>
+                    <p className="text-[10px] mt-1 text-orange-300">Drag a project here for client staging approval</p>
+                  </div>
+                ) : (
+                  stagePartition.review.map((p) => renderProjectCard(p, { showNextAction: true }))
+                )}
+              </div>
+            </div>
+
+            {/* LANE 4: STAGE 4 - COMPLETED & SHIPPED */}
+            <div
+              onDragOver={(e) => handleDragOver(e, 'completed')}
+              onDragEnter={() => setDragOverStage('completed')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDropOnStage(e, 'completed')}
+              className={`rounded-2xl border p-3 space-y-3 shadow-2xs transition-all duration-200 min-h-[380px] flex flex-col ${
+                dragOverStage === 'completed'
+                  ? 'bg-[#F0FDF4] border-2 border-[#10B981] shadow-[0_8px_24px_rgba(16,185,129,0.22)] scale-[1.01]'
+                  : 'bg-[#F0FDF4]/70 border-green-200/80'
+              }`}
+            >
+              {/* Lane Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-green-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                  <div>
+                    <h3 className="text-xs font-black text-[#1A085C]">Stage 4: Completed</h3>
+                    <p className="text-[10px] text-green-700 font-medium">Delivered Deliverables</p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-green-100 text-green-800">
+                  {stagePartition.completed.length}
+                </span>
+              </div>
+
+              {/* Drop Target Indicator */}
+              {dragOverStage === 'completed' && (
+                <div className="h-11 rounded-xl border-2 border-dashed border-[#10B981] bg-green-100/60 flex items-center justify-center text-xs font-bold text-[#10B981] animate-pulse shrink-0">
+                  Drop here to mark Stage 4: Completed
+                </div>
+              )}
+
+              {/* Stage Projects Cards */}
+              <div className="space-y-3 flex-1">
+                {stagePartition.completed.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl border border-dashed border-green-200 text-green-400 text-xs">
+                    <span>No completed projects yet</span>
+                    <p className="text-[10px] mt-1 text-green-300">Drag a project here once final handover is done</p>
+                  </div>
+                ) : (
+                  stagePartition.completed.map((p) => renderProjectCard(p, { showNextAction: false }))
+                )}
+              </div>
             </div>
           </div>
 
-          {/* LANE 2: STAGE 2 - IN PROGRESS & EXECUTION */}
-          <div className="bg-[#EFF6FF]/70 rounded-2xl border border-blue-200/80 p-3 space-y-3 shadow-2xs">
-            {/* Lane Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-blue-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse" />
-                <div>
-                  <h3 className="text-xs font-black text-[#1A085C]">Stage 2: Execution</h3>
-                  <p className="text-[10px] text-blue-700 font-medium">Active Sprints &amp; Dev</p>
+          {/* LANE 5: ON HOLD / PAUSED PROJECTS (Visible when projects are on hold or while dragging) */}
+          {(stagePartition.on_hold.length > 0 || draggedProjectId !== null) && (
+            <div
+              onDragOver={(e) => handleDragOver(e, 'on_hold')}
+              onDragEnter={() => setDragOverStage('on_hold')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDropOnStage(e, 'on_hold')}
+              className={`mt-4 rounded-2xl border p-3.5 transition-all duration-200 ${
+                dragOverStage === 'on_hold'
+                  ? 'bg-rose-50 border-2 border-rose-500 shadow-[0_8px_24px_rgba(244,63,94,0.22)] scale-[1.005]'
+                  : 'bg-[#FFF1F2]/60 border-rose-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-rose-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <div>
+                    <h3 className="text-xs font-black text-[#1A085C]">On Hold / Paused Projects</h3>
+                    <p className="text-[10px] text-rose-700 font-medium">Waiting on client feedback, pending approvals or scope renegotiation</p>
+                  </div>
                 </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800">
+                  {stagePartition.on_hold.length}
+                </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-800">
-                {stagePartition.in_progress.length}
-              </span>
-            </div>
 
-            {/* Stage Projects Cards */}
-            <div className="space-y-3">
-              {stagePartition.in_progress.length === 0 ? (
-                <div className="p-6 text-center rounded-xl border border-dashed border-blue-200 text-blue-400 text-xs">
-                  <span>No projects in active dev</span>
+              {dragOverStage === 'on_hold' && (
+                <div className="h-11 my-2 rounded-xl border-2 border-dashed border-rose-400 bg-rose-100/60 flex items-center justify-center text-xs font-bold text-rose-700 animate-pulse">
+                  Drop here to put project On Hold
                 </div>
-              ) : (
-                stagePartition.in_progress.map((p) => renderProjectCard(p, { showNextAction: true }))
+              )}
+
+              {stagePartition.on_hold.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-2.5">
+                  {stagePartition.on_hold.map((p) => renderProjectCard(p, { showNextAction: true }))}
+                </div>
               )}
             </div>
-          </div>
-
-          {/* LANE 3: STAGE 3 - QA & CLIENT REVIEW */}
-          <div className="bg-[#FFF7ED]/70 rounded-2xl border border-orange-200/80 p-3 space-y-3 shadow-2xs">
-            {/* Lane Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-orange-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#F97316] shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                <div>
-                  <h3 className="text-xs font-black text-[#1A085C]">Stage 3: Review</h3>
-                  <p className="text-[10px] text-orange-700 font-medium">Staging QA &amp; Audits</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-black bg-orange-100 text-orange-800">
-                {stagePartition.review.length}
-              </span>
-            </div>
-
-            {/* Stage Projects Cards */}
-            <div className="space-y-3">
-              {stagePartition.review.length === 0 ? (
-                <div className="p-6 text-center rounded-xl border border-dashed border-orange-200 text-orange-400 text-xs">
-                  <span>No projects in review</span>
-                </div>
-              ) : (
-                stagePartition.review.map((p) => renderProjectCard(p, { showNextAction: true }))
-              )}
-            </div>
-          </div>
-
-          {/* LANE 4: STAGE 4 - COMPLETED & SHIPPED */}
-          <div className="bg-[#F0FDF4]/70 rounded-2xl border border-green-200/80 p-3 space-y-3 shadow-2xs">
-            {/* Lane Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-green-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-                <div>
-                  <h3 className="text-xs font-black text-[#1A085C]">Stage 4: Completed</h3>
-                  <p className="text-[10px] text-green-700 font-medium">Delivered Deliverables</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-black bg-green-100 text-green-800">
-                {stagePartition.completed.length}
-              </span>
-            </div>
-
-            {/* Stage Projects Cards */}
-            <div className="space-y-3">
-              {stagePartition.completed.length === 0 ? (
-                <div className="p-6 text-center rounded-xl border border-dashed border-green-200 text-green-400 text-xs">
-                  <span>No completed projects yet</span>
-                </div>
-              ) : (
-                stagePartition.completed.map((p) => renderProjectCard(p, { showNextAction: false }))
-              )}
-            </div>
-          </div>
+          )}
         </div>
       ) : viewMode === 'categories' ? (
         /* ========================================================= */
