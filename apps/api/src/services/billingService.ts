@@ -241,8 +241,9 @@ export async function sendInvoiceEmailViaResend(
     clientEmail: string;
     invoiceNumber: string;
     projectTitle: string;
+    milestoneTitle?: string;
     amount: number;
-    totalBudget: number;
+    totalBudget?: number;
     paymentLinkUrl?: string;
     dueDateFormatted: string;
   },
@@ -253,145 +254,183 @@ export async function sendInvoiceEmailViaResend(
     clientEmail,
     invoiceNumber,
     projectTitle,
+    milestoneTitle,
     amount,
-    totalBudget,
     paymentLinkUrl,
     dueDateFormatted,
   } = params;
 
   const formattedAmount = '₹' + amount.toLocaleString('en-IN');
-  const formattedBudget = totalBudget > 0 ? '₹' + totalBudget.toLocaleString('en-IN') : formattedAmount;
+
+  // Format clean payment type / milestone title (e.g., "Advance Payment")
+  let cleanMilestone = (milestoneTitle || 'Advance Payment').trim();
+  if (cleanMilestone.includes('—')) {
+    cleanMilestone = cleanMilestone.split('—')[0].trim();
+  } else if (cleanMilestone.includes('-')) {
+    cleanMilestone = cleanMilestone.split('-')[0].trim();
+  }
+  if (!cleanMilestone.toLowerCase().includes('payment') && !cleanMilestone.toLowerCase().includes('milestone')) {
+    cleanMilestone = `${cleanMilestone} Payment`;
+  }
+
+  // Exact Subject format requested: "Advance Payment for Website Development (INV-2026-653)"
+  const subject = `${cleanMilestone} for ${projectTitle} (${invoiceNumber})`;
 
   const html = `
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Invoice ${invoiceNumber} from InfoHQ Pvt Ltd</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(subject)}</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A; }
-    .wrapper { max-width: 620px; margin: 30px auto; background: #FFFFFF; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
-    .header { padding: 32px 36px 24px; border-bottom: 1px solid #F1F5F9; }
-    .brand-title { font-size: 26px; font-weight: 900; color: #0F172A; margin: 0; letter-spacing: -0.5px; }
-    .brand-blue { color: #2563EB; }
-    .brand-sub { font-size: 13px; font-weight: 600; color: #64748B; margin-top: 2px; }
-    .brand-desc { font-size: 11px; color: #94A3B8; margin-top: 6px; line-height: 1.4; }
-    .badge { display: inline-block; padding: 5px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; text-transform: uppercase; letter-spacing: 0.5px; }
-    .content { padding: 28px 36px; }
-    .cards-table { width: 100%; border-collapse: separate; border-spacing: 12px 0; margin-bottom: 24px; }
-    .card-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; vertical-align: top; }
-    .card-label { font-size: 10px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-    .card-value { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 2px; }
-    .card-detail { font-size: 12px; color: #64748B; }
-    .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
-    .items-table th { background: #F8FAFC; padding: 10px 14px; font-size: 10px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid #E2E8F0; text-align: left; }
-    .items-table td { padding: 14px; font-size: 12px; border-bottom: 1px solid #F1F5F9; color: #1E293B; }
-    .summary-box { margin-top: 20px; padding: 16px; background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 12px; }
-    .summary-row { display: flex; justify-content: space-between; font-size: 13px; color: #1E293B; margin-bottom: 6px; }
-    .summary-total { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: #1D4ED8; padding-top: 8px; border-top: 1px dashed #BFDBFE; }
-    .btn { display: block; box-sizing: border-box; text-align: center; padding: 14px 24px; border-radius: 12px; background: #2563EB; color: #FFFFFF !important; font-size: 14px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 14px rgba(37,99,235,0.3); margin: 24px 0 10px; }
-    .footer { background: #F8FAFC; padding: 22px 36px; text-align: center; font-size: 11px; color: #64748B; border-top: 1px solid #E2E8F0; line-height: 1.6; }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F8F8FF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1A085C;
+    }
+    table {
+      border-collapse: collapse;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    td {
+      vertical-align: middle;
+    }
+    .email-container {
+      max-width: 580px;
+      width: 100%;
+      margin: 25px auto;
+      background-color: #FFFFFF;
+      border-radius: 24px;
+      border: 1px solid #EAE6F7;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(124, 92, 232, 0.04), 0 2px 6px rgba(15, 9, 38, 0.02);
+    }
+    @media only screen and (max-width: 620px) {
+      .email-container {
+        margin: 10px auto !important;
+        border-radius: 18px !important;
+      }
+      .inner-padding {
+        padding: 20px 18px !important;
+      }
+      .amount-display {
+        font-size: 20px !important;
+      }
+    }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td valign="top">
-            <h1 class="brand-title">Info<span class="brand-blue">HQ</span></h1>
-            <div class="brand-sub">Pvt Ltd</div>
-            <div class="brand-desc">
-              Engineering Studio for AI, SaaS &amp; Digital Systems<br>
-              Prayagraj, Uttar Pradesh, India • billing@infohq.in
-            </div>
-          </td>
-          <td align="right" valign="top">
-            <span class="badge">PAYMENT DUE</span>
-            <div style="font-size: 18px; font-weight: 900; color: #0F172A; margin-top: 8px; letter-spacing: 0.5px;">INVOICE</div>
-            <div style="font-size: 12px; font-family: monospace; font-weight: 700; color: #1D4ED8; margin-top: 4px;">${invoiceNumber}</div>
-            <div style="font-size: 11px; color: #64748B; margin-top: 4px;">Due Date: <strong>${dueDateFormatted}</strong></div>
-          </td>
-        </tr>
-      </table>
+<body style="margin: 0; padding: 20px 10px; background-color: #F8F8FF;">
+  <div class="email-container" style="max-width: 580px; width: 100%; margin: 25px auto; background-color: #FFFFFF; border-radius: 24px; border: 1px solid #EAE6F7; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="padding: 28px 32px 20px; border-bottom: 1px solid #EAE6F7;" class="inner-padding">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; color: #1A085C;">
+        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 18px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
+      </h1>
+      <div style="font-size: 13px; font-weight: 500; color: #6B7280; margin-top: 3px;">
+        Engineering Studio for AI, SaaS &amp; Digital Systems
+      </div>
     </div>
 
-    <div class="content">
-      <table class="cards-table" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td class="card-box" width="50%">
-            <div class="card-label">BILL TO</div>
-            <div class="card-value">${clientName}</div>
-            <div class="card-detail">${clientEmail}</div>
-          </td>
-          <td class="card-box" width="50%">
-            <div class="card-label">PROJECT DELIVERABLE</div>
-            <div class="card-value">${projectTitle}</div>
-            <div class="card-detail">Milestone Payment</div>
-          </td>
-        </tr>
-      </table>
+    <!-- Body Content -->
+    <div style="padding: 28px 32px 0;" class="inner-padding">
+      <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #1A085C; letter-spacing: -0.02em;">
+        Hello ${escapeHtml(clientName)},
+      </h2>
+      <p style="margin: 0 0 24px 0; font-size: 15px; color: #4B5563; line-height: 1.5;">
+        Your payment request for <strong style="color: #1A085C;">${escapeHtml(projectTitle)}</strong> is ready.
+      </p>
 
-      <table class="items-table" cellpadding="0" cellspacing="0" border="0">
-        <thead>
+      <!-- Payment Details Box -->
+      <div style="background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 16px; padding: 20px 22px; margin-bottom: 24px;">
+        <div style="font-size: 15px; font-weight: 800; color: #1A085C; margin-bottom: 16px;">
+          Payment Details
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
           <tr>
-            <th width="40">#</th>
-            <th>DESCRIPTION</th>
-            <th width="50" style="text-align: center;">QTY</th>
-            <th width="100" style="text-align: right;">AMOUNT</th>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; width: 42%; white-space: nowrap;">Payment Type</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; width: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(cleanMilestone)}</td>
           </tr>
-        </thead>
-        <tbody>
           <tr>
-            <td style="color: #94A3B8; font-family: monospace;">1</td>
-            <td><strong>${projectTitle}</strong><br><span style="color: #64748B; font-size: 11px;">Milestone kickoff &amp; system architecture deliverables</span></td>
-            <td style="text-align: center; color: #64748B;">1</td>
-            <td style="text-align: right; font-weight: 800; color: #0F172A;">${formattedAmount}</td>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
           </tr>
-        </tbody>
-      </table>
+          <tr>
+            <td style="padding: 12px 0; color: #6B7280; font-size: 14px; font-weight: 500;">Amount Due</td>
+            <td style="padding: 12px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 12px 0; color: #5B4CF5; font-size: 22px; font-weight: 900;" class="amount-display">${escapeHtml(formattedAmount)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Payment Due Date</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(dueDateFormatted)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Invoice / Reference</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(invoiceNumber)}</td>
+          </tr>
+        </table>
+      </div>
 
-      <table width="100%" style="margin-top: 20px;" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td valign="top" style="font-size: 11px; color: #64748B; line-height: 1.5; padding-right: 20px;">
-            <strong style="color: #475569; text-transform: uppercase; font-size: 10px;">Payment Terms &amp; Notes</strong><br>
-            Online settlement via UPI, Debit/Credit Card, or NetBanking powered by secure Razorpay checkout.
-          </td>
-          <td width="220" valign="top">
-            <div class="summary-box">
-              <table width="100%" style="font-size: 12px; color: #475569;" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>Subtotal:</td>
-                  <td align="right" style="font-weight: 600; color: #0F172A;">${formattedAmount}</td>
-                </tr>
-                <tr>
-                  <td style="padding-top: 4px;">Tax / GST:</td>
-                  <td align="right" style="padding-top: 4px; font-weight: 600; color: #0F172A;">Nil / Exempt</td>
-                </tr>
-                <tr>
-                  <td colspan="2" style="padding-top: 8px; border-top: 1px dashed #BFDBFE;"></td>
-                </tr>
-                <tr style="font-size: 14px; font-weight: 900; color: #1D4ED8;">
-                  <td>Balance Due:</td>
-                  <td align="right">${formattedAmount}</td>
-                </tr>
-              </table>
-            </div>
-          </td>
-        </tr>
-      </table>
-
+      <!-- Action Button -->
       ${
         paymentLinkUrl
-          ? `<a href="${paymentLinkUrl}" class="btn" target="_blank">Click Here to Pay ${formattedAmount} Online</a>`
+          ? `
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 28px 0 10px 0;">
+        <tr>
+          <td align="center">
+            <a href="${paymentLinkUrl}" target="_blank" style="background-color: #5B4CF5; background: linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%); color: #FFFFFF !important; font-size: 16px; font-weight: 800; text-decoration: none; padding: 14px 44px; border-radius: 9999px; display: inline-block; box-shadow: 0 4px 14px rgba(99, 88, 240, 0.35); text-align: center;">
+              Pay Now &rarr;
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding-top: 12px; font-size: 12px; color: #6B7280;">
+            Secure payment powered by <strong style="color: #1A085C;">Razorpay</strong>
+          </td>
+        </tr>
+      </table>
+      `
           : ''
       }
+
+      <!-- Reminder Notice -->
+      <div style="margin: 24px 0 20px 0; padding: 12px 16px; background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 12px; font-size: 13px; color: #4B5563; line-height: 1.4;">
+        If you have already completed the payment, please ignore this email.
+      </div>
+
+      <!-- Sign off -->
+      <p style="margin: 0 0 28px 0; font-size: 14px; color: #4B5563;">
+        Thank you for choosing <strong style="color: #1A085C;">Info<span style="color: #7C5CE8;">HQ</span></strong>.
+      </p>
     </div>
 
-    <div class="footer">
-      <strong>InfoHQ Pvt Ltd</strong> • Prayagraj, India<br>
-      This is a computer-generated tax invoice. For queries, contact <a href="mailto:billing@infohq.in" style="color: #2563EB; text-decoration: none;">billing@infohq.in</a>.
+    <!-- Footer (Location, email and website omitted as requested) -->
+    <div style="border-top: 1px solid #EAE6F7; padding: 22px 32px 28px; text-align: center; background-color: #FAFAFD;" class="inner-padding">
+      <div style="font-size: 14px; font-weight: 800; color: #1A085C; letter-spacing: -0.01em;">
+        Info<span style="color: #7C5CE8;">HQ</span> Pvt Ltd
+      </div>
+      <div style="font-size: 12px; color: #6B7280; margin-top: 3px;">
+        Engineering Studio for AI, SaaS &amp; Digital Systems
+      </div>
+      <div style="font-size: 11px; color: #9CA3AF; margin-top: 12px; line-height: 1.4;">
+        This is an automatically generated email. Please do not reply directly to this message.
+      </div>
     </div>
+
   </div>
 </body>
 </html>
@@ -405,10 +444,10 @@ export async function sendInvoiceEmailViaResend(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'InfoHQ Billing <hello@infohq.in>',
+        from: 'InfoHQ Billing <billing@infohq.in>',
         to: [clientEmail],
         reply_to: 'billing@infohq.in',
-        subject: `[InfoHQ Invoice] Advance Payment for ${projectTitle} (${invoiceNumber})`,
+        subject,
         html,
       }),
     });
