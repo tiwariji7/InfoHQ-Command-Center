@@ -181,6 +181,12 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     try {
       const res = await resendPaymentLinkApi(getToken, inv.id);
       alert(res.message || 'Fresh 24h payment link generated and sent to client via Email & Telegram!');
+      if (res.payment && clientDetail) {
+        setClientDetail({
+          ...clientDetail,
+          payments: clientDetail.payments.map((p) => (p.id === inv.id ? res.payment! : p)),
+        });
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to generate/resend link.');
     } finally {

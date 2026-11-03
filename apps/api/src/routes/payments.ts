@@ -416,6 +416,7 @@ const handleGenerateOrResendLink = async (c: any) => {
       description: payment.title || 'InfoHQ Service Milestone',
       paymentDbId: paymentId,
       clientId: payment.clientId || undefined,
+      previousLinkId: payment.razorpayPaymentLinkId || undefined,
       customer: {
         name: payment.clientName || 'Valued Client',
         email: payment.clientEmail,

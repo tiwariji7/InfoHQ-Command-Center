@@ -19,6 +19,7 @@ export async function createRazorpayPaymentLink(
     description: string;
     paymentDbId?: string;
     clientId?: string;
+    previousLinkId?: string;
     customer: {
       name: string;
       email?: string | null;
@@ -27,9 +28,26 @@ export async function createRazorpayPaymentLink(
   },
   keys: { keyId: string; keySecret: string }
 ): Promise<RazorpayLinkResult | null> {
-  const { amount, invoiceNumber, description, paymentDbId, clientId, customer } = params;
+  const { amount, invoiceNumber, description, paymentDbId, clientId, previousLinkId, customer } = params;
 
-  // Clean Indian mobile number if provided
+  const cleanKeyId = keys.keyId.replace(/^['"]|['"]$/g, '').trim();
+  const cleanKeySecret = keys.keySecret.replace(/^['"]|['"]$/g, '').trim();
+  const authHeader = `Basic ${btoa(`${cleanKeyId}:${cleanKeySecret}`)}`;
+
+  // If a previous Razorpay link ID is present, cancel the previous link so it does not accept duplicate payments
+  if (previousLinkId && previousLinkId.startsWith('plink_')) {
+    try {
+      await fetch(`https://api.razorpay.com/v1/payment_links/${previousLinkId}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      });
+      console.log(`[Razorpay Payment Link Cancel]: Successfully requested cancel for previous link ${previousLinkId}`);
+    } catch (cancelErr) {
+      console.warn('[Razorpay Cancel Previous Link Notice]:', cancelErr);
+    }
+  }
+
+  // Clean Indian mobile number if provided (E.164 format with 10-15 digits)
   let contact: string | undefined = undefined;
   if (customer.contact) {
     const digits = customer.contact.replace(/\D/g, '');
@@ -39,7 +57,7 @@ export async function createRazorpayPaymentLink(
       contact = `+91${digits.slice(1)}`;
     } else if (digits.length === 12 && digits.startsWith('91')) {
       contact = `+${digits}`;
-    } else if (digits.length >= 10) {
+    } else if (digits.length >= 10 && digits.length <= 15) {
       contact = `+${digits}`;
     }
   }
@@ -47,24 +65,41 @@ export async function createRazorpayPaymentLink(
   // Validate email format loosely to prevent Razorpay 400 validation error
   let email: string | undefined = undefined;
   if (customer.email && customer.email.includes('@') && customer.email.includes('.')) {
-    email = customer.email.trim();
+    const trimmed = customer.email.trim();
+    if (trimmed.length >= 5 && trimmed.length <= 80) {
+      email = trimmed;
+    }
   }
 
   const nowMs = Date.now();
   const expireBySeconds = Math.floor((nowMs + 24 * 60 * 60 * 1000) / 1000);
   const expiresAtMs = expireBySeconds * 1000;
 
+  // Razorpay reference_id max length is 40 characters and MUST be unique across all links.
+  // Using payment ID / invoice identifier with unique base36 timestamp suffix guarantees uniqueness on retries.
+  const safeToken = Date.now().toString(36);
+  let referenceId: string;
+  if (paymentDbId) {
+    const cleanId = paymentDbId.replace(/^pay_/, '').replace(/[^a-zA-Z0-9]/g, '');
+    referenceId = `p_${cleanId.slice(-14)}_${safeToken}`.slice(0, 40);
+  } else if (invoiceNumber) {
+    const cleanInv = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '');
+    referenceId = `${cleanInv}_${safeToken}`.slice(0, 40);
+  } else {
+    referenceId = `inv_${safeToken}`;
+  }
+
   const payload = {
     amount: Math.max(100, Math.round(amount * 100)), // Razorpay accepts paise (minimum 100 paise = ₹1)
     currency: 'INR',
     accept_partial: false,
-    reference_id: paymentDbId || invoiceNumber,
+    reference_id: referenceId,
     description: `${description} (${invoiceNumber})`,
     expire_by: expireBySeconds,
     customer: {
-      name: customer.name,
-      email: email || undefined,
-      contact: contact || undefined,
+      name: (customer.name || 'Valued Client').trim(),
+      ...(email ? { email } : {}),
+      ...(contact ? { contact } : {}),
     },
     notify: {
       sms: false,
@@ -75,14 +110,10 @@ export async function createRazorpayPaymentLink(
       paymentDbId: paymentDbId || '',
       clientId: clientId || '',
       invoiceNumber,
-      customerName: customer.name || '',
+      customerName: (customer.name || 'Valued Client').trim(),
       platform: 'InfoHQ Command Center',
     },
   };
-
-  const cleanKeyId = keys.keyId.replace(/^['"]|['"]$/g, '').trim();
-  const cleanKeySecret = keys.keySecret.replace(/^['"]|['"]$/g, '').trim();
-  const authHeader = `Basic ${btoa(`${cleanKeyId}:${cleanKeySecret}`)}`;
 
   try {
     const res = await fetch('https://api.razorpay.com/v1/payment_links', {
@@ -1397,13 +1428,32 @@ export async function handleRazorpayWebhookEvent(
       if (row) return row;
     }
 
-    // 0.1 By reference_id matching payment ID or invoice number
+    // 0.1 By reference_id matching payment ID or invoice number or clean token
     if (referenceId) {
       const row = await db
         .prepare('SELECT * FROM payments WHERE id = ? OR invoice_number = ?')
         .bind(referenceId, referenceId)
         .first<Record<string, unknown>>();
       if (row) return row;
+
+      const parts = referenceId.split('_');
+      if (parts.length >= 2) {
+        const prefix = parts[0];
+        const mid = parts[1];
+        if (prefix === 'p' && mid.length >= 8) {
+          const rowBySuffix = await db
+            .prepare('SELECT * FROM payments WHERE id LIKE ?')
+            .bind(`%${mid}%`)
+            .first<Record<string, unknown>>();
+          if (rowBySuffix) return rowBySuffix;
+        } else if (prefix.startsWith('INV')) {
+          const rowByInv = await db
+            .prepare('SELECT * FROM payments WHERE invoice_number = ?')
+            .bind(prefix)
+            .first<Record<string, unknown>>();
+          if (rowByInv) return rowByInv;
+        }
+      }
     }
 
     // 1. By razorpay_payment_link_id
