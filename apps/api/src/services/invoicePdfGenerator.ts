@@ -51,7 +51,6 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
   // Exact Brand Colors matching website & CRM design
   const colorNavy = rgb(26 / 255, 8 / 255, 92 / 255);         // #1A085C (Headings)
@@ -326,22 +325,21 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   drawSummaryLine('Total Settled', isPaidState ? formattedAmt : 'INR 0');
   drawSummaryLine('Balance Due', isPaidState ? 'INR 0.00' : formattedAmt, true, false, isPaidState);
 
-  // 6. EXACT CRM STAMP (matching style, angle, and position 1:1)
-  // Mirroring CRM: border-[2.5px] font-mono tracking-widest uppercase rotate(-12deg) at right-24 sm:right-28 bottom-2.5
-  let stampWord = 'PAID';
+  // 6. EXACT CRM STAMP (Rounded corners, centered text, exact -12deg angle, placed at right-24 sm:right-28 bottom-2.5)
+  let stampWord = 'P A I D';
   let stampColor = colorSuccess;
 
   if (statusStr.includes('refund')) {
-    stampWord = 'REFUNDED';
+    stampWord = 'R E F U N D E D';
     stampColor = rgb(124 / 255, 92 / 255, 232 / 255); // #7C5CE8
   } else if (statusStr.includes('fail')) {
-    stampWord = 'FAILED';
+    stampWord = 'F A I L E D';
     stampColor = rgb(220 / 255, 38 / 255, 38 / 255);   // #DC2626
   } else if (statusStr.includes('expire')) {
-    stampWord = 'EXPIRED';
+    stampWord = 'E X P I R E D';
     stampColor = rgb(217 / 255, 119 / 255, 6 / 255);   // #D97706
   } else if (!isPaidState || statusStr.includes('unpaid') || statusStr.includes('pending')) {
-    stampWord = 'UNPAID';
+    stampWord = 'U N P A I D';
     stampColor = rgb(217 / 255, 119 / 255, 6 / 255);   // #D97706
   }
 
@@ -350,37 +348,38 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
 
-  const wordW = fontMono.widthOfTextAtSize(stampWord, 14);
-  const stampW = Math.max(76, wordW + 28);
-  const stampH = 26;
+  const fontSize = 14;
+  const wordW = fontBold.widthOfTextAtSize(stampWord, fontSize);
+  const stampW = Math.max(86, wordW + 28);
+  const stampH = 30;
+  const r = 6;
 
-  // Exact position matching CRM view (right-24 to 28, bottom-2.5):
-  const stampX = sumBoxX + boxW - stampW - 32;
-  const stampY = boxY + 28;
+  // Exact position matching CRM view:
+  const stampX = sumBoxX + boxW - stampW - 36;
+  const stampY = boxY + 54; // Since SVG draws downwards, top is at boxY + 54, bottom is at boxY + 24
 
-  // Draw clean rectangular stamp with 2.2pt border matching CRM view
-  page.drawRectangle({
+  const stampPath = `M ${r} 0 L ${stampW - r} 0 Q ${stampW} 0 ${stampW} ${r} L ${stampW} ${stampH - r} Q ${stampW} ${stampH} ${stampW - r} ${stampH} L ${r} ${stampH} Q 0 ${stampH} 0 ${stampH - r} L 0 ${r} Q 0 0 ${r} 0 Z`;
+
+  page.drawSvgPath(stampPath, {
     x: stampX,
     y: stampY,
-    width: stampW,
-    height: stampH,
     borderColor: stampColor,
-    borderWidth: 2.2,
+    borderWidth: 2.5,
     color: colorWhite,
     rotate: degrees(angle),
   });
 
-  const localDx = (stampW - wordW) / 2;
-  const localDy = (stampH - 14) / 2 + 1;
+  const localX = (stampW - wordW) / 2;
+  const localY = -(stampH / 2 + 0.36 * fontSize);
 
-  const textX = stampX + localDx * cos - localDy * sin;
-  const textY = stampY + localDx * sin + localDy * cos;
+  const textX = stampX + localX * cos - localY * sin;
+  const textY = stampY + localX * sin + localY * cos;
 
   page.drawText(stampWord, {
     x: textX,
     y: textY,
-    size: 14,
-    font: fontMono,
+    size: fontSize,
+    font: fontBold,
     color: stampColor,
     rotate: degrees(angle),
   });
