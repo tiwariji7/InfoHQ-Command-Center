@@ -182,14 +182,15 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   }
 
   // Draw Items Rows
-  items.slice(0, 5).forEach((item, idx) => {
+  items.slice(0, 5).forEach((item: any, idx) => {
     const itemNum = String(item.num || idx + 1);
-    const itemQty = String(item.qty || 1);
-    const itemRate = Number(item.rate || item.amount || 0);
-    const itemAmt = Number(item.amount || itemRate);
+    const itemDesc = String(item.desc || item.description || item.title || item.name || 'Milestone Delivery').trim();
+    const itemQty = String(item.qty || item.quantity || 1);
+    const itemRate = Number(item.rate || item.price || item.unitPrice || item.amount || 0);
+    const itemAmt = Number(item.amount || (Number(itemQty) * itemRate) || itemRate);
 
     page.drawText(itemNum, { x: tableX + 10, y, size: 9, font: fontRegular, color: colorNavy });
-    const truncatedDesc = item.desc.length > 50 ? item.desc.substring(0, 48) + '...' : item.desc;
+    const truncatedDesc = itemDesc.length > 50 ? itemDesc.substring(0, 48) + '...' : itemDesc;
     page.drawText(truncatedDesc, { x: tableX + 35, y, size: 9, font: fontBold, color: colorNavy });
     page.drawText(itemQty, { x: tableX + 325, y, size: 9, font: fontRegular, color: colorBody });
     page.drawText(`INR ${itemRate.toLocaleString('en-IN')}`, { x: tableX + 365, y, size: 9, font: fontRegular, color: colorBody });
