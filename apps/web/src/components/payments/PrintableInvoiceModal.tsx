@@ -621,61 +621,96 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
               {/* Right Box: Totals & Authentic Stamp (Centered between labels and numbers) */}
               <div className="relative p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2 text-xs min-h-[140px]">
-                {/* Rotated Stamp: Placed right in the middle, avoiding both labels on left and amounts on right */}
-                <div className="absolute right-24 sm:right-28 bottom-2.5 pointer-events-none select-none z-10">
+                {/* Rotated Authentic Rubber Stamp: Centered in middle corridor with double-border & seal */}
+                <div className="absolute left-[40%] bottom-2.5 pointer-events-none select-none z-10 -translate-x-1/2">
                   {isPaid && (
                     <div
-                      style={{
-                        transform: 'rotate(-12deg)',
-                        boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.2)',
-                      }}
-                      className="border-[2.5px] border-emerald-600/90 text-emerald-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                      style={{ transform: 'rotate(-12deg)' }}
+                      className="inline-block p-[2.5px] rounded-md border-[2.2px] border-emerald-600 bg-emerald-50/85 shadow-xs backdrop-blur-2xs"
                     >
-                      PAID
+                      <div className="border border-emerald-600/90 rounded-[2.5px] px-2.5 py-0.5 flex flex-col items-center justify-center text-center">
+                        <span className="text-[6.5px] font-black tracking-widest uppercase text-emerald-800 leading-none pb-0.5">
+                          OFFICIAL RECEIPT
+                        </span>
+                        <span className="text-base sm:text-[17px] font-black tracking-[0.25em] uppercase text-emerald-700 leading-tight font-mono py-0.5">
+                          PAID
+                        </span>
+                        <span className="text-[6px] font-bold tracking-wider uppercase text-emerald-800 leading-none pt-0.5">
+                          VERIFIED &amp; SETTLED
+                        </span>
+                      </div>
                     </div>
                   )}
                   {isUnpaid && (
                     <div
-                      style={{
-                        transform: 'rotate(-12deg)',
-                        boxShadow: '0 0 0 1px rgba(245, 158, 11, 0.2)',
-                      }}
-                      className="border-[2.5px] border-amber-600/90 text-amber-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                      style={{ transform: 'rotate(-12deg)' }}
+                      className="inline-block p-[2.5px] rounded-md border-[2.2px] border-amber-600 bg-amber-50/85 shadow-xs backdrop-blur-2xs"
                     >
-                      UNPAID
+                      <div className="border border-amber-600/90 rounded-[2.5px] px-2.5 py-0.5 flex flex-col items-center justify-center text-center">
+                        <span className="text-[6.5px] font-black tracking-widest uppercase text-amber-800 leading-none pb-0.5">
+                          PAYMENT PENDING
+                        </span>
+                        <span className="text-base sm:text-[17px] font-black tracking-[0.25em] uppercase text-amber-700 leading-tight font-mono py-0.5">
+                          UNPAID
+                        </span>
+                        <span className="text-[6px] font-bold tracking-wider uppercase text-amber-800 leading-none pt-0.5">
+                          ACTION REQUIRED
+                        </span>
+                      </div>
                     </div>
                   )}
                   {isExpired && (
                     <div
-                      style={{
-                        transform: 'rotate(-12deg)',
-                        boxShadow: '0 0 0 1px rgba(217, 119, 6, 0.2)',
-                      }}
-                      className="border-[2.5px] border-amber-600 text-amber-700 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                      style={{ transform: 'rotate(-12deg)' }}
+                      className="inline-block p-[2.5px] rounded-md border-[2.2px] border-orange-600 bg-orange-50/85 shadow-xs backdrop-blur-2xs"
                     >
-                      EXPIRED
+                      <div className="border border-orange-600/90 rounded-[2.5px] px-2.5 py-0.5 flex flex-col items-center justify-center text-center">
+                        <span className="text-[6.5px] font-black tracking-widest uppercase text-orange-800 leading-none pb-0.5">
+                          WINDOW CLOSED
+                        </span>
+                        <span className="text-base sm:text-[17px] font-black tracking-[0.25em] uppercase text-orange-700 leading-tight font-mono py-0.5">
+                          EXPIRED
+                        </span>
+                        <span className="text-[6px] font-bold tracking-wider uppercase text-orange-800 leading-none pt-0.5">
+                          LINK INACTIVE
+                        </span>
+                      </div>
                     </div>
                   )}
                   {isRefunded && (
                     <div
-                      style={{
-                        transform: 'rotate(-12deg)',
-                        boxShadow: '0 0 0 1px rgba(124, 92, 232, 0.2)',
-                      }}
-                      className="border-[2.5px] border-[#7C5CE8] text-[#7C5CE8] font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                      style={{ transform: 'rotate(-12deg)' }}
+                      className="inline-block p-[2.5px] rounded-md border-[2.2px] border-[#6D28D9] bg-purple-50/85 shadow-xs backdrop-blur-2xs"
                     >
-                      REFUNDED
+                      <div className="border border-[#6D28D9]/90 rounded-[2.5px] px-2.5 py-0.5 flex flex-col items-center justify-center text-center">
+                        <span className="text-[6.5px] font-black tracking-widest uppercase text-purple-900 leading-none pb-0.5">
+                          AMOUNT REVERSED
+                        </span>
+                        <span className="text-base sm:text-[17px] font-black tracking-[0.2em] uppercase text-[#6D28D9] leading-tight font-mono py-0.5">
+                          REFUNDED
+                        </span>
+                        <span className="text-[6px] font-bold tracking-wider uppercase text-purple-900 leading-none pt-0.5">
+                          OFFICIAL SETTLEMENT
+                        </span>
+                      </div>
                     </div>
                   )}
                   {isFailed && (
                     <div
-                      style={{
-                        transform: 'rotate(-12deg)',
-                        boxShadow: '0 0 0 1px rgba(220, 38, 38, 0.2)',
-                      }}
-                      className="border-[2.5px] border-rose-600 text-rose-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                      style={{ transform: 'rotate(-12deg)' }}
+                      className="inline-block p-[2.5px] rounded-md border-[2.2px] border-rose-600 bg-rose-50/85 shadow-xs backdrop-blur-2xs"
                     >
-                      FAILED
+                      <div className="border border-rose-600/90 rounded-[2.5px] px-2.5 py-0.5 flex flex-col items-center justify-center text-center">
+                        <span className="text-[6.5px] font-black tracking-widest uppercase text-rose-900 leading-none pb-0.5">
+                          TRANSACTION FAILED
+                        </span>
+                        <span className="text-base sm:text-[17px] font-black tracking-[0.25em] uppercase text-rose-600 leading-tight font-mono py-0.5">
+                          FAILED
+                        </span>
+                        <span className="text-[6px] font-bold tracking-wider uppercase text-rose-900 leading-none pt-0.5">
+                          UNSUCCESSFUL ATTEMPT
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
