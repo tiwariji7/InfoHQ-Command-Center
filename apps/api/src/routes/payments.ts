@@ -14,6 +14,7 @@ import {
   handleRazorpayWebhookEvent,
   fetchAndVerifyRazorpayStatus,
   sendTelegramPaymentSuccessAlert,
+  autoSyncPendingRazorpayPayments,
 } from '../services/billingService.js';
 import { generateInvoicePdf } from '../services/invoicePdfGenerator.js';
 import {
@@ -39,6 +40,15 @@ paymentsRouter.get('/', async (c) => {
   const projectId = c.req.query('projectId');
   const status = c.req.query('status');
   const search = c.req.query('search');
+
+  // Non-blocking auto-sync of pending Razorpay payments
+  const keyId = c.env.RAZORPAY_KEY_ID?.replace(/^['"]|['"]$/g, '').trim();
+  const keySecret = c.env.RAZORPAY_KEY_SECRET?.replace(/^['"]|['"]$/g, '').trim();
+  if (keyId && keySecret && c.executionCtx) {
+    c.executionCtx.waitUntil(
+      autoSyncPendingRazorpayPayments(c.env.DB, c.env, c.executionCtx)
+    );
+  }
 
   try {
     const data = await getPayments(c.env.DB, { projectId, status, search });
@@ -692,3 +702,18 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
   }
 });
 
+
+// POST /api/payments/auto-sync - Force background sync of all pending Razorpay links
+paymentsRouter.post('/auto-sync', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  try {
+    const syncedCount = await autoSyncPendingRazorpayPayments(c.env.DB, c.env, c.executionCtx);
+    return c.json({ success: true, syncedCount });
+  } catch (err) {
+    console.error('Error auto-syncing pending payments:', err);
+    return c.json({ error: 'internal_error', message: err instanceof Error ? err.message : 'Sync failed' }, 500);
+  }
+});

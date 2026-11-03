@@ -928,6 +928,30 @@ export async function sendTelegramPaymentFailedAlert(
 }
 
 // 4.2 Telegram Alert: Refund Processed
+// 4.3 Telegram Alert: Payment Link Cancelled or Expired
+export async function sendTelegramPaymentCancelledAlert(
+  params: {
+    clientName: string;
+    projectTitle: string;
+    invoiceNumber: string;
+    amount: number;
+    reason: string;
+    timeIST: string;
+  },
+  env: Bindings
+) {
+  const msg =
+    `⚠️ <b>PAYMENT LINK CANCELLED / EXPIRED</b>\n\n` +
+    `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
+    `💼 <b>Project:</b> ${escapeHtml(params.projectTitle)}\n` +
+    `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
+    `💰 <b>Amount:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
+    `ℹ️ <b>Status:</b> ${escapeHtml(params.reason)}\n` +
+    `🕒 <b>Time (IST):</b> ${escapeHtml(params.timeIST)}`;
+
+  return sendTelegramMessage(msg, env);
+}
+
 export async function sendTelegramRefundProcessedAlert(
   params: {
     clientName: string;
@@ -1881,5 +1905,121 @@ export async function handleRazorpayWebhookEvent(
     return { success: true, message: `Refund alert ${refundId} dispatched.` };
   }
 
+  // =========================================================================
+  // CASE D: PAYMENT LINK CANCELLED / EXPIRED
+  // =========================================================================
+  else if (eventType === 'payment_link.cancelled' || eventType === 'payment_link.expired') {
+    const paymentRow = await findMatchingPaymentRow();
+    const clientName = String(paymentRow?.client_name || paymentNotes.customerName || 'Client');
+    const projectTitle = String(paymentRow?.title || 'Client Project');
+    const invNum = String(invoiceNumber || paymentRow?.invoice_number || 'INV');
+    const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
+    const reason = eventType === 'payment_link.cancelled' ? 'Payment Link Cancelled by User/Admin' : 'Payment Link Expired';
+
+    dispatchAlert(
+      sendTelegramPaymentCancelledAlert(
+        {
+          clientName,
+          projectTitle,
+          invoiceNumber: invNum,
+          amount: actualAmount,
+          reason,
+          timeIST,
+        },
+        env
+      )
+    );
+
+    return { success: true, message: `Payment link status ${eventType} acknowledged and Telegram alert dispatched.` };
+  }
+
   return { success: true, message: `Event ${eventType} acknowledged.` };
+}
+
+// 7. Automatic Fail-Safe Background Sync for Pending Razorpay Invoices
+export async function autoSyncPendingRazorpayPayments(
+  db: D1Database,
+  env: Bindings,
+  ctx?: { waitUntil: (p: Promise<unknown>) => void }
+): Promise<number> {
+  const keyId = env.RAZORPAY_KEY_ID?.replace(/^['"]|['"]$/g, '').trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.replace(/^['"]|['"]$/g, '').trim();
+  if (!keyId || !keySecret) return 0;
+
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+  let pendingRows: Array<Record<string, unknown>> = [];
+  try {
+    const res = await db
+      .prepare(`
+        SELECT id, razorpay_payment_link_id, razorpay_payment_id, amount, client_name, title, invoice_number, created_at
+        FROM payments
+        WHERE status = 'pending' AND (razorpay_payment_link_id IS NOT NULL OR razorpay_payment_id IS NOT NULL) AND created_at >= ?
+        ORDER BY created_at DESC
+        LIMIT 6
+      `)
+      .bind(thirtyDaysAgo)
+      .all<Record<string, unknown>>();
+    pendingRows = res.results || [];
+  } catch (err) {
+    console.warn('[autoSyncPendingRazorpayPayments DB query error]:', err);
+    return 0;
+  }
+
+  if (pendingRows.length === 0) return 0;
+
+  let syncedCount = 0;
+  for (const row of pendingRows) {
+    const linkId = row.razorpay_payment_link_id ? String(row.razorpay_payment_link_id).trim() : null;
+    const paymentId = row.razorpay_payment_id ? String(row.razorpay_payment_id).trim() : null;
+
+    try {
+      const verified = await fetchAndVerifyRazorpayStatus({ linkId, paymentId }, { keyId, keySecret });
+      if (verified && verified.isConfirmed) {
+        const syntheticEvent = {
+          event: 'payment_link.paid',
+          payload: {
+            payment_link: {
+              entity: {
+                id: linkId,
+                status: 'paid',
+                amount: Math.round(verified.amountRupees * 100),
+                notes: {
+                  paymentDbId: String(row.id),
+                  invoiceNumber: row.invoice_number ? String(row.invoice_number) : undefined,
+                  customerName: row.client_name ? String(row.client_name) : undefined,
+                },
+                payments: [
+                  {
+                    payment_id: verified.paymentId,
+                    amount: Math.round(verified.amountRupees * 100),
+                    status: 'captured',
+                    method: verified.paymentMethod,
+                  },
+                ],
+              },
+            },
+            payment: {
+              entity: {
+                id: verified.paymentId,
+                amount: Math.round(verified.amountRupees * 100),
+                status: 'captured',
+                method: verified.paymentMethod,
+                email: verified.customerEmail,
+                contact: verified.customerContact,
+              },
+            },
+          },
+        };
+
+        await handleRazorpayWebhookEvent(syntheticEvent, env, ctx);
+        syncedCount += 1;
+      }
+    } catch (e) {
+      console.warn(`[autoSyncPendingRazorpayPayments sync error for ${row.id}]:`, e);
+    }
+  }
+
+  return syncedCount;
 }

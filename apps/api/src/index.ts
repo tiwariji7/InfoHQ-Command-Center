@@ -11,6 +11,7 @@ import { intakeRouter } from './routes/intake.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { clientsRouter } from './routes/clients.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
+import { autoSyncPendingRazorpayPayments } from './services/billingService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
 
 const app = new Hono<AppContext>();
@@ -96,9 +97,13 @@ app.get('/api/me', requireSuperadmin, (c) => {
 // Public: Website and landing page inbound lead intake webhook
 app.route('/api/intake', intakeRouter);
 
-// Public: Razorpay & external payment webhooks (supports both plural and singular)
+// Public: Razorpay & external payment webhooks (supports all common URL variants)
 app.route('/api/webhooks', webhooksRouter);
 app.route('/api/webhook', webhooksRouter);
+app.route('/webhooks', webhooksRouter);
+app.route('/webhook', webhooksRouter);
+app.route('/api/razorpay', webhooksRouter);
+app.route('/razorpay', webhooksRouter);
 
 // Protected: Leads core router
 app.route('/api/leads', leadsRouter);
@@ -134,9 +139,12 @@ export default {
     }
 
     ctx.waitUntil(
-      runMorningBriefingAndAudits(db, env, { sendTelegram: true, persistAlerts: true })
-        .then(() => console.log('[Cloudflare Cron] Daily morning briefing & audit completed.'))
-        .catch((err) => console.error('[Cloudflare Cron] Audit failed:', err))
+      Promise.all([
+        runMorningBriefingAndAudits(db, env, { sendTelegram: true, persistAlerts: true }),
+        autoSyncPendingRazorpayPayments(db, env, ctx),
+      ])
+        .then(() => console.log('[Cloudflare Cron] Daily morning briefing & payment sync completed.'))
+        .catch((err) => console.error('[Cloudflare Cron] Cron task failed:', err))
     );
   },
 };
