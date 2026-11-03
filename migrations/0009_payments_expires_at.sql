@@ -3,3 +3,4 @@
 
 ALTER TABLE payments ADD COLUMN expires_at INTEGER;
 CREATE INDEX IF NOT EXISTS idx_payments_expires_at ON payments(expires_at);
+

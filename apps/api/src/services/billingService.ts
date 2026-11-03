@@ -1625,6 +1625,7 @@ export async function handleRazorpayWebhookEvent(
         paymentDate: timeIST,
         status: 'received',
         notes: paymentRow?.notes ? String(paymentRow.notes) : undefined,
+        itemsJson: paymentRow?.items_json ? String(paymentRow.items_json) : undefined,
       });
     } catch (pdfErr) {
       console.warn('[Invoice PDF Generation Warning]:', pdfErr);

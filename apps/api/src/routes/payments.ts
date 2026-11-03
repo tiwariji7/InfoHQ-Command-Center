@@ -275,6 +275,7 @@ paymentsRouter.post('/:id/record-payment', async (c) => {
         paymentDate: timeIST,
         status: 'received',
         notes: updated.notes ? String(updated.notes) : undefined,
+        itemsJson: updated.itemsJson || undefined,
       });
     } catch (pdfErr) {
       console.warn('[Record Payment PDF Generation Warning]:', pdfErr);
@@ -659,6 +660,7 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
           paymentDate: timeIST,
           status: 'received',
           notes: payment.notes ? String(payment.notes) : undefined,
+          itemsJson: payment.itemsJson || undefined,
         });
       } catch (pdfErr) {
         console.warn('[Sync Razorpay PDF Generation Warning]:', pdfErr);
@@ -744,4 +746,64 @@ paymentsRouter.post('/auto-sync', async (c) => {
     console.error('Error auto-syncing pending payments:', err);
     return c.json({ error: 'internal_error', message: err instanceof Error ? err.message : 'Sync failed' }, 500);
   }
+});
+
+// GET /api/payments/:id/invoice-pdf - Download official vector PDF tax invoice
+paymentsRouter.get('/:id/invoice-pdf', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const paymentId = c.req.param('id');
+  const payment = await getPaymentById(c.env.DB, paymentId);
+  if (!payment) {
+    return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
+  }
+
+  const invoiceNumber = payment.invoiceNumber || `INV-2026-${payment.id.slice(-4).toUpperCase()}`;
+  const now = Date.now();
+  const issueDate = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(payment.createdAt || now));
+
+  const paymentDate = payment.paidAt
+    ? new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(payment.paidAt))
+    : payment.status === 'received'
+    ? issueDate
+    : undefined;
+
+  const pdfBytes = await generateInvoicePdf({
+    invoiceNumber,
+    clientId: payment.clientId || undefined,
+    clientName: payment.clientName || 'Valued Client',
+    clientEmail: payment.clientEmail || undefined,
+    clientPhone: payment.clientPhone || undefined,
+    projectTitle: payment.projectTitle || payment.title || 'Client Project',
+    milestoneTitle: payment.title || 'Milestone Delivery',
+    amount: payment.amount,
+    paymentMode: payment.paymentMethod || (payment.status === 'received' ? 'UPI / Online' : 'Online Checkout / UPI'),
+    transactionRef: payment.razorpayPaymentId || (payment.status === 'received' ? payment.id : 'Pending Online Checkout'),
+    issueDate,
+    paymentDate,
+    status: payment.status,
+    notes: payment.notes || undefined,
+    itemsJson: payment.itemsJson || undefined,
+  });
+
+  return new Response(pdfBytes, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${invoiceNumber}_${(payment.clientName || 'Client').replace(/\s+/g, '_')}.pdf"`,
+      'Cache-Control': 'no-cache',
+    },
+  });
 });

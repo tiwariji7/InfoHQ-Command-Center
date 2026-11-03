@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import type { Payment } from '@infohq/shared';
 import {
   X,
@@ -45,6 +46,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 }) => {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { getToken } = useAuth();
 
   // Draggable window state matching Client Profile & Create Payment modals
   const { cardRef, position, handlePointerDown, resetPosition } = useDraggable('printable_invoice_modal');
@@ -129,35 +131,59 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     ];
   }
 
-  // Clean Download PDF: Fits exact single A4 page with footer pinned at the very bottom
+  // Clean Download PDF: Downloads official vector PDF identical to Telegram & Email attachment
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
     try {
-      const html2pdf = await loadHtml2Pdf();
-      const element = document.getElementById('invoice-container') || invoiceRef.current;
-      if (!element) {
-        window.print();
+      // 1. Primary: Download official vector PDF from backend (crisp, selectable, zero gap)
+      const token = await getToken();
+      const res = await fetch(`/api/payments/${payment.id}/invoice-pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
         return;
       }
+      throw new Error(`Server returned ${res.status}`);
+    } catch (serverErr) {
+      console.warn('[Server PDF download fallback to html2pdf]:', serverErr);
+      // 2. Fallback: Client-side html2pdf
+      try {
+        const html2pdf = await loadHtml2Pdf();
+        const element = document.getElementById('invoice-container') || invoiceRef.current;
+        if (!element) {
+          window.print();
+          return;
+        }
 
-      const opt = {
-        margin: [0, 0, 0, 0],
-        filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#FFFFFF',
-          windowWidth: 794,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
+        const opt = {
+          margin: [0, 0, 0, 0],
+          filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#FFFFFF',
+            windowWidth: 794,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
 
-      await html2pdf().set(opt).from(element).save();
-    } catch (err) {
-      console.warn('[html2pdf fallback to native print]:', err);
-      window.print();
+        await html2pdf().set(opt).from(element).save();
+      } catch (clientErr) {
+        console.warn('[html2pdf fallback to native print]:', clientErr);
+        window.print();
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -179,7 +205,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
       aria-modal="true"
       onClick={onClose}
     >
-      {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer */}
+      {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer, never blank */}
       <style>{`
         @media print {
           @page {
@@ -192,18 +218,40 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          body > *:not(.printable-modal-overlay) {
+          /* Hide surrounding app elements */
+          header, nav, aside, .sidebar, .app-layout {
             display: none !important;
           }
+          /* Keep #root visible but hide everything inside except printable overlay */
+          body * {
+            visibility: hidden;
+          }
+          .printable-modal-overlay,
+          .printable-modal-overlay *,
+          #invoice-container,
+          #invoice-container * {
+            visibility: visible !important;
+          }
+          .print-hidden-control {
+            display: none !important;
+            visibility: hidden !important;
+          }
           .printable-modal-overlay {
-            position: static !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
             display: block !important;
             padding: 0 !important;
             margin: 0 !important;
             background: #FFFFFF !important;
             overflow: visible !important;
             backdrop-filter: none !important;
+            z-index: 999999 !important;
           }
           .popup-card {
             position: static !important;
@@ -213,20 +261,19 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             height: auto !important;
             box-shadow: none !important;
             border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
             overflow: visible !important;
             background: #FFFFFF !important;
           }
-          .print-hidden-control {
-            display: none !important;
-          }
           #invoice-container {
-            width: 100% !important;
-            max-width: 100% !important;
+            position: relative !important;
+            width: 210mm !important;
             min-height: 297mm !important;
             height: 297mm !important;
             box-sizing: border-box !important;
-            padding: 12mm 14mm 10mm 14mm !important;
-            margin: 0 !important;
+            padding: 14mm 16mm 12mm 16mm !important;
+            margin: 0 auto !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
@@ -234,6 +281,8 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             border: none !important;
             background: #FFFFFF !important;
             overflow: hidden !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
@@ -355,17 +404,16 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
         {/* ========================================================= */}
         {/* Printable Invoice Sheet Container: id="invoice-container" */}
-        {/* Full A4 single-page height (1120px) with Pinned Bottom Footer */}
+        {/* Natural view on CRM screen, strict 297mm A4 on print/download */}
         {/* ========================================================= */}
         <div
           ref={invoiceRef}
           id="invoice-container"
           style={{
             backgroundColor: '#FFFFFF',
-            minHeight: '1120px',
             boxSizing: 'border-box',
           }}
-          className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 md:p-12 bg-white font-sans text-slate-900 flex flex-col justify-between"
+          className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-8 md:p-10 bg-white font-sans text-slate-900 flex flex-col justify-between"
         >
           {/* Top Section: Header, Meta, Items, Notes & Totals */}
           <div className="space-y-6">
@@ -680,7 +728,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* ========================================================= */}
           {/* 6. PINNED FOOTER SIGN-OFF (Strictly at Bottom of A4)      */}
           {/* ========================================================= */}
-          <div className="mt-auto pt-6 border-t border-[#E5E7EB] text-center text-xs space-y-1">
+          <div className="mt-8 pt-5 border-t border-[#E5E7EB] text-center text-xs space-y-1 shrink-0">
             <p className="font-bold text-[#1A085C] text-xs sm:text-sm">
               <span
                 style={{
