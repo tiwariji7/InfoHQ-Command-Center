@@ -160,7 +160,8 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   });
 
   page.drawText('1', { x: tableX + 330, y, size: 9.5, font: fontRegular, color: colorBody });
-  const formattedAmt = `INR ${data.amount.toLocaleString('en-IN')}`;
+  const numAmt = Number(data.amount) || 0;
+  const formattedAmt = `INR ${numAmt.toLocaleString("en-IN")}`;
   page.drawText(formattedAmt, { x: tableX + 375, y, size: 9.5, font: fontRegular, color: colorBody });
   page.drawText(formattedAmt, { x: tableX + 440, y, size: 9.5, font: fontBold, color: colorNavy });
 

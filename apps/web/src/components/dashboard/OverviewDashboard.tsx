@@ -60,7 +60,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     }
   };
 
-  const firstName = clerkUser?.firstName || 'Sajibur';
+  const firstName = clerkUser?.firstName || 'Shivam';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -141,30 +141,35 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   const metrics = data?.metrics;
   const recentProjects = data?.recentProjects || [];
-  const urgentFollowUps = data?.urgentFollowUps || [];
+  const recentLeads = data?.recentLeads || [];
 
-  const totalInvoiced = metrics?.totalInvoiced || 5628500;
-  const totalPending = metrics?.totalPending || 642000;
-  const totalLeads = metrics?.totalLeads || 28;
-  const activeProjectsCount = metrics?.activeProjectsCount || 12;
+  const totalInvoiced = metrics?.totalInvoiced ?? 0;
+  const totalCollected = metrics?.totalCollected ?? 0;
+  const totalPending = metrics?.totalPending ?? 0;
+  const totalLeads = metrics?.totalLeads ?? 0;
+  const newLeadsToday = metrics?.newLeadsToday ?? 0;
+  const activeProjectsCount = metrics?.activeProjectsCount ?? 0;
+  const completedProjectsCount = metrics?.completedProjectsCount ?? 0;
+  const todayRevenue = metrics?.todayRevenue ?? 0;
+  const activePipelineValue = metrics?.activePipelineValue ?? 0;
+  const activePipelineDealsCount = metrics?.activePipelineDealsCount ?? 0;
+  const totalClientsCount = metrics?.totalClientsCount ?? 0;
+  const pendingInvoicesCount = metrics?.pendingInvoicesCount ?? 0;
 
-  // Deliverables fallback
-  const displayProjects = recentProjects.length > 0 ? recentProjects.slice(0, 5) : [
-    { id: '1', clientName: 'Apex Glass Pvt. Ltd.', title: 'Company Website & CRM', status: 'In Progress', dueDate: Date.now() + 5 * 86400000 },
-    { id: '2', clientName: 'MORSO Foods', title: 'Online Ordering Platform', status: 'Delivery', dueDate: Date.now() },
-    { id: '3', clientName: 'Tiwari Brothers', title: 'Business Website', status: 'In Development', dueDate: Date.now() + 12 * 86400000 },
-    { id: '4', clientName: 'SeHAT SmartCare', title: 'Android App (v1.2)', status: 'In Progress', dueDate: Date.now() + 20 * 86400000 },
-    { id: '5', clientName: 'Om Sai Enterprises', title: 'Brand & Automation Setup', status: 'QA & Testing', dueDate: Date.now() + 2 * 86400000 },
-  ];
-
-  // Leads fallback
-  const displayLeads = urgentFollowUps.length > 0 ? urgentFollowUps.slice(0, 5) : [
-    { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@gmail.com', service: 'Website Development', source: 'Website', status: 'New' },
-    { id: '2', name: 'Priya Singh', email: 'priya.singh@outlook.com', service: 'Automation / CRM', source: 'LinkedIn', status: 'Contacted' },
-    { id: '3', name: 'Amit Sharma', email: 'amit.sharma@gmail.com', service: 'Mobile App Development', source: 'Google Ads', status: 'Proposal Sent' },
-    { id: '4', name: 'Nikhil Verma', email: 'nikhil.verma@mail.com', service: 'AI Chatbot Integration', source: 'Website', status: 'In Discussion' },
-    { id: '5', name: 'Sonal Dubey', email: 'sonal.dubey@company.com', service: 'Business Automation', source: 'Instagram', status: 'New' },
-  ];
+  const monthlyTrends = metrics?.monthlyTrends || {
+    monthName: 'November 2026',
+    totalMtdRevenue: totalCollected,
+    totalMtdLeads: totalLeads,
+    conversionRate: 0,
+    mtdRealizationPct: 100,
+    mtdGrowthPct: 0,
+    weeks: [
+      { weekLabel: 'Week 1', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+      { weekLabel: 'Week 2', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+      { weekLabel: 'Week 3', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+      { weekLabel: 'Week 4', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+    ],
+  };
 
   const getMonogram = (name: string) => {
     const parts = name.trim().split(/\s+/);
@@ -253,8 +258,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     {
       id: 0,
       title: "Today's Revenue",
-      value: "₹4,85,000",
-      subtext: "↑ +12.6% vs yesterday",
+      value: formatCurrency(todayRevenue),
+      subtext: todayRevenue > 0 ? "↑ Real-time collected today" : "No collections today yet",
       icon: Coins,
       iconBg: "bg-[#FFF0F7]",
       iconColor: "text-[#E85AA0]",
@@ -262,9 +267,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     },
     {
       id: 1,
-      title: "Total Leads (Today)",
-      value: totalLeads.toString(),
-      subtext: "↑ +7 new vs yesterday",
+      title: "New Leads (Today)",
+      value: newLeadsToday.toString(),
+      subtext: `Total: ${totalLeads} lifetime leads`,
       icon: Users,
       iconBg: "bg-[#F3F0FF]",
       iconColor: "text-[#5B4CF5]",
@@ -274,7 +279,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 2,
       title: "Active Projects",
       value: activeProjectsCount.toString(),
-      subtext: "↗ 2 new this week",
+      subtext: `${completedProjectsCount} completed to date`,
       icon: Layers,
       iconBg: "bg-[#EFF6FF]",
       iconColor: "text-[#3B82F6]",
@@ -283,8 +288,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     {
       id: 3,
       title: "Active Sales Pipeline",
-      value: "₹24,60,000",
-      subtext: "↑ 6 deals • 8 in progress",
+      value: formatCurrency(activePipelineValue),
+      subtext: `${activePipelineDealsCount} active stage deals`,
       icon: KanbanSquare,
       iconBg: "bg-[#F0FDF4]",
       iconColor: "text-[#10B981]",
@@ -297,8 +302,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     {
       id: 0,
       label: "Projects",
-      value: "12",
-      subtext: "4 in delivery",
+      value: activeProjectsCount.toString(),
+      subtext: `${activeProjectsCount} in progress`,
       dotColor: "#3B82F6",
       icon: Code,
       action: (e: React.MouseEvent) => {
@@ -309,8 +314,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     {
       id: 1,
       label: "Clients",
-      value: "36",
-      subtext: "↑ +3 month",
+      value: totalClientsCount.toString(),
+      subtext: "Verified clients",
       dotColor: "#10B981",
       icon: Users,
       action: (e: React.MouseEvent) => {
@@ -322,7 +327,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 2,
       label: "Invoices",
       value: formatCurrency(totalPending),
-      subtext: "4 pending",
+      subtext: `${pendingInvoicesCount} pending settlement`,
       dotColor: "#E85AA0",
       icon: FileText,
       action: (e: React.MouseEvent) => {
@@ -580,7 +585,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* COLUMN 3: Revenue & Lead Trends (Proper Dual Graph)       */}
+        {/* COLUMN 3: Revenue & Lead Trends (Dynamic Dual Graph)       */}
         {/* Clear Amounts & Leads on Each Pillar                      */}
         {/* ========================================================= */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
@@ -591,7 +596,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   <TrendingUp size={13} />
                 </div>
                 <h3 className="text-xs sm:text-sm font-bold text-[#1A085C]">
-                  Monthly Trends (October 2026)
+                  Monthly Trends ({monthlyTrends.monthName})
                 </h3>
               </div>
 
@@ -612,80 +617,148 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <div className="grid grid-cols-3 gap-1 py-1.5 px-2 my-2 bg-[#FAF9FD] rounded-xl border border-[#EAE6F7] text-center">
               <div>
                 <span className="text-[9px] text-[#6B7280] block">Total MTD Rev</span>
-                <span className="text-xs font-black text-[#5B4CF5]">₹71,90,000</span>
+                <span className="text-xs font-black text-[#5B4CF5]">{formatCurrency(monthlyTrends.totalMtdRevenue)}</span>
               </div>
               <div className="border-x border-[#EAE6F7]">
                 <span className="text-[9px] text-[#6B7280] block">Total Leads</span>
-                <span className="text-xs font-black text-[#E85AA0]">101 Leads</span>
+                <span className="text-xs font-black text-[#E85AA0]">{monthlyTrends.totalMtdLeads} Leads</span>
               </div>
               <div>
                 <span className="text-[9px] text-[#6B7280] block">Conversion</span>
-                <span className="text-xs font-black text-[#10B981]">28.5% Won</span>
+                <span className="text-xs font-black text-[#10B981]">{monthlyTrends.conversionRate.toFixed(1)}% Won</span>
               </div>
             </div>
           </div>
 
-          {/* SVG Grouped Dual Pillar Chart with Exact Amounts & Lead Counts */}
+          {/* SVG Grouped Dual Pillar Chart with Exact Live Amounts & Lead Counts */}
           <div className="py-1 flex-1 flex flex-col justify-center">
-            <svg viewBox="0 0 380 145" className="w-full h-auto overflow-visible">
-              <defs>
-                <linearGradient id="monthRevGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#7C5CE8" />
-                  <stop offset="100%" stopColor="#5B4CF5" />
-                </linearGradient>
-                <linearGradient id="monthLeadGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#FF4D8D" />
-                  <stop offset="100%" stopColor="#E85AA0" />
-                </linearGradient>
-              </defs>
+            {(() => {
+              const weeksData = monthlyTrends.weeks && monthlyTrends.weeks.length > 0
+                ? monthlyTrends.weeks
+                : [
+                    { weekLabel: 'Week 1', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+                    { weekLabel: 'Week 2', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+                    { weekLabel: 'Week 3', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+                    { weekLabel: 'Week 4', revenue: 0, leadsCount: 0, startDate: 0, endDate: 0 },
+                  ];
 
-              {/* Grid Lines */}
-              <line x1="38" y1="18" x2="365" y2="18" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="38" y1="46" x2="365" y2="46" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="38" y1="74" x2="365" y2="74" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="38" y1="102" x2="365" y2="102" stroke="#F1EFF9" strokeDasharray="3 3" />
-              <line x1="38" y1="126" x2="365" y2="126" stroke="#EAE6F7" />
+              const maxRev = Math.max(1, ...weeksData.map((w) => w.revenue));
+              const maxLds = Math.max(1, ...weeksData.map((w) => w.leadsCount));
 
-              {/* Y-Axis Left (Revenue in Lakh) */}
-              <text x="4" y="21" fontSize="8" fill="#9CA3AF" fontWeight="600">₹25L</text>
-              <text x="4" y="49" fontSize="8" fill="#9CA3AF" fontWeight="600">₹20L</text>
-              <text x="4" y="77" fontSize="8" fill="#9CA3AF" fontWeight="600">₹15L</text>
-              <text x="4" y="105" fontSize="8" fill="#9CA3AF" fontWeight="600">₹10L</text>
-              <text x="14" y="129" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
+              const xPositions = [
+                { center: 84, revX: 66, leadX: 86 },
+                { center: 162, revX: 144, leadX: 164 },
+                { center: 240, revX: 222, leadX: 242 },
+                { center: 318, revX: 300, leadX: 320 },
+              ];
 
-              {/* WEEK 1 (Oct 1-7): Revenue ₹12.5L, Leads 18 */}
-              <text x="74" y="65" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹12.5L</text>
-              <rect x="66" y="70" width="16" height="56" rx="3.5" fill="url(#monthRevGrad)" />
-              <text x="94" y="79" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">18</text>
-              <rect x="86" y="84" width="16" height="42" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="84" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 1</text>
+              const formatPillarRev = (amt: number) => {
+                if (amt >= 100000) return `₹${(amt / 100000).toFixed(1)}L`;
+                if (amt >= 1000) return `₹${(amt / 1000).toFixed(0)}k`;
+                if (amt > 0) return `₹${amt}`;
+                return '₹0';
+              };
 
-              {/* WEEK 2 (Oct 8-14): Revenue ₹15.8L, Leads 22 */}
-              <text x="152" y="49" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹15.8L</text>
-              <rect x="144" y="54" width="16" height="72" rx="3.5" fill="url(#monthRevGrad)" />
-              <text x="172" y="69" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">22</text>
-              <rect x="164" y="74" width="16" height="52" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="162" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 2</text>
+              return (
+                <svg viewBox="0 0 380 145" className="w-full h-auto overflow-visible">
+                  <defs>
+                    <linearGradient id="monthRevGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#7C5CE8" />
+                      <stop offset="100%" stopColor="#5B4CF5" />
+                    </linearGradient>
+                    <linearGradient id="monthLeadGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#FF4D8D" />
+                      <stop offset="100%" stopColor="#E85AA0" />
+                    </linearGradient>
+                  </defs>
 
-              {/* WEEK 3 (Oct 15-21): Revenue ₹19.4L, Leads 27 */}
-              <text x="230" y="35" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹19.4L</text>
-              <rect x="222" y="40" width="16" height="86" rx="3.5" fill="url(#monthRevGrad)" />
-              <text x="250" y="55" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">27</text>
-              <rect x="242" y="60" width="16" height="66" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="240" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 3</text>
+                  {/* Grid Lines */}
+                  <line x1="38" y1="18" x2="365" y2="18" stroke="#F1EFF9" strokeDasharray="3 3" />
+                  <line x1="38" y1="46" x2="365" y2="46" stroke="#F1EFF9" strokeDasharray="3 3" />
+                  <line x1="38" y1="74" x2="365" y2="74" stroke="#F1EFF9" strokeDasharray="3 3" />
+                  <line x1="38" y1="102" x2="365" y2="102" stroke="#F1EFF9" strokeDasharray="3 3" />
+                  <line x1="38" y1="126" x2="365" y2="126" stroke="#EAE6F7" />
 
-              {/* WEEK 4 (Oct 22-31): Revenue ₹24.2L, Leads 34 */}
-              <text x="308" y="19" fontSize="7.5" fill="#5B4CF5" fontWeight="800" textAnchor="middle">₹24.2L</text>
-              <rect x="300" y="24" width="16" height="102" rx="3.5" fill="url(#monthRevGrad)" />
-              <text x="328" y="41" fontSize="7.5" fill="#E85AA0" fontWeight="800" textAnchor="middle">34</text>
-              <rect x="320" y="46" width="16" height="80" rx="3.5" fill="url(#monthLeadGrad)" />
-              <text x="318" y="139" fontSize="8.5" fill="#1A085C" fontWeight="700" textAnchor="middle">Week 4</text>
-            </svg>
+                  {/* Dynamic Y-Axis Labels */}
+                  <text x="4" y="21" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev)}</text>
+                  <text x="4" y="49" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev * 0.75)}</text>
+                  <text x="4" y="77" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev * 0.5)}</text>
+                  <text x="4" y="105" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev * 0.25)}</text>
+                  <text x="14" y="129" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
+
+                  {weeksData.slice(0, 4).map((wk, idx) => {
+                    const pos = xPositions[idx] || xPositions[0];
+                    const revHeight = wk.revenue > 0 ? Math.max(8, Math.round((wk.revenue / maxRev) * 98)) : 4;
+                    const revY = 126 - revHeight;
+                    const leadHeight = wk.leadsCount > 0 ? Math.max(8, Math.round((wk.leadsCount / maxLds) * 88)) : 4;
+                    const leadY = 126 - leadHeight;
+
+                    return (
+                      <g key={wk.weekLabel || idx}>
+                        {/* Revenue Bar & Label */}
+                        <text
+                          x={pos.revX + 8}
+                          y={revY - 5}
+                          fontSize="7.5"
+                          fill="#5B4CF5"
+                          fontWeight="800"
+                          textAnchor="middle"
+                        >
+                          {formatPillarRev(wk.revenue)}
+                        </text>
+                        <rect
+                          x={pos.revX}
+                          y={revY}
+                          width="16"
+                          height={revHeight}
+                          rx="3.5"
+                          fill="url(#monthRevGrad)"
+                        />
+
+                        {/* Leads Bar & Label */}
+                        <text
+                          x={pos.leadX + 8}
+                          y={leadY - 5}
+                          fontSize="7.5"
+                          fill="#E85AA0"
+                          fontWeight="800"
+                          textAnchor="middle"
+                        >
+                          {wk.leadsCount}
+                        </text>
+                        <rect
+                          x={pos.leadX}
+                          y={leadY}
+                          width="16"
+                          height={leadHeight}
+                          rx="3.5"
+                          fill="url(#monthLeadGrad)"
+                        />
+
+                        {/* Week Label */}
+                        <text
+                          x={pos.center}
+                          y="139"
+                          fontSize="8.5"
+                          fill="#1A085C"
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          {wk.weekLabel}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              );
+            })()}
           </div>
 
           <div className="pt-2 border-t border-[#EAE6F7] flex items-center justify-between text-[10px] text-[#6B7280]">
-            <span>MTD Realization: <strong className="text-[#1A085C]">91.4%</strong></span>
-            <span className="text-[#10B981] font-bold">↗ +28% MTD Growth</span>
+            <span>MTD Realization: <strong className="text-[#1A085C]">{monthlyTrends.mtdRealizationPct.toFixed(1)}%</strong></span>
+            <span className="text-[#10B981] font-bold">
+              {monthlyTrends.mtdGrowthPct >= 0 ? `↗ +${monthlyTrends.mtdGrowthPct}%` : `↘ ${monthlyTrends.mtdGrowthPct}%`} MTD Growth
+            </span>
           </div>
         </div>
       </div>
@@ -729,31 +802,39 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EAE6F7]/60">
-                  {displayProjects.map((p: any, idx) => {
-                    return (
-                      <tr
-                        key={p.id || idx}
-                        onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
-                        className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
-                      >
-                        <td className="py-2 px-2.5 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs truncate max-w-[130px]">
-                          {p.clientName}
-                        </td>
-                        <td className="py-2 px-2.5 font-medium text-[#4B5563] text-xs truncate max-w-[150px]">
-                          {p.title || p.name}
-                        </td>
-                        <td className="py-2 px-2.5 whitespace-nowrap">
-                          {getStatusBadge(p.status)}
-                        </td>
-                        <td className="py-2 px-2.5 text-right text-[10.5px] text-[#6B7280] font-medium whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 justify-end">
-                            <Calendar size={9} className="text-[#9CA3AF]" />
-                            <span>{formatISTDate(p.dueDate || Date.now())}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {recentProjects.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-xs text-[#9CA3AF]">
+                        No active projects recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentProjects.slice(0, 5).map((p) => {
+                      return (
+                        <tr
+                          key={p.id}
+                          onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
+                          className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2 px-2.5 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs truncate max-w-[130px]">
+                            {p.clientName}
+                          </td>
+                          <td className="py-2 px-2.5 font-medium text-[#4B5563] text-xs truncate max-w-[150px]">
+                            {p.title}
+                          </td>
+                          <td className="py-2 px-2.5 whitespace-nowrap">
+                            {getStatusBadge(p.status)}
+                          </td>
+                          <td className="py-2 px-2.5 text-right text-[10.5px] text-[#6B7280] font-medium whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 justify-end">
+                              <Calendar size={9} className="text-[#9CA3AF]" />
+                              <span>{formatISTDate(p.deadline || Date.now())}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -793,43 +874,51 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EAE6F7]/60">
-                  {displayLeads.map((ld: any, idx) => {
-                    const leadName = ld.name || ld.clientName || 'Valued Lead';
-                    const initials = getMonogram(leadName);
-                    const leadEmail = ld.email || 'inquiry@lead.in';
-                    return (
-                      <tr
-                        key={ld.id || idx}
-                        onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
-                        className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
-                      >
-                        <td className="py-2 px-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-5.5 h-5.5 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[8.5px] flex items-center justify-center shrink-0">
-                              {initials}
+                  {recentLeads.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-xs text-[#9CA3AF]">
+                        No leads recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentLeads.slice(0, 5).map((ld) => {
+                      const leadName = ld.name || 'Valued Lead';
+                      const initials = getMonogram(leadName);
+                      const leadEmail = ld.email || '—';
+                      return (
+                        <tr
+                          key={ld.id}
+                          onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
+                          className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2 px-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5.5 h-5.5 rounded-full bg-gradient-to-tr from-[#5B4CF5]/15 to-[#E85AA0]/20 text-[#5B4CF5] font-black text-[8.5px] flex items-center justify-center shrink-0">
+                                {initials}
+                              </div>
+                              <div className="truncate max-w-[130px]">
+                                <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-[11px] leading-tight">{leadName}</div>
+                                <div className="text-[9px] text-[#9CA3AF] truncate leading-tight">{leadEmail}</div>
+                              </div>
                             </div>
-                            <div className="truncate max-w-[130px]">
-                              <div className="font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors truncate text-[11px] leading-tight">{leadName}</div>
-                              <div className="text-[9px] text-[#9CA3AF] truncate leading-tight">{leadEmail}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 px-2.5">
-                          <span className="font-semibold text-[#4B5563] truncate max-w-[140px] block text-[11px]">
-                            {ld.service || ld.requirements || 'Digital Architecture'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2.5">
-                          <span className="text-[10px] font-medium text-[#6B7280]">
-                            {ld.source || 'Website'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2.5 text-right whitespace-nowrap">
-                          {getStatusBadge(ld.status || 'New')}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="py-2 px-2.5">
+                            <span className="font-semibold text-[#4B5563] truncate max-w-[140px] block text-[11px]">
+                              {ld.serviceNeeded || 'General Engineering'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5">
+                            <span className="text-[10px] font-medium text-[#6B7280]">
+                              {ld.source || 'Website'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5 text-right whitespace-nowrap">
+                            {getStatusBadge(ld.stage || 'New')}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

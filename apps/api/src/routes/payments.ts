@@ -110,6 +110,16 @@ paymentsRouter.post('/', async (c) => {
           payment.razorpayPaymentLinkUrl = rzpResult.shortUrl;
           payment.invoiceNumber = invoiceNumber;
 
+          // Determine project budget if available
+          let projectBudget = payment.amount;
+          if (payment.projectId) {
+            const prRow = await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first<{ budget: string }>();
+            if (prRow?.budget) {
+              const parsed = parseFloat(String(prRow.budget).replace(/[^0-9.]/g, ''));
+              if (!isNaN(parsed) && parsed > 0) projectBudget = parsed;
+            }
+          }
+
           // Send Telegram Alert for instant notification
           c.executionCtx.waitUntil(
             sendTelegramPaymentLinkAlert(
@@ -118,7 +128,7 @@ paymentsRouter.post('/', async (c) => {
                 projectTitle: payment.projectTitle || payment.title || 'Client Project',
                 invoiceNumber,
                 amount: payment.amount,
-                totalBudget: payment.amount,
+                totalBudget: projectBudget,
                 paymentLinkUrl: rzpResult.shortUrl,
               },
               c.env
@@ -143,7 +153,7 @@ paymentsRouter.post('/', async (c) => {
                   projectTitle: payment.projectTitle || 'Website Development',
                   milestoneTitle: payment.title || 'Advance Payment',
                   amount: payment.amount,
-                  totalBudget: payment.amount,
+                  totalBudget: projectBudget,
                   paymentLinkUrl: rzpResult.shortUrl,
                   dueDateFormatted,
                 },
@@ -215,6 +225,14 @@ paymentsRouter.post('/:id/record-payment', async (c) => {
       return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
     }
 
+    // Auto-update associated lead stage to won and project to in_progress
+    if (updated.projectId) {
+      const projRow = await c.env.DB.prepare('SELECT lead_id FROM projects WHERE id = ?').bind(updated.projectId).first<{ lead_id: string }>();
+      if (projRow?.lead_id) {
+        await c.env.DB.prepare("UPDATE leads SET stage = 'won', updated_at = ? WHERE id = ? AND stage != 'won'").bind(Date.now(), projRow.lead_id).run();
+      }
+    }
+
     const now = Date.now();
     const timeIST = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
@@ -242,6 +260,8 @@ paymentsRouter.post('/:id/record-payment', async (c) => {
         transactionRef: updated.razorpayPaymentId || updated.id || 'Manual Record',
         issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(updated.createdAt || now)),
         paymentDate: timeIST,
+        status: 'received',
+        notes: updated.notes ? String(updated.notes) : undefined,
       });
     } catch (pdfErr) {
       console.warn('[Record Payment PDF Generation Warning]:', pdfErr);
@@ -396,6 +416,15 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
     .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, paymentId)
     .run();
 
+  let projectBudget = payment.amount;
+  if (payment.projectId) {
+    const prRow = await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first<{ budget: string }>();
+    if (prRow?.budget) {
+      const parsed = parseFloat(String(prRow.budget).replace(/[^0-9.]/g, ''));
+      if (!isNaN(parsed) && parsed > 0) projectBudget = parsed;
+    }
+  }
+
   // Send Telegram Alert 1
   c.executionCtx.waitUntil(
     sendTelegramPaymentLinkAlert(
@@ -404,7 +433,7 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
         projectTitle: payment.projectTitle || payment.title || 'Client Project',
         invoiceNumber,
         amount: payment.amount,
-        totalBudget: payment.amount,
+        totalBudget: projectBudget,
         paymentLinkUrl: rzpResult.shortUrl,
       },
       c.env
@@ -547,7 +576,7 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
         }
       }
 
-      // 3. Update associated Project status to 'in_progress'
+      // 3. Update associated Project status to 'in_progress' and lead to 'won'
       if (payment.projectId) {
         try {
           await c.env.DB.prepare(`
@@ -567,6 +596,11 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
             .bind(payment.projectId)
             .run();
         }
+
+        const projRow = await c.env.DB.prepare('SELECT lead_id FROM projects WHERE id = ?').bind(payment.projectId).first<{ lead_id: string }>();
+        if (projRow?.lead_id) {
+          await c.env.DB.prepare("UPDATE leads SET stage = 'won', updated_at = ? WHERE id = ? AND stage != 'won'").bind(now, projRow.lead_id).run();
+        }
       }
 
       // Generate Invoice PDF
@@ -585,6 +619,8 @@ paymentsRouter.post('/:id/sync-razorpay', async (c) => {
           transactionRef: verified.paymentId,
           issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.createdAt || now)),
           paymentDate: timeIST,
+          status: 'received',
+          notes: payment.notes ? String(payment.notes) : undefined,
         });
       } catch (pdfErr) {
         console.warn('[Sync Razorpay PDF Generation Warning]:', pdfErr);

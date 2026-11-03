@@ -793,7 +793,10 @@ export async function sendTelegramDocument(
     formData.append('chat_id', creds.chatId);
     formData.append('caption', caption);
     formData.append('parse_mode', 'HTML');
-    formData.append('document', new Blob([fileBytes], { type: 'application/pdf' }), fileName);
+    const docFile = typeof File !== 'undefined'
+      ? new File([fileBytes], fileName, { type: 'application/pdf' })
+      : new Blob([fileBytes], { type: 'application/pdf' });
+    formData.append('document', docFile, fileName);
 
     const res = await fetch(`https://api.telegram.org/bot${creds.token}/sendDocument`, {
       method: 'POST',
@@ -1457,6 +1460,12 @@ export async function handleRazorpayWebhookEvent(
   ) {
     const paymentRow = await findMatchingPaymentRow();
 
+    // Idempotency: Skip duplicate processing if already recorded
+    if (paymentRow && paymentRow.status === 'received') {
+      console.log(`[Razorpay Webhook]: Payment ${paymentRow.id} (${paymentRow.invoice_number}) is already recorded as 'received'. Skipping duplicate webhook dispatch.`);
+      return { success: true, message: `Payment ${paymentRow.invoice_number} was already confirmed.` };
+    }
+
     // 1. Determine verified details directly from Razorpay + CRM fallback
     const effectivePaymentId = razorpayPaymentId || `pay_${now}`;
     const actualAmount = amountInRupees > 0 ? amountInRupees : Number(paymentRow?.amount || 0);
@@ -1531,6 +1540,8 @@ export async function handleRazorpayWebhookEvent(
         transactionRef: verifiedPaymentId,
         issueDate: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date((paymentRow?.created_at as number) || now)),
         paymentDate: timeIST,
+        status: 'received',
+        notes: paymentRow?.notes ? String(paymentRow.notes) : undefined,
       });
     } catch (pdfErr) {
       console.warn('[Invoice PDF Generation Warning]:', pdfErr);
@@ -1650,6 +1661,12 @@ export async function handleRazorpayWebhookEvent(
           .first<{ lead_id: string }>();
 
         if (projRow?.lead_id) {
+          // Auto-update lead stage to won if not already won
+          await db
+            .prepare("UPDATE leads SET stage = 'won', updated_at = ? WHERE id = ? AND stage != 'won'")
+            .bind(now, projRow.lead_id)
+            .run();
+
           const actId = `act_${crypto.randomUUID()}`;
           await db
             .prepare(`

@@ -475,8 +475,27 @@ export interface ClientDetailResponse {
 
 // --- Dashboard & Analytics Models ---
 
+export interface WeeklyTrendBucket {
+  weekLabel: string;
+  startDate: number;
+  endDate: number;
+  revenue: number;
+  leadsCount: number;
+}
+
+export interface MonthlyTrendsData {
+  monthName: string;
+  totalMtdRevenue: number;
+  totalMtdLeads: number;
+  conversionRate: number;
+  mtdRealizationPct: number;
+  mtdGrowthPct: number;
+  weeks: WeeklyTrendBucket[];
+}
+
 export interface DashboardMetrics {
   totalLeads: number;
+  newLeadsToday: number;
   newLeadsThisWeek: number;
   leadsByStage: {
     new: number;
@@ -488,9 +507,16 @@ export interface DashboardMetrics {
   followUpsDueTodayCount: number;
   activeProjectsCount: number;
   completedProjectsCount: number;
+  totalClientsCount: number;
+  todayRevenue: number;
+  yesterdayRevenue: number;
+  activePipelineValue: number;
+  activePipelineDealsCount: number;
+  pendingInvoicesCount: number;
   totalInvoiced: number;
   totalCollected: number;
   totalPending: number;
+  monthlyTrends: MonthlyTrendsData;
 }
 
 export interface UrgentFollowUpItem {
@@ -528,6 +554,7 @@ export interface RecentPaymentItem {
 export interface DashboardOverviewResponse {
   metrics: DashboardMetrics;
   urgentFollowUps: UrgentFollowUpItem[];
+  recentLeads: Lead[];
   recentProjects: RecentProjectItem[];
   recentPayments: RecentPaymentItem[];
 }

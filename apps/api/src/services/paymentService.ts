@@ -169,11 +169,25 @@ export async function createPayment(
     .bind(input.projectId)
     .first<Record<string, unknown>>();
 
-  const clientId = projectRow?.client_id ? String(projectRow.client_id) : null;
-  const clientName = projectRow?.client_name ? String(projectRow.client_name) : null;
-  const clientEmail = projectRow?.client_email ? String(projectRow.client_email) : null;
-  const clientPhone = projectRow?.client_phone ? String(projectRow.client_phone) : null;
-  const company = projectRow?.company ? String(projectRow.company) : null;
+  let clientId = projectRow?.client_id ? String(projectRow.client_id) : null;
+  let clientName = projectRow?.client_name ? String(projectRow.client_name) : null;
+  let clientEmail = projectRow?.client_email ? String(projectRow.client_email) : null;
+  let clientPhone = projectRow?.client_phone ? String(projectRow.client_phone) : null;
+  let company = projectRow?.company ? String(projectRow.company) : null;
+
+  // Fallback to clients table if contact info is missing on the project record
+  if (clientId && (!clientEmail || !clientPhone || !clientName)) {
+    const clientRow = await db
+      .prepare('SELECT name, email, phone, company FROM clients WHERE id = ?')
+      .bind(clientId)
+      .first<Record<string, unknown>>();
+    if (clientRow) {
+      if (!clientName && clientRow.name) clientName = String(clientRow.name);
+      if (!clientEmail && clientRow.email) clientEmail = String(clientRow.email);
+      if (!clientPhone && clientRow.phone) clientPhone = String(clientRow.phone);
+      if (!company && clientRow.company) company = String(clientRow.company);
+    }
+  }
 
   const invoiceNum = input.invoiceNumber || (await generateInvoiceNumber(db));
 
