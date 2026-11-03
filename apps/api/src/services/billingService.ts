@@ -624,150 +624,72 @@ export async function sendPaymentReceiptEmailViaResend(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(subject)}</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #F8F8FF;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      color: #1A085C;
-    }
-    table {
-      border-collapse: collapse;
-      mso-table-lspace: 0pt;
-      mso-table-rspace: 0pt;
-    }
-    td {
-      vertical-align: middle;
-    }
-    .email-container {
-      max-width: 580px;
-      width: 100%;
-      margin: 25px auto;
-      background-color: #FFFFFF;
-      border-radius: 24px;
-      border: 1px solid #EAE6F7;
-      overflow: hidden;
-      box-shadow: 0 8px 24px rgba(124, 92, 232, 0.04), 0 2px 6px rgba(15, 9, 38, 0.02);
-    }
-    @media only screen and (max-width: 620px) {
-      .email-container {
-        margin: 10px auto !important;
-        border-radius: 18px !important;
-      }
-      .inner-padding {
-        padding: 20px 18px !important;
-      }
-      .amount-display {
-        font-size: 20px !important;
-      }
-    }
-  </style>
 </head>
-<body style="margin: 0; padding: 20px 10px; background-color: #F8F8FF;">
-  <div class="email-container" style="max-width: 580px; width: 100%; margin: 25px auto; background-color: #FFFFFF; border-radius: 24px; border: 1px solid #EAE6F7; overflow: hidden;">
-    
-    <!-- Header -->
-    <div style="padding: 28px 32px 20px; border-bottom: 1px solid #EAE6F7;" class="inner-padding">
-      <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; color: #1A085C;">
-        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 18px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
-      </h1>
-      <div style="font-size: 13px; font-weight: 500; color: #6B7280; margin-top: 3px;">
+<body style="margin: 0; padding: 24px 16px; background-color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1A085C; line-height: 1.6;">
+  <div style="max-width: 560px; margin: 0 auto;">
+
+    <!-- Brand Header -->
+    <div style="padding-bottom: 18px; border-bottom: 2px solid #5B4CF5;">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 900; color: #1A085C; letter-spacing: -0.01em;">
+        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 16px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
+      </h2>
+      <p style="margin: 4px 0 0 0; font-size: 12px; color: #6B7280;">
         Engineering Studio for AI, SaaS &amp; Digital Systems
-      </div>
+      </p>
     </div>
 
-    <!-- Body Content -->
-    <div style="padding: 28px 32px 0;" class="inner-padding">
-      <div style="display: inline-block; padding: 5px 14px; background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 9999px; color: #16A34A; font-size: 12px; font-weight: 800; margin-bottom: 12px;">
-        &#x2705; PAYMENT CONFIRMED &amp; SETTLED
-      </div>
-
-      <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #1A085C; letter-spacing: -0.02em;">
-        Hello ${escapeHtml(clientName)},
-      </h2>
-      <p style="margin: 0 0 24px 0; font-size: 15px; color: #4B5563; line-height: 1.5;">
-        Thank you! We have received and confirmed your payment for <strong style="color: #1A085C;">${escapeHtml(projectTitle)}</strong>.
+    <!-- Main Message -->
+    <div style="padding: 24px 0 16px 0;">
+      <p style="margin: 0 0 14px 0; font-size: 16px; font-weight: 700; color: #1A085C;">
+        Hi ${escapeHtml(clientName)},
+      </p>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">
+        We have received and verified your payment of <strong style="color: #16A34A; font-size: 15px;">${escapeHtml(formattedAmount)}</strong> for <strong style="color: #1A085C;">${escapeHtml(projectTitle)}</strong>. Thank you!
       </p>
 
-      <!-- Receipt Details Box -->
-      <div style="background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 16px; padding: 20px 22px; margin-bottom: 24px;">
-        <div style="font-size: 15px; font-weight: 800; color: #1A085C; margin-bottom: 16px;">
-          Payment Receipt Details
-        </div>
-
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; width: 42%; white-space: nowrap;">Payment Type</td>
-            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; width: 14px; text-align: center;">:</td>
-            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(cleanMilestone)}</td>
-          </tr>
-          <tr>
-            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
-          </tr>
-          <tr>
-            <td style="padding: 12px 0; color: #6B7280; font-size: 14px; font-weight: 500;">Amount Received</td>
-            <td style="padding: 12px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
-            <td style="padding: 12px 0; color: #16A34A; font-size: 22px; font-weight: 900;" class="amount-display">${escapeHtml(formattedAmount)}</td>
-          </tr>
-          <tr>
-            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
-          </tr>
-          <tr>
-            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Payment Mode</td>
-            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
-            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(mode)}</td>
-          </tr>
-          <tr>
-            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
-          </tr>
-          <tr>
-            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Payment ID</td>
-            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
-            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(paymentId)}</td>
-          </tr>
-          <tr>
-            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
-          </tr>
-          <tr>
-            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Paid At</td>
-            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
-            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700;">${escapeHtml(paidAtFormatted)}</td>
-          </tr>
-          <tr>
-            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
-          </tr>
-          <tr>
-            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Invoice Reference</td>
-            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
-            <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(invoiceNumber)}</td>
-          </tr>
-        </table>
-      </div>
+      <!-- Simple, spacious payment details (No nested cards, clean lines) -->
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13.5px;">
+        <tr>
+          <td style="padding: 9px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9; width: 140px;">Payment Type</td>
+          <td style="padding: 9px 0; color: #1A085C; font-weight: 700; border-bottom: 1px solid #F0EDF9;">${escapeHtml(cleanMilestone)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9;">Amount Received</td>
+          <td style="padding: 10px 0; color: #16A34A; font-weight: 800; font-size: 15px; border-bottom: 1px solid #F0EDF9;">${escapeHtml(formattedAmount)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 9px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9;">Payment Mode</td>
+          <td style="padding: 9px 0; color: #1A085C; font-weight: 700; border-bottom: 1px solid #F0EDF9;">${escapeHtml(mode)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 9px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9;">Payment ID</td>
+          <td style="padding: 9px 0; color: #1A085C; font-weight: 700; font-family: monospace; border-bottom: 1px solid #F0EDF9; word-break: break-all;">${escapeHtml(paymentId)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 9px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9;">Paid At</td>
+          <td style="padding: 9px 0; color: #1A085C; font-weight: 700; border-bottom: 1px solid #F0EDF9;">${escapeHtml(paidAtFormatted)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 9px 0; color: #6B7280; font-weight: 500; border-bottom: 1px solid #F0EDF9;">Invoice Reference</td>
+          <td style="padding: 9px 0; color: #5B4CF5; font-weight: 700; font-family: monospace; border-bottom: 1px solid #F0EDF9;">${escapeHtml(invoiceNumber)}</td>
+        </tr>
+      </table>
 
       <!-- Attachment Notice -->
-      <div style="margin: 24px 0 20px 0; padding: 14px 18px; background-color: #F8F8FF; border: 1px solid #EAE6F7; border-radius: 12px; font-size: 13px; color: #4B5563; line-height: 1.5;">
-        &#x1F4CE; <strong>Official Invoice Attached:</strong> Your tax invoice is attached as a PDF (<strong>Invoice-${escapeHtml(invoiceNumber)}.pdf</strong>) for your records.
-      </div>
+      <p style="margin: 20px 0; font-size: 13.5px; color: #4B5563; background-color: #FAF8FF; border-left: 3px solid #5B4CF5; padding: 12px 16px; border-radius: 4px;">
+        &#x1F4CE; <strong>Official Invoice Attached:</strong> Your tax invoice is attached as a PDF (<strong>Invoice-${escapeHtml(invoiceNumber)}.pdf</strong>) for your accounting and records.
+      </p>
 
-      <!-- Sign off -->
-      <p style="margin: 0 0 28px 0; font-size: 14px; color: #4B5563;">
-        Thank you for choosing <strong style="color: #1A085C;">Info<span style="color: #7C5CE8;">HQ</span></strong>.
+      <p style="margin: 24px 0 0 0; font-size: 14px; color: #4B5563;">
+        Best regards,<br>
+        <strong style="color: #1A085C;">InfoHQ Billing Team</strong>
       </p>
     </div>
 
-    <!-- Footer -->
-    <div style="border-top: 1px solid #EAE6F7; padding: 22px 32px 28px; text-align: center; background-color: #FAFAFD;" class="inner-padding">
-      <div style="font-size: 14px; font-weight: 800; color: #1A085C; letter-spacing: -0.01em;">
-        Info<span style="color: #7C5CE8;">HQ</span> Pvt Ltd
-      </div>
-      <div style="font-size: 12px; color: #6B7280; margin-top: 3px;">
-        Engineering Studio for AI, SaaS &amp; Digital Systems
-      </div>
-      <div style="font-size: 11px; color: #9CA3AF; margin-top: 12px; line-height: 1.4;">
-        This is an automatically generated email. Please do not reply directly to this message.
-      </div>
+    <!-- Simple Minimal Footer -->
+    <div style="border-top: 1px solid #E5E7EB; padding-top: 18px; margin-top: 24px; font-size: 11.5px; color: #9CA3AF; text-align: center; line-height: 1.5;">
+      InfoHQ Pvt Ltd • Prayagraj, Uttar Pradesh, India • <a href="https://infohq.in" style="color: #5B4CF5; text-decoration: none;">infohq.in</a><br>
+      For any billing queries, contact us at <a href="mailto:billing@infohq.in" style="color: #5B4CF5; text-decoration: none;">billing@infohq.in</a>
     </div>
 
   </div>

@@ -20,9 +20,28 @@ export interface InvoicePdfOptions {
   itemsJson?: string;
 }
 
+// Clean word-wrap helper to prevent any text clipping or truncation
+function wrapWords(text: string, maxCharsPerLine: number): string[] {
+  const words = text.trim().split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    if (!word) continue;
+    if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
+      currentLine = (currentLine + ' ' + word).trim();
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
 /**
  * Generates an official, beautifully branded vector PDF Tax Invoice
- * matching InfoHQ Command Center luxury design specification.
+ * matching InfoHQ Command Center CRM view specifications 1:1.
  */
 export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
@@ -32,6 +51,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
 
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
   // Exact Brand Colors matching website & CRM design
   const colorNavy = rgb(26 / 255, 8 / 255, 92 / 255);         // #1A085C (Headings)
@@ -41,17 +61,17 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const colorPink = rgb(232 / 255, 90 / 255, 160 / 255);      // #E85AA0 (Accent Pink)
   const colorBody = rgb(55 / 255, 65 / 255, 81 / 255);        // #374151 (Body Text)
   const colorMuted = rgb(107 / 255, 114 / 255, 128 / 255);    // #6B7280 (Muted Labels)
-  const colorSubtle = rgb(156 / 255, 163 / 255, 175 / 255);  // #9CA3AF (Subtle)
+  const colorSubtle = rgb(156 / 255, 163 / 255, 175 / 255);  // #9CA3AF
   const colorBorder = rgb(233 / 255, 213 / 255, 255 / 255);  // #E9D5FF (Card Borders)
-  const colorBgBox = rgb(250 / 255, 248 / 255, 255 / 255);   // #FAF8FF (Light Tint)
+  const colorBgBox = rgb(250 / 255, 248 / 255, 255 / 255);   // #FAF8FF (Card Background)
   const colorTableBorder = rgb(240 / 255, 237 / 255, 249 / 255); // #F0EDF9
   const colorWhite = rgb(1, 1, 1);
-  const colorSuccess = rgb(4 / 255, 120 / 255, 87 / 255);     // #047857 (Paid Emerald)
+  const colorSuccess = rgb(5 / 255, 150 / 255, 105 / 255);    // #059669 (Paid Emerald)
 
   const marginX = 45;
-  const contentW = width - marginX * 2; // 505.28
+  const contentW = width - marginX * 2; // 505.28 pt
 
-  // 1. BRAND HEADER (Info Coral, HQ Violet, Pvt Ltd Navy)
+  // 1. BRAND HEADER (Info in Coral, HQ in Violet, Pvt Ltd in Navy)
   let y = height - 48; // 793.89
   page.drawText('Info', { x: marginX, y, size: 24, font: fontBold, color: colorCoral });
   const infoW = fontBold.widthOfTextAtSize('Info', 24);
@@ -68,7 +88,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     color: colorMuted,
   });
 
-  // 3-Tone Brand Gradient Bar
+  // 3-Tone Brand Gradient Bar across full content width
   y -= 14;
   const segW = contentW / 3;
   page.drawLine({ start: { x: marginX, y }, end: { x: marginX + segW, y }, thickness: 2.5, color: colorViolet });
@@ -109,14 +129,13 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   page.drawText(clientIdText, { x: marginX + 62, y: billCursorY, size: 9, font: fontBold, color: colorNavy });
 
   // Right Column: Key-Value aligned with colon
-  const rightColX = 305;
-  const colonX = 385;
-  const valX = 395;
+  const rightColX = 300;
+  const colonX = 380;
+  const valX = 390;
   const drawMeta = (lbl: string, val: string, rY: number) => {
     page.drawText(lbl, { x: rightColX, y: rY, size: 9, font: fontRegular, color: colorMuted });
     page.drawText(':', { x: colonX, y: rY, size: 9, font: fontBold, color: colorSubtle });
-    const cleanVal = val.length > 24 ? val.substring(0, 22) + '...' : val;
-    page.drawText(cleanVal, { x: valX, y: rY, size: 9, font: fontBold, color: colorNavy });
+    page.drawText(val, { x: valX, y: rY, size: 8.5, font: fontBold, color: colorNavy });
   };
 
   drawMeta('Client ID', clientIdText, colY);
@@ -172,7 +191,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     ];
   }
 
-  // Draw Items Rows (up to 5 items)
+  // Draw Items Rows (Wrapped by words so no text is ever clipped or truncated with ...)
   items.slice(0, 5).forEach((item: any, idx) => {
     const itemNum = String(item.num || idx + 1);
     const itemDesc = String(item.desc || item.description || item.title || item.name || 'Milestone Delivery').trim();
@@ -180,10 +199,17 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     const itemRate = Number(item.rate || item.price || item.unitPrice || item.amount || 0);
     const itemAmt = Number(item.amount || (Number(itemQty) * itemRate) || itemRate);
 
+    const descLines = wrapWords(itemDesc, 48);
+
     y -= 14;
     page.drawText(itemNum, { x: marginX + 12, y, size: 9, font: fontBold, color: colorNavy });
-    const truncated = itemDesc.length > 55 ? itemDesc.substring(0, 53) + '...' : itemDesc;
-    page.drawText(truncated, { x: marginX + 38, y, size: 9, font: fontBold, color: colorNavy });
+
+    let descY = y;
+    for (const dl of descLines) {
+      page.drawText(dl, { x: marginX + 38, y: descY, size: 9, font: fontBold, color: colorNavy });
+      descY -= 12;
+    }
+
     page.drawText(itemQty, { x: marginX + 330, y, size: 9, font: fontRegular, color: colorBody });
 
     const rateStr = `INR ${itemRate.toLocaleString('en-IN')}`;
@@ -194,7 +220,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     const amtW = fontBold.widthOfTextAtSize(amtStr, 9);
     page.drawText(amtStr, { x: marginX + contentW - 14 - amtW, y, size: 9, font: fontBold, color: colorNavy });
 
-    y -= 10;
+    y = descY - 2;
     page.drawLine({
       start: { x: marginX, y },
       end: { x: marginX + contentW, y },
@@ -204,7 +230,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     y -= 4;
   });
 
-  // 5. BOTTOM SECTION: 2 EQUAL BOXES (Payment Terms vs Summary & Real Rubber Stamp)
+  // 5. BOTTOM SECTION: 2 EQUAL BOXES (Payment Terms vs Summary & Exact CRM Stamp)
   y -= 16;
   const boxW = 244;
   const boxH = 140;
@@ -234,19 +260,21 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     page.drawText('Milestone Description:', { x: marginX + 14, y: noteY, size: 8, font: fontBold, color: colorNavy });
     noteY -= 12;
     const cleanMilestone = data.milestoneTitle.trim();
-    const truncatedMilestone = cleanMilestone.length > 46 ? cleanMilestone.substring(0, 44) + '...' : cleanMilestone;
-    page.drawText(truncatedMilestone, { x: marginX + 14, y: noteY, size: 8, font: fontRegular, color: colorBody });
-    noteY -= 16;
+    const msLines = wrapWords(cleanMilestone, 46);
+    for (const ml of msLines.slice(0, 2)) {
+      page.drawText(ml, { x: marginX + 14, y: noteY, size: 8, font: fontRegular, color: colorBody });
+      noteY -= 11;
+    }
+    noteY -= 4;
   }
 
   if (data.notes && data.notes.trim().length > 0) {
     page.drawText('Terms & Notes:', { x: marginX + 14, y: noteY, size: 8, font: fontBold, color: colorNavy });
     noteY -= 12;
     const cleanNote = data.notes.trim();
-    const lines = cleanNote.split('\n');
-    for (const l of lines.slice(0, 3)) {
-      const lineTrunc = l.trim().length > 46 ? l.trim().substring(0, 44) + '...' : l.trim();
-      page.drawText(lineTrunc, { x: marginX + 14, y: noteY, size: 8, font: fontRegular, color: colorBody });
+    const noteLines = wrapWords(cleanNote, 46);
+    for (const nl of noteLines.slice(0, 3)) {
+      page.drawText(nl, { x: marginX + 14, y: noteY, size: 8, font: fontRegular, color: colorBody });
       noteY -= 11;
     }
   } else if (!data.milestoneTitle || data.milestoneTitle.trim().length === 0) {
@@ -298,37 +326,23 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   drawSummaryLine('Total Settled', isPaidState ? formattedAmt : 'INR 0');
   drawSummaryLine('Balance Due', isPaidState ? 'INR 0.00' : formattedAmt, true, false, isPaidState);
 
-  // 6. AUTHENTIC DOUBLE-LINE REAL RUBBER INK STAMP (-12 degrees)
-  let stampMainText = 'P A I D';
-  let stampTopText = 'OFFICIAL RECEIPT';
-  let stampBotText = 'VERIFIED & SETTLED';
+  // 6. EXACT CRM STAMP (matching style, angle, and position 1:1)
+  // Mirroring CRM: border-[2.5px] font-mono tracking-widest uppercase rotate(-12deg) at right-24 sm:right-28 bottom-2.5
+  let stampWord = 'PAID';
   let stampColor = colorSuccess;
-  let stampBg = rgb(240 / 255, 253 / 255, 244 / 255);
 
   if (statusStr.includes('refund')) {
-    stampMainText = 'R E F U N D E D';
-    stampTopText = 'AMOUNT REVERSED';
-    stampBotText = 'OFFICIAL SETTLEMENT';
-    stampColor = rgb(109 / 255, 40 / 255, 217 / 255);
-    stampBg = rgb(245 / 255, 243 / 255, 255 / 255);
+    stampWord = 'REFUNDED';
+    stampColor = rgb(124 / 255, 92 / 255, 232 / 255); // #7C5CE8
   } else if (statusStr.includes('fail')) {
-    stampMainText = 'F A I L E D';
-    stampTopText = 'TRANSACTION FAILED';
-    stampBotText = 'UNSUCCESSFUL ATTEMPT';
-    stampColor = rgb(220 / 255, 38 / 255, 38 / 255);
-    stampBg = rgb(254 / 255, 242 / 255, 242 / 255);
+    stampWord = 'FAILED';
+    stampColor = rgb(220 / 255, 38 / 255, 38 / 255);   // #DC2626
   } else if (statusStr.includes('expire')) {
-    stampMainText = 'E X P I R E D';
-    stampTopText = 'WINDOW CLOSED';
-    stampBotText = 'LINK INACTIVE';
-    stampColor = rgb(194 / 255, 65 / 255, 12 / 255);
-    stampBg = rgb(255 / 255, 237 / 255, 213 / 255);
+    stampWord = 'EXPIRED';
+    stampColor = rgb(217 / 255, 119 / 255, 6 / 255);   // #D97706
   } else if (!isPaidState || statusStr.includes('unpaid') || statusStr.includes('pending')) {
-    stampMainText = 'U N P A I D';
-    stampTopText = 'PAYMENT PENDING';
-    stampBotText = 'ACTION REQUIRED';
-    stampColor = rgb(217 / 255, 119 / 255, 6 / 255);
-    stampBg = rgb(254 / 255, 243 / 255, 199 / 255);
+    stampWord = 'UNPAID';
+    stampColor = rgb(217 / 255, 119 / 255, 6 / 255);   // #D97706
   }
 
   const angle = -12;
@@ -336,18 +350,15 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
 
-  const stampW = 108;
-  const stampH = 44;
-  const stampX = sumBoxX + 50;
-  const stampY = boxY + 20;
-  const p = 2.5;
+  const wordW = fontMono.widthOfTextAtSize(stampWord, 14);
+  const stampW = Math.max(76, wordW + 28);
+  const stampH = 26;
 
-  const getRotated = (dx: number, dy: number) => ({
-    x: stampX + dx * cos - dy * sin,
-    y: stampY + dx * sin + dy * cos,
-  });
+  // Exact position matching CRM view (right-24 to 28, bottom-2.5):
+  const stampX = sumBoxX + boxW - stampW - 32;
+  const stampY = boxY + 28;
 
-  // Outer Border (Thick Ink Line)
+  // Draw clean rectangular stamp with 2.2pt border matching CRM view
   page.drawRectangle({
     x: stampX,
     y: stampY,
@@ -355,54 +366,21 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     height: stampH,
     borderColor: stampColor,
     borderWidth: 2.2,
-    color: stampBg,
+    color: colorWhite,
     rotate: degrees(angle),
   });
 
-  // Inner Border (Thin Inset Line)
-  const innerPos = getRotated(p, p);
-  page.drawRectangle({
-    x: innerPos.x,
-    y: innerPos.y,
-    width: stampW - p * 2,
-    height: stampH - p * 2,
-    borderColor: stampColor,
-    borderWidth: 0.8,
-    rotate: degrees(angle),
-  });
+  const localDx = (stampW - wordW) / 2;
+  const localDy = (stampH - 14) / 2 + 1;
 
-  // Top Subtext Banner
-  const topW = fontBold.widthOfTextAtSize(stampTopText, 6.5);
-  const topPos = getRotated((stampW - topW) / 2, stampH - 11);
-  page.drawText(stampTopText, {
-    x: topPos.x,
-    y: topPos.y,
-    size: 6.5,
-    font: fontBold,
-    color: stampColor,
-    rotate: degrees(angle),
-  });
+  const textX = stampX + localDx * cos - localDy * sin;
+  const textY = stampY + localDx * sin + localDy * cos;
 
-  // Center Main Status Word (Stamped uppercase)
-  const mainW = fontBold.widthOfTextAtSize(stampMainText, 16);
-  const mainPos = getRotated((stampW - mainW) / 2, (stampH - 16) / 2 + 1);
-  page.drawText(stampMainText, {
-    x: mainPos.x,
-    y: mainPos.y,
-    size: 16,
-    font: fontBold,
-    color: stampColor,
-    rotate: degrees(angle),
-  });
-
-  // Bottom Subtext Banner
-  const botW = fontBold.widthOfTextAtSize(stampBotText, 6);
-  const botPos = getRotated((stampW - botW) / 2, 5.5);
-  page.drawText(stampBotText, {
-    x: botPos.x,
-    y: botPos.y,
-    size: 6,
-    font: fontBold,
+  page.drawText(stampWord, {
+    x: textX,
+    y: textY,
+    size: 14,
+    font: fontMono,
     color: stampColor,
     rotate: degrees(angle),
   });
