@@ -328,6 +328,7 @@ export const PaymentStatusSchema = z.enum([
   'pending',
   'received',
   'failed',
+  'expired',
 ]);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
@@ -366,6 +367,7 @@ export const PaymentSchema = z.object({
   razorpayPaymentLinkUrl: z.string().nullable().optional(),
   razorpayPaymentId: z.string().nullable().optional(),
   itemsJson: z.string().nullable().optional(),
+  expiresAt: z.number().nullable().optional(),
 });
 
 export const AutoConvertWonLeadSchema = z.object({

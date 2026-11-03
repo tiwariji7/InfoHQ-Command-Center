@@ -10,6 +10,25 @@ import type {
 import { generateInvoiceNumber } from '../utils/idGenerator.js';
 
 function mapDbRowToPayment(row: Record<string, unknown>): Payment {
+  const now = Date.now();
+  const isPaid = row.status === 'received' || !!row.paid_at;
+  const expiresAt = row.expires_at
+    ? Number(row.expires_at)
+    : row.razorpay_payment_link_id
+    ? Number(row.created_at) + 24 * 60 * 60 * 1000
+    : null;
+
+  let effectiveStatus: Payment['status'] = (row.status as Payment['status']) || 'pending';
+  if (isPaid) {
+    effectiveStatus = 'received';
+  } else if (expiresAt && expiresAt < now) {
+    effectiveStatus = 'expired';
+  } else if (row.status === 'failed') {
+    effectiveStatus = 'failed';
+  } else {
+    effectiveStatus = 'pending';
+  }
+
   return {
     id: String(row.id),
     projectId: String(row.project_id),
@@ -24,7 +43,7 @@ function mapDbRowToPayment(row: Record<string, unknown>): Payment {
       : 'Milestone Payment',
     amount: Number(row.amount),
     currency: 'INR',
-    status: (row.status as Payment['status']) || 'pending',
+    status: effectiveStatus,
     paymentMethod: row.payment_method ? (String(row.payment_method) as Payment['paymentMethod']) : null,
     invoiceNumber: row.invoice_number ? String(row.invoice_number) : null,
     dueDate: row.due_date ? Number(row.due_date) : null,
@@ -41,6 +60,7 @@ function mapDbRowToPayment(row: Record<string, unknown>): Payment {
     razorpayPaymentLinkUrl: row.razorpay_payment_link_url ? String(row.razorpay_payment_link_url) : undefined,
     razorpayPaymentId: row.razorpay_payment_id ? String(row.razorpay_payment_id) : undefined,
     itemsJson: row.items_json ? String(row.items_json) : undefined,
+    expiresAt,
   };
 }
 
@@ -56,9 +76,22 @@ export async function getPayments(
     bindings.push(params.projectId);
   }
 
+  const now = Date.now();
   if (params.status && params.status !== 'all') {
-    conditions.push('py.status = ?');
-    bindings.push(params.status);
+    if (params.status === 'received') {
+      conditions.push("py.status = 'received'");
+    } else if (params.status === 'failed') {
+      conditions.push("py.status = 'failed'");
+    } else if (params.status === 'expired') {
+      conditions.push("(py.status != 'received' AND ((py.expires_at IS NOT NULL AND py.expires_at < ?) OR (py.expires_at IS NULL AND py.razorpay_payment_link_id IS NOT NULL AND (py.created_at + 86400000) < ?)))");
+      bindings.push(now, now);
+    } else if (params.status === 'pending') {
+      conditions.push("(py.status = 'pending' AND (py.expires_at IS NULL OR py.expires_at >= ?) AND (py.razorpay_payment_link_id IS NULL OR (py.created_at + 86400000) >= ?))");
+      bindings.push(now, now);
+    } else {
+      conditions.push("py.status = ?");
+      bindings.push(params.status);
+    }
   }
 
   if (params.search && params.search.trim().length > 0) {
@@ -87,10 +120,10 @@ export async function getPayments(
     LEFT JOIN clients c ON (c.id = py.client_id OR c.id = p.client_id)
     ${whereClause}
     ORDER BY 
-      CASE py.status
-        WHEN 'pending' THEN 1
-        WHEN 'received' THEN 2
-        WHEN 'failed' THEN 3
+      CASE 
+        WHEN py.status = 'received' THEN 2
+        WHEN py.status = 'failed' THEN 3
+        ELSE 1
       END ASC,
       py.created_at DESC
   `;
@@ -99,7 +132,6 @@ export async function getPayments(
   const payments = (results || []).map(mapDbRowToPayment);
 
   // Calculate summary metrics
-  const now = Date.now();
   let totalInvoiced = 0;
   let totalCollected = 0;
   let totalPending = 0;

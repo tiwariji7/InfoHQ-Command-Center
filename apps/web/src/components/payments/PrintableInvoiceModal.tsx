@@ -56,7 +56,9 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   const isPaid = statusLower === 'received' || statusLower === 'paid' || statusLower === 'completed';
   const isRefunded = statusLower === 'refunded';
   const isFailed = statusLower === 'failed';
-  const isUnpaid = !isPaid && !isRefunded && !isFailed;
+  const expiresAt = payment.expiresAt || (payment.razorpayPaymentLinkId ? payment.createdAt + 24 * 60 * 60 * 1000 : null);
+  const isExpired = !isPaid && (statusLower === 'expired' || (expiresAt ? expiresAt < Date.now() : false));
+  const isUnpaid = !isPaid && !isRefunded && !isFailed && !isExpired;
 
   const invoiceCode = payment.invoiceNumber || `INV-2026-${payment.id.slice(-4).toUpperCase()}`;
   const clientId = payment.clientId || `CLT-2026-${payment.id.slice(-4).toUpperCase()}`;
@@ -593,6 +595,17 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                       className="border-[2.5px] border-amber-600/90 text-amber-600 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
                     >
                       UNPAID
+                    </div>
+                  )}
+                  {isExpired && (
+                    <div
+                      style={{
+                        transform: 'rotate(-12deg)',
+                        boxShadow: '0 0 0 1px rgba(217, 119, 6, 0.2)',
+                      }}
+                      className="border-[2.5px] border-amber-600 text-amber-700 font-black tracking-widest text-lg sm:text-xl px-3.5 py-1 rounded-lg uppercase opacity-90 font-mono inline-block bg-white/80 backdrop-blur-2xs"
+                    >
+                      EXPIRED
                     </div>
                   )}
                   {isRefunded && (

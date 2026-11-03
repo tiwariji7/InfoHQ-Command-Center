@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { generateRazorpayPaymentLinkApi } from '../../lib/api.js';
+import { resendPaymentLinkApi } from '../../lib/api.js';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal.js';
 import type { Payment } from '@infohq/shared';
 import {
@@ -20,6 +20,7 @@ import {
   MessageCircle,
   FileCheck2,
   Calendar,
+  RefreshCw,
 } from 'lucide-react';
 
 interface InvoiceDetailDrawerProps {
@@ -89,16 +90,22 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
     setLocalPaymentLink(payment?.razorpayPaymentLinkUrl || null);
   }, [payment?.razorpayPaymentLinkUrl]);
 
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+
   const handleGenerateRazorpayLink = async () => {
-    if (!payment) return;
+    if (!payment || payment.status === 'received') return;
     setIsGeneratingRzp(true);
+    setResendNotice(null);
     try {
-      const res = await generateRazorpayPaymentLinkApi(getToken, payment.id);
+      const res = await resendPaymentLinkApi(getToken, payment.id);
       if (res.paymentLinkUrl) {
         setLocalPaymentLink(res.paymentLinkUrl);
+        setResendNotice('Fresh 24h payment link generated and sent via Email & Telegram!');
+        setTimeout(() => setResendNotice(null), 7000);
       }
-    } catch (err) {
-      console.error('Failed to create Razorpay link:', err);
+    } catch (err: unknown) {
+      console.error('Failed to create/resend Razorpay link:', err);
+      alert(err instanceof Error ? err.message : 'Failed to generate payment link');
     } finally {
       setIsGeneratingRzp(false);
     }
@@ -119,7 +126,14 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
 
   const isPaid = payment.status === 'received';
   const isFailed = payment.status === 'failed';
-  const isOverdue = !isPaid && payment.dueDate ? payment.dueDate < Date.now() : false;
+  const now = Date.now();
+  const expiresAt = payment.expiresAt || (payment.razorpayPaymentLinkId ? payment.createdAt + 24 * 60 * 60 * 1000 : null);
+  const isExpired = !isPaid && (payment.status === 'expired' || (expiresAt ? expiresAt < now : false));
+  const isOverdue = !isPaid && !isExpired && payment.dueDate ? payment.dueDate < now : false;
+
+  const remainingMs = expiresAt && !isPaid ? Math.max(0, expiresAt - now) : 0;
+  const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60));
+  const remainingMins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
   const amountPaid = isPaid ? payment.amount : 0;
   const pendingAmount = isPaid ? 0 : payment.amount;
@@ -232,6 +246,11 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
               ) : isFailed ? (
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
                   Failed
+                </span>
+              ) : isExpired ? (
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-300 shadow-2xs flex items-center gap-1.5">
+                  <Clock size={12} />
+                  <span>Expired (24h)</span>
                 </span>
               ) : isOverdue ? (
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs flex items-center gap-1.5 animate-pulse">
@@ -498,23 +517,75 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
                   <span>Record Received Funds (Mark Paid)</span>
                 </button>
 
-                {/* RAZORPAY PAYMENT LINK */}
-                {localPaymentLink ? (
-                  <a
-                    href={localPaymentLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                      boxShadow: '0 6px 20px -2px rgba(16, 185, 129, 0.35)',
-                    }}
-                    className="w-full h-11 rounded-2xl text-white text-xs font-extrabold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-98 transition-all cursor-pointer shadow-md group"
-                  >
-                    <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                      <ExternalLink size={13} className="text-white stroke-[2.8]" />
+                {resendNotice && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    <span>{resendNotice}</span>
+                  </div>
+                )}
+
+                {/* Expiry / Countdown Banner */}
+                {isExpired ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-2xl text-amber-800 text-[11.5px] space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <Clock size={13} className="text-amber-600" />
+                      <span>Payment Link Expired (24h Window)</span>
                     </div>
-                    <span>Open Live Razorpay Gateway</span>
-                  </a>
+                    <div className="text-[11px] text-amber-700">
+                      The client cannot pay using the previous link. Click below to generate a new live 24h link for this invoice.
+                    </div>
+                  </div>
+                ) : (
+                  remainingMs > 0 && (
+                    <div className="px-3 py-1.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[11px] text-[#5B4CF5] font-semibold flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={12} />
+                        <span>Link Active (24h Window)</span>
+                      </div>
+                      <span className="font-bold">Expires in {remainingHours}h {remainingMins}m</span>
+                    </div>
+                  )
+                )}
+
+                {/* RAZORPAY PAYMENT LINK & RESEND BUTTONS */}
+                {isExpired ? (
+                  <button
+                    type="button"
+                    onClick={handleGenerateRazorpayLink}
+                    disabled={isGeneratingRzp}
+                    className="w-full h-11 rounded-2xl bg-gradient-to-r from-[#5B4CF5] to-[#E85AA0] hover:brightness-105 active:scale-98 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={isGeneratingRzp ? 'animate-spin' : ''} />
+                    <span>{isGeneratingRzp ? 'Generating New 24h Link...' : 'Resend Payment Link (Fresh 24h)'}</span>
+                  </button>
+                ) : localPaymentLink ? (
+                  <div className="space-y-2">
+                    <a
+                      href={localPaymentLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                        boxShadow: '0 6px 20px -2px rgba(16, 185, 129, 0.35)',
+                      }}
+                      className="w-full h-11 rounded-2xl text-white text-xs font-extrabold flex items-center justify-center gap-2 hover:brightness-110 hover:-translate-y-0.5 active:scale-98 transition-all cursor-pointer shadow-md group"
+                    >
+                      <div className="w-6 h-6 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <ExternalLink size={13} className="text-white stroke-[2.8]" />
+                      </div>
+                      <span>Open Live Razorpay Gateway</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={handleGenerateRazorpayLink}
+                      disabled={isGeneratingRzp}
+                      className="w-full h-9 rounded-xl bg-white hover:bg-[#FAF9FD] text-[#5B4CF5] border border-[#5B4CF5]/30 hover:border-[#5B4CF5] text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} className={isGeneratingRzp ? 'animate-spin' : ''} />
+                      <span>{isGeneratingRzp ? 'Regenerating...' : 'Regenerate & Resend Link'}</span>
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -525,7 +596,7 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
                     <div className="w-6 h-6 rounded-xl bg-[#F3F0FF] text-[#5B4CF5] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                       {isGeneratingRzp ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="stroke-[2.5]" />}
                     </div>
-                    <span>{isGeneratingRzp ? 'Generating Razorpay Link...' : 'Create Razorpay Payment Link'}</span>
+                    <span>{isGeneratingRzp ? 'Generating Razorpay Link...' : 'Create Razorpay Payment Link (24h)'}</span>
                   </button>
                 )}
               </>

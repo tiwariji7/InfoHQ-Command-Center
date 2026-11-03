@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Payment, PaymentSummary } from '@infohq/shared';
-import { fetchPayments, deletePaymentApi, syncRazorpayPaymentApi } from '../../lib/api.js';
+import { fetchPayments, deletePaymentApi, syncRazorpayPaymentApi, resendPaymentLinkApi } from '../../lib/api.js';
 import { CreatePaymentModal } from './CreatePaymentModal.js';
 import { RecordPaymentModal } from './RecordPaymentModal.js';
 import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
@@ -20,6 +20,7 @@ import {
   Eye,
   Download,
   Clock,
+  Send,
 } from 'lucide-react';
 
 export const PaymentsView: React.FC = () => {
@@ -114,6 +115,20 @@ export const PaymentsView: React.FC = () => {
   };
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResendLink = async (paymentId: string) => {
+    setResendingId(paymentId);
+    try {
+      const res = await resendPaymentLinkApi(getToken, paymentId);
+      alert(res.message || 'Fresh 24h payment link generated and sent to client via Email & Telegram!');
+      loadPayments(true);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to generate/resend link.');
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const handleSyncRazorpay = async (paymentId: string) => {
     setSyncingId(paymentId);
@@ -168,6 +183,7 @@ export const PaymentsView: React.FC = () => {
     { key: 'all', label: 'All Invoices' },
     { key: 'pending', label: 'Pending Receivables' },
     { key: 'received', label: 'Received / Paid' },
+    { key: 'expired', label: 'Expired (24h)' },
     { key: 'failed', label: 'Failed' },
   ];
 
@@ -481,8 +497,9 @@ export const PaymentsView: React.FC = () => {
               <tbody className="divide-y divide-[#EAE6F7]/60">
                 {payments.map((py) => {
                   const isPaid = py.status === 'received';
-                  const isOverdue =
-                    py.status === 'pending' && py.dueDate && py.dueDate < now;
+                  const expiresAt = py.expiresAt || (py.razorpayPaymentLinkId ? py.createdAt + 24 * 60 * 60 * 1000 : null);
+                  const isExpired = !isPaid && (py.status === 'expired' || (expiresAt ? expiresAt < now : false));
+                  const isOverdue = !isPaid && !isExpired && py.dueDate && py.dueDate < now;
 
                   return (
                     <tr
@@ -546,6 +563,11 @@ export const PaymentsView: React.FC = () => {
                             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
                             <span>Received</span>
                           </div>
+                        ) : isExpired ? (
+                          <div className="flex items-center gap-1.5 text-amber-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span>Expired (24h)</span>
+                          </div>
                         ) : isOverdue ? (
                           <div className="flex items-center gap-1.5 text-rose-600">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
@@ -582,6 +604,17 @@ export const PaymentsView: React.FC = () => {
                           >
                             <Download size={15} />
                           </button>
+
+                          {!isPaid && (
+                            <button
+                              onClick={() => handleResendLink(py.id)}
+                              disabled={resendingId === py.id}
+                              className="p-1.5 rounded-lg text-[#6B7280] hover:text-[#5B4CF5] hover:bg-[#F3F0FF] transition-colors disabled:opacity-50 cursor-pointer"
+                              title={isExpired ? "Payment link expired. Generate new 24h link & resend" : "Resend 24-hour payment link"}
+                            >
+                              <Send size={13} className={resendingId === py.id ? 'animate-spin' : ''} />
+                            </button>
+                          )}
 
                           {!isPaid && py.razorpayPaymentLinkId && (
                             <button

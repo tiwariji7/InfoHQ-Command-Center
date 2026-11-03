@@ -111,19 +111,20 @@ paymentsRouter.post('/', async (c) => {
 
         if (rzpResult) {
           await c.env.DB.prepare(
-            'UPDATE payments SET razorpay_payment_link_id = ?, razorpay_payment_link_url = ?, invoice_number = ? WHERE id = ?'
+            'UPDATE payments SET razorpay_payment_link_id = ?, razorpay_payment_link_url = ?, invoice_number = ?, expires_at = ? WHERE id = ?'
           )
-            .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, payment.id)
+            .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, rzpResult.expiresAt, payment.id)
             .run();
 
           payment.razorpayPaymentLinkId = rzpResult.id;
           payment.razorpayPaymentLinkUrl = rzpResult.shortUrl;
           payment.invoiceNumber = invoiceNumber;
+          payment.expiresAt = rzpResult.expiresAt;
 
           // Determine project budget if available
           let projectBudget = payment.amount;
           if (payment.projectId) {
-            const prRow = await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first<{ budget: string }>();
+            const prRow = (await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first()) as { budget: string } | null;
             if (prRow?.budget) {
               const parsed = parseFloat(String(prRow.budget).replace(/[^0-9.]/g, ''));
               if (!isNaN(parsed) && parsed > 0) projectBudget = parsed;
@@ -140,6 +141,7 @@ paymentsRouter.post('/', async (c) => {
                 amount: payment.amount,
                 totalBudget: projectBudget,
                 paymentLinkUrl: rzpResult.shortUrl,
+                expiresAt: rzpResult.expiresAt,
               },
               c.env
             )
@@ -166,6 +168,7 @@ paymentsRouter.post('/', async (c) => {
                   totalBudget: projectBudget,
                   paymentLinkUrl: rzpResult.shortUrl,
                   dueDateFormatted,
+                  expiresAt: rzpResult.expiresAt,
                 },
                 c.env.RESEND_API_KEY
               )
@@ -377,8 +380,9 @@ paymentsRouter.delete('/:id', async (c) => {
   }
 });
 
-// POST /api/payments/:id/generate-payment-link - Generate a live Razorpay link for this invoice
-paymentsRouter.post('/:id/generate-payment-link', async (c) => {
+// POST /api/payments/:id/generate-payment-link and /resend-payment-link
+// Generates or resends a fresh 24-hour live Razorpay link for this invoice
+const handleGenerateOrResendLink = async (c: any) => {
   if (!c.env.DB) {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
   }
@@ -387,6 +391,14 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
   const payment = await getPaymentById(c.env.DB, paymentId);
   if (!payment) {
     return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
+  }
+
+  // Strict Protection: If payment is already received/settled, prevent repeat links or regeneration
+  if (payment.status === 'received' || payment.paidAt) {
+    return c.json({
+      error: 'already_paid',
+      message: 'Payment has already been received and confirmed. Cannot generate or resend payment link.',
+    }, 400);
   }
 
   const keyId = c.env.RAZORPAY_KEY_ID;
@@ -416,26 +428,30 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
     return c.json({ error: 'razorpay_error', message: 'Failed to create payment link on Razorpay.' }, 502);
   }
 
+  // Update payments table with new link and fresh 24h expires_at, reset status to pending
   await c.env.DB.prepare(`
     UPDATE payments
     SET razorpay_payment_link_id = ?,
         razorpay_payment_link_url = ?,
-        invoice_number = ?
+        invoice_number = ?,
+        expires_at = ?,
+        status = 'pending',
+        updated_at = ?
     WHERE id = ?
   `)
-    .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, paymentId)
+    .bind(rzpResult.id, rzpResult.shortUrl, invoiceNumber, rzpResult.expiresAt, Date.now(), paymentId)
     .run();
 
   let projectBudget = payment.amount;
   if (payment.projectId) {
-    const prRow = await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first<{ budget: string }>();
+    const prRow = (await c.env.DB.prepare('SELECT budget FROM projects WHERE id = ?').bind(payment.projectId).first()) as { budget: string } | null;
     if (prRow?.budget) {
       const parsed = parseFloat(String(prRow.budget).replace(/[^0-9.]/g, ''));
       if (!isNaN(parsed) && parsed > 0) projectBudget = parsed;
     }
   }
 
-  // Send Telegram Alert 1
+  // Send Telegram Alert 1 with 24-hour expiration details
   c.executionCtx.waitUntil(
     sendTelegramPaymentLinkAlert(
       {
@@ -445,12 +461,13 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
         amount: payment.amount,
         totalBudget: projectBudget,
         paymentLinkUrl: rzpResult.shortUrl,
+        expiresAt: rzpResult.expiresAt,
       },
       c.env
     )
   );
 
-  // Send Resend Email if email is available
+  // Send Resend Email with fresh link and 24h validity notice
   if (payment.clientEmail && c.env.RESEND_API_KEY) {
     const dueDateFormatted = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
@@ -466,19 +483,30 @@ paymentsRouter.post('/:id/generate-payment-link', async (c) => {
           clientEmail: payment.clientEmail,
           invoiceNumber,
           projectTitle: payment.projectTitle || 'Website Development',
-          milestoneTitle: payment.title || 'Advance Payment',
+          milestoneTitle: payment.title || 'Payment Request',
           amount: payment.amount,
-          totalBudget: payment.amount,
+          totalBudget: projectBudget,
           paymentLinkUrl: rzpResult.shortUrl,
           dueDateFormatted,
+          expiresAt: rzpResult.expiresAt,
         },
         c.env.RESEND_API_KEY
       )
     );
   }
 
-  return c.json({ success: true, paymentLinkUrl: rzpResult.shortUrl });
-});
+  const updatedPayment = await getPaymentById(c.env.DB, paymentId);
+  return c.json({
+    success: true,
+    paymentLinkUrl: rzpResult.shortUrl,
+    expiresAt: rzpResult.expiresAt,
+    payment: updatedPayment,
+    message: 'New 24-hour payment link created and sent to client via Email and Telegram.',
+  });
+};
+
+paymentsRouter.post('/:id/generate-payment-link', handleGenerateOrResendLink);
+paymentsRouter.post('/:id/resend-payment-link', handleGenerateOrResendLink);
 
 // POST /api/payments/:id/sync-razorpay - Verify & sync payment status directly from Razorpay
 paymentsRouter.post('/:id/sync-razorpay', async (c) => {

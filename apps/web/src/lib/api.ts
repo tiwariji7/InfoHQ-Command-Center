@@ -422,9 +422,22 @@ export async function autoConvertWonLeadApi(
 export async function generateRazorpayPaymentLinkApi(
   getToken: () => Promise<string | null>,
   paymentId: string
-): Promise<{ success: boolean; paymentLinkUrl: string }> {
-  return fetchWithAuth<{ success: boolean; paymentLinkUrl: string }>(
+): Promise<{ success: boolean; paymentLinkUrl: string; expiresAt?: number; payment?: Payment; message?: string }> {
+  return fetchWithAuth<{ success: boolean; paymentLinkUrl: string; expiresAt?: number; payment?: Payment; message?: string }>(
     `/api/payments/${paymentId}/generate-payment-link`,
+    getToken,
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function resendPaymentLinkApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<{ success: boolean; paymentLinkUrl: string; expiresAt?: number; payment?: Payment; message?: string }> {
+  return fetchWithAuth<{ success: boolean; paymentLinkUrl: string; expiresAt?: number; payment?: Payment; message?: string }>(
+    `/api/payments/${paymentId}/resend-payment-link`,
     getToken,
     {
       method: 'POST',

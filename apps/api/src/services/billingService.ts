@@ -8,6 +8,7 @@ import { generateInvoiceNumber } from '../utils/idGenerator.js';
 export interface RazorpayLinkResult {
   id: string;
   shortUrl: string;
+  expiresAt: number;
 }
 
 // 1. Create Razorpay Payment Link
@@ -49,12 +50,17 @@ export async function createRazorpayPaymentLink(
     email = customer.email.trim();
   }
 
+  const nowMs = Date.now();
+  const expireBySeconds = Math.floor((nowMs + 24 * 60 * 60 * 1000) / 1000);
+  const expiresAtMs = expireBySeconds * 1000;
+
   const payload = {
     amount: Math.max(100, Math.round(amount * 100)), // Razorpay accepts paise (minimum 100 paise = ₹1)
     currency: 'INR',
     accept_partial: false,
     reference_id: paymentDbId || invoiceNumber,
     description: `${description} (${invoiceNumber})`,
+    expire_by: expireBySeconds,
     customer: {
       name: customer.name,
       email: email || undefined,
@@ -94,10 +100,11 @@ export async function createRazorpayPaymentLink(
       return null;
     }
 
-    const data = (await res.json()) as { id: string; short_url: string };
+    const data = (await res.json()) as { id: string; short_url: string; expire_by?: number };
     return {
       id: data.id,
       shortUrl: data.short_url,
+      expiresAt: data.expire_by ? data.expire_by * 1000 : expiresAtMs,
     };
   } catch (err) {
     console.error('[Razorpay Link Fetch Exception]:', err);
@@ -258,6 +265,7 @@ export async function sendInvoiceEmailViaResend(
     totalBudget?: number;
     paymentLinkUrl?: string;
     dueDateFormatted: string;
+    expiresAt?: number;
   },
   apiKey: string
 ): Promise<boolean> {
@@ -270,7 +278,19 @@ export async function sendInvoiceEmailViaResend(
     amount,
     paymentLinkUrl,
     dueDateFormatted,
+    expiresAt,
   } = params;
+
+  const expiryEpoch = expiresAt || (Date.now() + 24 * 60 * 60 * 1000);
+  const expiryTimeFormatted = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(expiryEpoch)) + ' IST';
 
   const formattedAmount = '₹' + amount.toLocaleString('en-IN');
 
@@ -393,6 +413,27 @@ export async function sendInvoiceEmailViaResend(
             <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Invoice / Reference</td>
             <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
             <td style="padding: 10px 0; color: #1A085C; font-size: 14px; font-weight: 700; font-family: monospace, Courier, monospace;">${escapeHtml(invoiceNumber)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border-top: 1px solid #EAE6F7; height: 1px; padding: 0;"></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6B7280; font-size: 14px; font-weight: 500; white-space: nowrap;">Link Validity</td>
+            <td style="padding: 10px 10px; color: #6B7280; font-size: 14px; text-align: center;">:</td>
+            <td style="padding: 10px 0; color: #D97706; font-size: 13px; font-weight: 700;">24 Hours (Expires ${escapeHtml(expiryTimeFormatted)})</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- 24-Hour Expiry Alert -->
+      <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-left: 4px solid #F59E0B; border-radius: 12px; padding: 14px 18px; margin: 20px 0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="28" style="vertical-align: top; font-size: 18px; line-height: 1;">⏳</td>
+            <td style="font-size: 13px; color: #92400E; line-height: 1.5; font-weight: 500;">
+              <strong style="color: #78350F; font-weight: 800; display: block; margin-bottom: 2px;">Strict 24-Hour Payment Validity</strong>
+              This payment link is active for exactly <strong>24 hours</strong> and will securely expire on <strong>${escapeHtml(expiryTimeFormatted)}</strong>. Please complete the settlement prior to expiry to prevent invoice deactivation.
+            </td>
           </tr>
         </table>
       </div>
@@ -817,7 +858,7 @@ export async function sendTelegramDocument(
   }
 }
 
-// 3. Telegram Alert: Advance Payment Link Generated (Message 1)
+// 3. Telegram Alert: Advance Payment Link Generated (Message 1 with 24h Expiry Notice)
 export async function sendTelegramPaymentLinkAlert(
   params: {
     clientName: string;
@@ -826,9 +867,21 @@ export async function sendTelegramPaymentLinkAlert(
     amount: number;
     totalBudget: number;
     paymentLinkUrl?: string;
+    expiresAt?: number;
   },
   env: Bindings
 ) {
+  const expiryEpoch = params.expiresAt || (Date.now() + 24 * 60 * 60 * 1000);
+  const expiryTimeIST = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(expiryEpoch)) + ' IST';
+
   const msg =
     `🔗 <b>New Payment Link Generated!</b>\n\n` +
     `👤 <b>Client:</b> ${escapeHtml(params.clientName)}\n` +
@@ -836,10 +889,12 @@ export async function sendTelegramPaymentLinkAlert(
     `🧾 <b>Invoice #:</b> <code>${escapeHtml(params.invoiceNumber)}</code>\n` +
     `💰 <b>Amount Due:</b> ₹${params.amount.toLocaleString('en-IN')}\n` +
     `📊 <b>Total Project Budget:</b> ₹${params.totalBudget.toLocaleString('en-IN')}\n\n` +
+    `⏳ <b>Validity:</b> 24 Hours Only (Strict)\n` +
+    `⏰ <b>Expires At:</b> ${expiryTimeIST}\n\n` +
     (params.paymentLinkUrl
       ? `🌐 <b>Payment Link:</b>\n${params.paymentLinkUrl}\n\n`
       : `ℹ️ <i>Direct offline settlement recorded.</i>\n\n`) +
-    `⚡ <i>Client can settle instantly via UPI, Cards, or NetBanking.</i>`;
+    `⚠️ <i>Note: This payment link will automatically expire and deactivate after 24 hours if unpaid.</i>`;
 
   return sendTelegramMessage(msg, env);
 }
@@ -1091,12 +1146,13 @@ export async function autoConvertWonLeadToProjectAndInvoice(
   // 4. Create Razorpay Payment Link if keys exist
   let razorpayLinkId: string | null = null;
   let razorpayLinkUrl: string | null = null;
+  let rzpResult: RazorpayLinkResult | null = null;
 
   const keyId = env.RAZORPAY_KEY_ID;
   const keySecret = env.RAZORPAY_KEY_SECRET;
 
   if (keyId && keySecret) {
-    const rzpResult = await createRazorpayPaymentLink(
+    rzpResult = await createRazorpayPaymentLink(
       {
         amount: advanceAmount,
         invoiceNumber,
@@ -1124,8 +1180,8 @@ export async function autoConvertWonLeadToProjectAndInvoice(
       INSERT INTO payments (
         id, client_id, project_id, amount, status, invoice_number, paid_at, created_at,
         client_name, client_email, client_phone, company, title, due_date, notes,
-        payment_method, razorpay_payment_link_id, razorpay_payment_link_url, items_json
-      ) VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+        payment_method, razorpay_payment_link_id, razorpay_payment_link_url, items_json, expires_at
+      ) VALUES (?, ?, ?, ?, 'pending', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
     `)
     .bind(
       paymentId,
@@ -1143,7 +1199,8 @@ export async function autoConvertWonLeadToProjectAndInvoice(
       `Advance milestone billing for ${projectTitle}.`,
       razorpayLinkId,
       razorpayLinkUrl,
-      JSON.stringify(lineItems)
+      JSON.stringify(lineItems),
+      rzpResult ? rzpResult.expiresAt : null
     )
     .run();
 
@@ -1215,6 +1272,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
         amount: advanceAmount,
         totalBudget,
         paymentLinkUrl: razorpayLinkUrl || undefined,
+        expiresAt: rzpResult?.expiresAt,
       },
       env
     );
@@ -1231,6 +1289,7 @@ export async function autoConvertWonLeadToProjectAndInvoice(
           totalBudget,
           paymentLinkUrl: razorpayLinkUrl || undefined,
           dueDateFormatted,
+          expiresAt: rzpResult?.expiresAt,
         },
         env.RESEND_API_KEY
       );
