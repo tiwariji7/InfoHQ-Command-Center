@@ -7,6 +7,7 @@ import { RecordPaymentModal } from './RecordPaymentModal.js';
 import { InvoiceDetailDrawer } from './InvoiceDetailDrawer.js';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal.js';
 import { ClientDetailDrawer } from './ClientDetailDrawer.js';
+import { RevealGroup, RevealItem, CountUp, SkeletonBox } from '../motion/index.js';
 import {
   Plus,
   Search,
@@ -199,6 +200,8 @@ export const PaymentsView: React.FC = () => {
       id: 0,
       title: 'Collected Realization',
       value: formatCurrency(summary.totalCollected),
+      rawNum: summary.totalCollected,
+      isCurrency: true,
       subtext: `↑ ${recoveryRate}% cashflow realized`,
       icon: IndianRupee,
       iconBg: 'bg-[#FFF0F7]',
@@ -208,6 +211,8 @@ export const PaymentsView: React.FC = () => {
       id: 1,
       title: 'Total Invoiced Ledger',
       value: formatCurrency(summary.totalInvoiced),
+      rawNum: summary.totalInvoiced,
+      isCurrency: true,
       subtext: 'Across all client milestones',
       icon: Receipt,
       iconBg: 'bg-[#F3F0FF]',
@@ -217,6 +222,8 @@ export const PaymentsView: React.FC = () => {
       id: 2,
       title: 'Pending Receivables',
       value: formatCurrency(summary.totalPending),
+      rawNum: summary.totalPending,
+      isCurrency: true,
       subtext: 'Awaiting client disbursement',
       icon: Clock,
       iconBg: 'bg-[#FFF7ED]',
@@ -226,6 +233,8 @@ export const PaymentsView: React.FC = () => {
       id: 3,
       title: 'Overdue Invoices',
       value: summary.overdueCount.toString(),
+      rawNum: summary.overdueCount,
+      isCurrency: false,
       subtext: summary.overdueCount > 0 ? 'Requires immediate follow-up' : 'Zero overdue dues',
       icon: AlertTriangle,
       iconBg: 'bg-rose-50',
@@ -306,13 +315,13 @@ export const PaymentsView: React.FC = () => {
       {/* ========================================================= */}
       {/* 1. TOP SUMMARY METRIC CARDS WITH DYNAMIC HOVER            */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <RevealGroup className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {paymentMetricCards.map((card, idx) => {
           const isHovered = hoveredMetricIndex === idx;
           const CardIcon = card.icon;
 
           return (
-            <div
+            <RevealItem
               key={card.id}
               onMouseEnter={() => setHoveredMetricIndex(idx)}
               onMouseLeave={() => setHoveredMetricIndex(null)}
@@ -352,7 +361,7 @@ export const PaymentsView: React.FC = () => {
                   className={`text-lg sm:text-xl font-black tabular-nums tracking-tight mt-0.5 truncate ${isHovered ? 'text-white' : 'text-[#1A085C]'
                     }`}
                 >
-                  {card.value}
+                  <CountUp value={card.rawNum} prefix={card.isCurrency ? '₹' : ''} />
                 </div>
                 <span
                   className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${isHovered ? 'text-white/90 font-medium' : 'text-[#10B981] font-bold'
@@ -361,10 +370,10 @@ export const PaymentsView: React.FC = () => {
                   {card.subtext}
                 </span>
               </div>
-            </div>
+            </RevealItem>
           );
         })}
-      </div>
+      </RevealGroup>
 
       {/* ========================================================= */}
       {/* 1.1 CASHFLOW REALIZATION TIMELINE DECK                    */}
@@ -453,10 +462,21 @@ export const PaymentsView: React.FC = () => {
       {/* 3. BESPOKE INVOICE LEDGER TABLE (Stripe-Grade Master View)*/}
       {/* ========================================================= */}
       <div className="bg-white rounded-2xl border border-[#E5E1F0] shadow-[0_4px_20px_rgba(26,8,92,0.06)] overflow-hidden">
-        {isLoading ? (
-          <div className="py-16 flex flex-col items-center justify-center gap-2.5">
-            <RefreshCw size={22} className="animate-spin text-[#5B4CF5]" />
-            <span className="text-xs font-semibold text-[#6B7280]">Fetching billing ledger...</span>
+        {isLoading && payments.length === 0 ? (
+          <div className="p-4 space-y-3.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-4 py-2.5 border-b border-[#EAE6F7]/50">
+                <SkeletonBox className="h-4 w-24" />
+                <div className="flex items-center gap-2.5">
+                  <SkeletonBox className="h-7 w-7 rounded-full" />
+                  <SkeletonBox className="h-4 w-28" />
+                </div>
+                <SkeletonBox className="h-4 w-32 hidden sm:block" />
+                <SkeletonBox className="h-4 w-20" />
+                <SkeletonBox className="h-5 w-16 rounded-full" />
+                <SkeletonBox className="h-6 w-20 rounded-md" />
+              </div>
+            ))}
           </div>
         ) : payments.length === 0 ? (
           <div className="py-12 text-center">

@@ -2,6 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse } from '@infohq/shared';
 import { fetchDashboardOverview, triggerAutomationAudit } from '../../lib/api.js';
+import { motion } from 'framer-motion';
+import {
+  RevealGroup,
+  RevealItem,
+  CountUp,
+  DashboardSkeleton,
+  chartLineDrawVariants,
+} from '../motion/index.js';
 import {
   Users,
   Calendar,
@@ -130,13 +138,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     }).format(new Date(timestamp));
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-12 flex flex-col items-center justify-center gap-2.5 shadow-[0_4px_20px_rgba(26,8,92,0.03)]">
-        <RefreshCw size={22} className="animate-spin text-[#5B4CF5]" />
-        <span className="text-xs font-semibold text-[#6B7280]">Loading executive command center...</span>
-      </div>
-    );
+  if (isLoading && !data) {
+    return <DashboardSkeleton />;
   }
 
   const metrics = data?.metrics;
@@ -259,6 +262,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 0,
       title: "Today's Revenue",
       value: formatCurrency(todayRevenue),
+      rawNum: todayRevenue,
+      isCurrency: true,
       subtext: todayRevenue > 0 ? "↑ Real-time collected today" : "No collections today yet",
       icon: Coins,
       iconBg: "bg-[#FFF0F7]",
@@ -269,6 +274,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 1,
       title: "New Leads (Today)",
       value: newLeadsToday.toString(),
+      rawNum: newLeadsToday,
+      isCurrency: false,
       subtext: `Total: ${totalLeads} lifetime leads`,
       icon: Users,
       iconBg: "bg-[#F3F0FF]",
@@ -279,6 +286,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 2,
       title: "Active Projects",
       value: activeProjectsCount.toString(),
+      rawNum: activeProjectsCount,
+      isCurrency: false,
       subtext: `${completedProjectsCount} completed to date`,
       icon: Layers,
       iconBg: "bg-[#EFF6FF]",
@@ -289,6 +298,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 3,
       title: "Active Sales Pipeline",
       value: formatCurrency(activePipelineValue),
+      rawNum: activePipelineValue,
+      isCurrency: true,
       subtext: `${activePipelineDealsCount} active stage deals`,
       icon: KanbanSquare,
       iconBg: "bg-[#F0FDF4]",
@@ -303,6 +314,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 0,
       label: "Projects",
       value: activeProjectsCount.toString(),
+      rawNum: activeProjectsCount,
+      isCurrency: false,
       subtext: `${activeProjectsCount} in progress`,
       dotColor: "#3B82F6",
       icon: Code,
@@ -315,6 +328,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 1,
       label: "Clients",
       value: totalClientsCount.toString(),
+      rawNum: totalClientsCount,
+      isCurrency: false,
       subtext: "Verified clients",
       dotColor: "#10B981",
       icon: Users,
@@ -327,6 +342,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       id: 2,
       label: "Invoices",
       value: formatCurrency(totalPending),
+      rawNum: totalPending,
+      isCurrency: true,
       subtext: `${pendingInvoicesCount} pending settlement`,
       dotColor: "#E85AA0",
       icon: FileText,
@@ -426,11 +443,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       {/* 2. THREE-COLUMN BALANCED TOP GRID (Solid Crisp White Cards)*/}
       {/* Col 1: Total Revenue | Col 2: 2x2 Square Cards | Col 3: Trends */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+      <RevealGroup className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
         {/* ========================================================= */}
         {/* COLUMN 1: Total Revenue Card with Interactive Sub-Tiles   */}
         {/* ========================================================= */}
-        <div
+        <RevealItem
           onClick={() => onNavigateTab('billing')}
           className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] hover:border-[#5B4CF5]/40 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
         >
@@ -452,7 +469,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
             <div className="my-2.5 sm:my-3">
               <div className="text-3xl sm:text-4xl font-black text-[#1A085C] tabular-nums tracking-tight">
-                {formatCurrency(totalInvoiced)}
+                <CountUp value={totalInvoiced} prefix="₹" />
               </div>
               <div className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-[#10B981] bg-[#F0FDF4] px-2.5 py-0.5 rounded-full border border-green-200 mt-2 shadow-2xs">
                 <span>↑ +18.4%</span>
@@ -498,7 +515,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   </div>
 
                   <div className={`text-sm sm:text-base font-black mt-1 truncate ${isTileHovered ? 'text-white' : 'text-[#1A085C]'}`}>
-                    {tile.value}
+                    <CountUp value={tile.rawNum} prefix={tile.isCurrency ? '₹' : ''} />
                   </div>
 
                   <div className={`text-[9.5px] font-medium flex items-center gap-1 mt-0.5 ${isTileHovered ? 'text-white/90' : 'text-[#6B7280]'}`}>
@@ -512,13 +529,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               );
             })}
           </div>
-        </div>
+        </RevealItem>
 
         {/* ========================================================= */}
         {/* COLUMN 2: 2x2 Square Cards with Dynamic Colorful Hover    */}
         {/* Whichever card the cursor enters becomes colorful!         */}
         {/* ========================================================= */}
-        <div className="lg:col-span-4 grid grid-cols-2 gap-2.5 sm:gap-3">
+        <RevealItem className="lg:col-span-4 grid grid-cols-2 gap-2.5 sm:gap-3">
           {squareCards.map((card, idx) => {
             const isHovered = hoveredCardIndex === idx;
             const Icon = card.icon;
@@ -569,7 +586,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       isHovered ? 'text-white' : 'text-[#1A085C]'
                     }`}
                   >
-                    {card.value}
+                    <CountUp value={card.rawNum} prefix={card.isCurrency ? '₹' : ''} />
                   </div>
                   <span
                     className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
@@ -582,13 +599,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </div>
             );
           })}
-        </div>
+        </RevealItem>
 
         {/* ========================================================= */}
         {/* COLUMN 3: Revenue & Lead Trends (Dynamic Dual Graph)       */}
         {/* Clear Amounts & Leads on Each Pillar                      */}
         {/* ========================================================= */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+        <RevealItem className="lg:col-span-4 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2 border-b border-[#EAE6F7]">
               <div className="flex items-center gap-1.5">
@@ -652,6 +669,34 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 { center: 318, revX: 300, leadX: 320 },
               ];
 
+              const slicedWeeks = weeksData.slice(0, 4);
+              const revPoints = slicedWeeks.map((wk, idx) => {
+                const pos = xPositions[idx] || xPositions[0];
+                const revHeight = wk.revenue > 0 ? Math.max(8, Math.round((wk.revenue / maxRev) * 98)) : 4;
+                return { x: pos.revX + 8, y: 126 - revHeight };
+              });
+              const leadPoints = slicedWeeks.map((wk, idx) => {
+                const pos = xPositions[idx] || xPositions[0];
+                const leadHeight = wk.leadsCount > 0 ? Math.max(8, Math.round((wk.leadsCount / maxLds) * 88)) : 4;
+                return { x: pos.leadX + 8, y: 126 - leadHeight };
+              });
+
+              const buildSmoothPath = (pts: { x: number; y: number }[]) => {
+                if (pts.length === 0) return '';
+                if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+                let d = `M ${pts[0].x} ${pts[0].y}`;
+                for (let i = 0; i < pts.length - 1; i++) {
+                  const p0 = pts[i];
+                  const p1 = pts[i + 1];
+                  const mx = (p0.x + p1.x) / 2;
+                  d += ` C ${mx} ${p0.y}, ${mx} ${p1.y}, ${p1.x} ${p1.y}`;
+                }
+                return d;
+              };
+
+              const revPathD = buildSmoothPath(revPoints);
+              const leadPathD = buildSmoothPath(leadPoints);
+
               const formatPillarRev = (amt: number) => {
                 if (amt >= 100000) return `₹${(amt / 100000).toFixed(1)}L`;
                 if (amt >= 1000) return `₹${(amt / 1000).toFixed(0)}k`;
@@ -685,6 +730,35 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   <text x="4" y="77" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev * 0.5)}</text>
                   <text x="4" y="105" fontSize="8" fill="#9CA3AF" fontWeight="600">{formatPillarRev(maxRev * 0.25)}</text>
                   <text x="14" y="129" fontSize="8" fill="#9CA3AF" fontWeight="600">₹0</text>
+
+                  {/* Motion 5: SVG Trend Lines with Draw Animation */}
+                  <motion.path
+                    d={revPathD}
+                    fill="none"
+                    stroke="#5B4CF5"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeOpacity="0.75"
+                    variants={chartLineDrawVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                  />
+                  <motion.path
+                    d={leadPathD}
+                    fill="none"
+                    stroke="#E85AA0"
+                    strokeWidth="2"
+                    strokeDasharray="3 3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeOpacity="0.75"
+                    variants={chartLineDrawVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                  />
 
                   {weeksData.slice(0, 4).map((wk, idx) => {
                     const pos = xPositions[idx] || xPositions[0];
@@ -755,22 +829,22 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
 
           <div className="pt-2 border-t border-[#EAE6F7] flex items-center justify-between text-[10px] text-[#6B7280]">
-            <span>MTD Realization: <strong className="text-[#1A085C]">{monthlyTrends.mtdRealizationPct.toFixed(1)}%</strong></span>
+            <span>MTD Realization: <strong className="text-[#1A085C]"><CountUp value={monthlyTrends.mtdRealizationPct} decimals={1} suffix="%" /></strong></span>
             <span className="text-[#10B981] font-bold">
               {monthlyTrends.mtdGrowthPct >= 0 ? `↗ +${monthlyTrends.mtdGrowthPct}%` : `↘ ${monthlyTrends.mtdGrowthPct}%`} MTD Growth
             </span>
           </div>
-        </div>
-      </div>
+        </RevealItem>
+      </RevealGroup>
 
       {/* ========================================================= */}
       {/* 3. LOWER SECTION: TWO MASTER TABLES (Solid White, Clean)   */}
       {/* Table 1: Project Health & Deliverables                     */}
       {/* Table 2: Recent Leads                                      */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+      <RevealGroup className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
         {/* Table 1: Project Health & Deliverables */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+        <RevealItem className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7] mb-1">
               <div className="flex items-center gap-1.5">
@@ -839,10 +913,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </table>
             </div>
           </div>
-        </div>
+        </RevealItem>
 
         {/* Table 2: Recent Leads */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
+        <RevealItem className="lg:col-span-6 bg-white rounded-2xl border border-[#E5E1F0] p-4 sm:p-5 shadow-[0_4px_20px_rgba(26,8,92,0.06)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2.5 border-b border-[#EAE6F7] mb-1">
               <div className="flex items-center gap-1.5">
@@ -923,8 +997,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </table>
             </div>
           </div>
-        </div>
-      </div>
+        </RevealItem>
+      </RevealGroup>
     </div>
   );
 };

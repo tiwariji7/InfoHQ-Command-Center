@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useClerk, useUser } from '@clerk/clerk-react';
+import { AnimatePresence } from 'framer-motion';
 import type { AuthUser, HealthResponse } from '@infohq/shared';
+import { PageTransition } from '../motion/index.js';
 import { LeadsInbox } from '../leads/LeadsInbox.js';
 import { PipelineView } from '../pipeline/PipelineView.js';
 import { ProjectsList } from '../projects/ProjectsList.js';
@@ -730,9 +732,13 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           </div>
         </header>
 
-        {/* Dynamic Page Container: Whisper Slate-Lavender #F8F7FC */}
+        {/* Dynamic Page Container with Motion 2: Blur-Fade Page Transition */}
         <main className="flex-1 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3.5 max-w-[1440px] w-full mx-auto">
-          {renderActiveView()}
+          <AnimatePresence mode="wait" initial={false}>
+            <PageTransition key={activeTab}>
+              {renderActiveView()}
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
     </div>
