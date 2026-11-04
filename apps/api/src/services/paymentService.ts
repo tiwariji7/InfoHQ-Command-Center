@@ -50,7 +50,7 @@ function mapDbRowToPayment(row: Record<string, unknown>): Payment {
     paidAt: row.paid_at ? Number(row.paid_at) : null,
     notes: row.notes ? String(row.notes) : null,
     createdAt: Number(row.created_at),
-    updatedAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at || row.created_at),
     projectTitle: row.project_title ? String(row.project_title) : undefined,
     clientName: row.client_name ? String(row.client_name) : undefined,
     clientEmail: row.client_email ? String(row.client_email) : undefined,
@@ -83,10 +83,10 @@ export async function getPayments(
     } else if (params.status === 'failed') {
       conditions.push("py.status = 'failed'");
     } else if (params.status === 'expired') {
-      conditions.push("(py.status != 'received' AND ((py.expires_at IS NOT NULL AND py.expires_at < ?) OR (py.expires_at IS NULL AND py.razorpay_payment_link_id IS NOT NULL AND (py.created_at + 86400000) < ?)))");
+      conditions.push("(py.status != 'received' AND ((py.expires_at IS NOT NULL AND py.expires_at < ?) OR (py.expires_at IS NULL AND py.razorpay_payment_link_id IS NOT NULL AND (COALESCE(py.updated_at, py.created_at) + 86400000) < ?)))");
       bindings.push(now, now);
     } else if (params.status === 'pending') {
-      conditions.push("(py.status = 'pending' AND (py.expires_at IS NULL OR py.expires_at >= ?) AND (py.razorpay_payment_link_id IS NULL OR (py.created_at + 86400000) >= ?))");
+      conditions.push("(py.status = 'pending' AND ((py.expires_at IS NOT NULL AND py.expires_at >= ?) OR (py.expires_at IS NULL AND (py.razorpay_payment_link_id IS NULL OR (COALESCE(py.updated_at, py.created_at) + 86400000) >= ?))))");
       bindings.push(now, now);
     } else {
       conditions.push("py.status = ?");
@@ -107,7 +107,7 @@ export async function getPayments(
   const sql = `
     SELECT 
       py.*,
-      COALESCE(py.title, p.title) as project_title,
+      COALESCE(p.title, py.title) as project_title,
       COALESCE(py.client_name, p.client_name, c.name) as client_name,
       COALESCE(py.client_email, p.client_email, c.email) as client_email,
       COALESCE(py.client_phone, p.client_phone, c.phone) as client_phone,
@@ -131,31 +131,34 @@ export async function getPayments(
   const { results } = await db.prepare(sql).bind(...bindings).all<Record<string, unknown>>();
   const payments = (results || []).map(mapDbRowToPayment);
 
-  // Calculate summary metrics
-  let totalInvoiced = 0;
-  let totalCollected = 0;
-  let totalPending = 0;
-  let overdueCount = 0;
-
-  for (const py of payments) {
-    if (py.status !== 'failed') {
-      totalInvoiced += py.amount;
-    }
-    if (py.status === 'received') {
-      totalCollected += py.amount;
-    } else if (py.status === 'pending') {
-      totalPending += py.amount;
-      if (py.dueDate && py.dueDate < now) {
-        overdueCount += 1;
-      }
-    }
+  // Calculate summary metrics independently so table tab filters do not distort ledger cards
+  const summaryConditions: string[] = [];
+  const summaryBindings: unknown[] = [];
+  if (params.projectId) {
+    summaryConditions.push('project_id = ?');
+    summaryBindings.push(params.projectId);
   }
+  const summaryWhere = summaryConditions.length > 0 ? `WHERE ${summaryConditions.join(' AND ')}` : '';
+  const summaryRow = await db.prepare(`
+    SELECT
+      SUM(CASE WHEN status != 'failed' THEN CAST(amount AS REAL) ELSE 0 END) as total_invoiced,
+      SUM(CASE WHEN status = 'received' THEN CAST(amount AS REAL) ELSE 0 END) as total_collected,
+      SUM(CASE WHEN status = 'pending' THEN CAST(amount AS REAL) ELSE 0 END) as total_pending,
+      SUM(CASE WHEN status = 'pending' AND due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
+    FROM payments
+    ${summaryWhere}
+  `).bind(now, ...summaryBindings).first<{
+    total_invoiced: number | null;
+    total_collected: number | null;
+    total_pending: number | null;
+    overdue_count: number | null;
+  }>();
 
   const summary: PaymentSummary = {
-    totalInvoiced,
-    totalCollected,
-    totalPending,
-    overdueCount,
+    totalInvoiced: Math.round(Number(summaryRow?.total_invoiced || 0)),
+    totalCollected: Math.round(Number(summaryRow?.total_collected || 0)),
+    totalPending: Math.round(Number(summaryRow?.total_pending || 0)),
+    overdueCount: Number(summaryRow?.overdue_count || 0),
   };
 
   return {
@@ -171,7 +174,7 @@ export async function getPaymentById(
   const sql = `
     SELECT 
       py.*,
-      COALESCE(py.title, p.title) as project_title,
+      COALESCE(p.title, py.title) as project_title,
       COALESCE(py.client_name, p.client_name, c.name) as client_name,
       COALESCE(py.client_email, p.client_email, c.email) as client_email,
       COALESCE(py.client_phone, p.client_phone, c.phone) as client_phone,

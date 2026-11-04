@@ -15,7 +15,17 @@ export function useDraggable(storageKey?: string): UseDraggableReturn {
     if (storageKey && typeof window !== 'undefined') {
       try {
         const saved = sessionStorage.getItem(`card_pos_${storageKey}`);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+            const maxX = Math.max(100, (window.innerWidth - 100) / 2);
+            const maxY = Math.max(100, (window.innerHeight - 100) / 2);
+            return {
+              x: Math.min(maxX, Math.max(-maxX, parsed.x)),
+              y: Math.min(maxY, Math.max(-maxY, parsed.y)),
+            };
+          }
+        }
       } catch {
         // Fallback
       }
@@ -164,11 +174,13 @@ export function useDraggable(storageKey?: string): UseDraggableReturn {
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('blur', handlePointerUp);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('blur', handlePointerUp);
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current);
         rafId.current = null;

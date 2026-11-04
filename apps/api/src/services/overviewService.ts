@@ -263,10 +263,10 @@ export async function getDashboardOverview(db: D1Database): Promise<DashboardOve
   const recentPayments: RecentPaymentItem[] = allPaymentRows.slice(0, 4).map((r) => ({
     id: String(r.id),
     projectId: String(r.project_id || ''),
-    title: r.invoice_number
-      ? String(r.invoice_number)
-      : r.title
+    title: r.title
       ? String(r.title)
+      : r.invoice_number
+      ? String(r.invoice_number)
       : 'Milestone Payment',
     amount: Number(r.amount) || 0,
     status: (r.status as PaymentStatus) || 'pending',
