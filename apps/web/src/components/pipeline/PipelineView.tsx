@@ -4,6 +4,7 @@ import type { Lead, LeadStage } from '@infohq/shared';
 import { fetchLeads, updateLeadStageApi } from '../../lib/api.js';
 import { AddLeadModal } from '../leads/AddLeadModal.js';
 import { LostReasonModal } from './LostReasonModal.js';
+import { RevealGroup, RevealItem, CountUp } from '../motion/index.js';
 import {
   Plus,
   RefreshCw,
@@ -175,7 +176,7 @@ export const PipelineView: React.FC = () => {
       if (!document.hidden) {
         loadPipelineLeads(false, true);
       }
-    }, 10000);
+    }, 5000);
 
     const onVisible = () => {
       if (!document.hidden) {
@@ -349,6 +350,8 @@ export const PipelineView: React.FC = () => {
       id: 0,
       title: 'Live Active Pipeline',
       value: formatInr(activePipelineValue),
+      rawNum: activePipelineValue,
+      isCurrency: true,
       subtext: `↑ ${activeDealsCount} deals in flight`,
       icon: Flame,
       iconBg: 'bg-[#FFF0F7]',
@@ -358,6 +361,8 @@ export const PipelineView: React.FC = () => {
       id: 1,
       title: 'Closed Won Revenue',
       value: formatInr(wonPipelineValue),
+      rawNum: wonPipelineValue,
+      isCurrency: true,
       subtext: `${groupedLeads.won.length} converted deals`,
       icon: Trophy,
       iconBg: 'bg-[#F0FDF4]',
@@ -367,6 +372,9 @@ export const PipelineView: React.FC = () => {
       id: 2,
       title: 'Funnel Win Rate',
       value: `${winRate}%`,
+      rawNum: winRate,
+      suffix: '%',
+      isCurrency: false,
       subtext: 'High Conversion Velocity',
       icon: Target,
       iconBg: 'bg-[#F3F0FF]',
@@ -376,6 +384,8 @@ export const PipelineView: React.FC = () => {
       id: 3,
       title: 'Total In Funnel',
       value: leads.length.toString(),
+      rawNum: leads.length,
+      isCurrency: false,
       subtext: `${groupedLeads.won.length} Won • ${groupedLeads.lost.length} Lost`,
       icon: TrendingUp,
       iconBg: 'bg-[#EFF6FF]',
@@ -468,13 +478,13 @@ export const PipelineView: React.FC = () => {
       {/* ========================================================= */}
       {/* 1. TOP SUMMARY METRIC CARDS WITH DYNAMIC HOVER            */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <RevealGroup className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {pipelineMetricCards.map((card, idx) => {
           const isHovered = hoveredMetricIndex === idx;
           const CardIcon = card.icon;
 
           return (
-            <div
+            <RevealItem
               key={card.id}
               onMouseEnter={() => setHoveredMetricIndex(idx)}
               onMouseLeave={() => setHoveredMetricIndex(null)}
@@ -518,7 +528,7 @@ export const PipelineView: React.FC = () => {
                     isHovered ? 'text-white' : 'text-[#1A085C]'
                   }`}
                 >
-                  {card.value}
+                  <CountUp value={card.rawNum} prefix={card.isCurrency ? '₹' : ''} suffix={card.suffix || ''} />
                 </div>
                 <span
                   className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
@@ -528,10 +538,10 @@ export const PipelineView: React.FC = () => {
                   {card.subtext}
                 </span>
               </div>
-            </div>
+            </RevealItem>
           );
         })}
-      </div>
+      </RevealGroup>
 
       {/* ========================================================= */}
       {/* 1.1 PIPELINE VELOCITY & STAGE CONVERSION GRAPH DECK       */}

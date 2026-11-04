@@ -103,7 +103,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       if (!document.hidden) {
         loadDashboard(true);
       }
-    }, 12000);
+    }, 5000);
 
     const onVisible = () => {
       if (!document.hidden) {
@@ -888,7 +888,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <tr
                           key={p.id}
                           onClick={() => onSelectProjectId ? onSelectProjectId(p.id) : onNavigateTab('projects')}
-                          className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                          className="hover:bg-[#F8F7FD] hover:translate-x-1 transition-all duration-200 cursor-pointer group"
                         >
                           <td className="py-2 px-2.5 font-bold text-[#1A085C] group-hover:text-[#5B4CF5] transition-colors text-xs truncate max-w-[130px]">
                             {p.clientName}
@@ -963,7 +963,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         <tr
                           key={ld.id}
                           onClick={() => onSelectLeadId ? onSelectLeadId(ld.id) : onNavigateTab('leads')}
-                          className="hover:bg-[#F8F7FD] transition-colors cursor-pointer group"
+                          className="hover:bg-[#F8F7FD] hover:translate-x-1 transition-all duration-200 cursor-pointer group"
                         >
                           <td className="py-2 px-2.5">
                             <div className="flex items-center gap-2">

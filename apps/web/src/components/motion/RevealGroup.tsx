@@ -86,3 +86,4 @@ export const RevealItem: React.FC<RevealItemProps> = ({
     </motion.div>
   );
 };
+

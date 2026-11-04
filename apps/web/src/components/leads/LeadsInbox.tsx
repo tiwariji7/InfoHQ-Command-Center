@@ -11,6 +11,7 @@ import type {
 } from '@infohq/shared';
 import { fetchLeads, fetchDashboardOverview, updateLeadStageApi, fetchLeadRelatedData } from '../../lib/api.js';
 import { AddLeadModal } from './AddLeadModal.js';
+import { RevealGroup, RevealItem, CountUp } from '../motion/index.js';
 import {
   Search,
   Plus,
@@ -150,7 +151,7 @@ export const LeadsInbox: React.FC = () => {
         loadLeads(true);
         loadOverview();
       }
-    }, 10000);
+    }, 5000);
 
     const onVisible = () => {
       if (!document.hidden) {
@@ -404,13 +405,13 @@ export const LeadsInbox: React.FC = () => {
       {/* ========================================================= */}
       {/* 2. FOUR METRIC SUMMARY CARDS WITH DYNAMIC HOVER           */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <RevealGroup className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {metricCards.map((card, idx) => {
           const isHovered = hoveredMetricIndex === idx;
           const CardIcon = card.icon;
 
           return (
-            <div
+            <RevealItem
               key={card.id}
               onMouseEnter={() => setHoveredMetricIndex(idx)}
               onMouseLeave={() => setHoveredMetricIndex(null)}
@@ -454,7 +455,7 @@ export const LeadsInbox: React.FC = () => {
                     isHovered ? 'text-white' : 'text-[#1A085C]'
                   }`}
                 >
-                  {card.value}
+                  <CountUp value={Number(card.value) || 0} />
                 </div>
                 <span
                   className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
@@ -464,10 +465,10 @@ export const LeadsInbox: React.FC = () => {
                   {card.subtext}
                 </span>
               </div>
-            </div>
+            </RevealItem>
           );
         })}
-      </div>
+      </RevealGroup>
 
       {/* ========================================================= */}
       {/* 2.1 LEAD ACQUISITION CHANNELS STRIP                       */}

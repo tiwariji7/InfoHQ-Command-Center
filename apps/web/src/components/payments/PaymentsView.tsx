@@ -85,7 +85,7 @@ export const PaymentsView: React.FC = () => {
       if (!document.hidden) {
         loadPayments(true);
       }
-    }, 8000);
+    }, 5000);
 
     const onVisible = () => {
       if (!document.hidden) {

@@ -29,20 +29,37 @@ export const CountUp: React.FC<CountUpProps> = ({
   const isInView = useInView(ref, { once: true, margin: '-20px' });
   const shouldReduceMotion = useReducedMotion();
   const [displayValue, setDisplayValue] = useState<number>(() => (shouldReduceMotion ? value : 0));
+  const prevValueRef = useRef<number>(0);
+  const hasInitialAnimatedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (shouldReduceMotion) {
       setDisplayValue(value);
+      prevValueRef.current = value;
       return;
     }
 
     if (!isInView) return;
 
-    const controls = animate(0, value, {
-      duration,
+    // If it already animated once and the new value is identical, don't restart
+    if (hasInitialAnimatedRef.current && Math.abs(prevValueRef.current - value) < 0.0001) {
+      return;
+    }
+
+    const startVal = hasInitialAnimatedRef.current ? prevValueRef.current : 0;
+    const animDuration = hasInitialAnimatedRef.current ? 0.75 : duration;
+
+    const controls = animate(startVal, value, {
+      duration: animDuration,
       ease: 'easeOut',
       onUpdate: (latest) => {
         setDisplayValue(latest);
+        prevValueRef.current = latest;
+      },
+      onComplete: () => {
+        setDisplayValue(value);
+        prevValueRef.current = value;
+        hasInitialAnimatedRef.current = true;
       },
     });
 
@@ -74,3 +91,4 @@ export const CountUp: React.FC<CountUpProps> = ({
     </span>
   );
 };
+

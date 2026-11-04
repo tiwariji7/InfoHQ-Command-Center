@@ -4,6 +4,7 @@ import type { Project, ProjectStatus } from '@infohq/shared';
 import { fetchProjects, updateProjectApi } from '../../lib/api.js';
 import { CreateProjectModal } from './CreateProjectModal.js';
 import { ProjectDetailDrawer } from './ProjectDetailDrawer.js';
+import { RevealGroup, RevealItem, CountUp, SkeletonCard } from '../motion/index.js';
 import {
   FolderKanban,
   Plus,
@@ -236,7 +237,7 @@ export const ProjectsList: React.FC = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       loadProjects(true);
-    }, 8000);
+    }, 5000);
 
     const onFocus = () => {
       loadProjects(true);
@@ -462,6 +463,8 @@ export const ProjectsList: React.FC = () => {
       id: 0,
       title: 'Active Deliverables',
       value: (inProgressCount + reviewCount).toString(),
+      rawNum: inProgressCount + reviewCount,
+      isCurrency: false,
       subtext: `${inProgressCount} in dev • ${reviewCount} in review`,
       icon: FolderKanban,
       iconBg: 'bg-[#FFF0F7]',
@@ -471,6 +474,9 @@ export const ProjectsList: React.FC = () => {
       id: 1,
       title: 'Portfolio Burn-Up',
       value: `${overallCompletionRate}%`,
+      rawNum: overallCompletionRate,
+      suffix: '%',
+      isCurrency: false,
       subtext: 'Task completion rate',
       icon: CheckCheck,
       iconBg: 'bg-[#F0FDF4]',
@@ -480,6 +486,8 @@ export const ProjectsList: React.FC = () => {
       id: 2,
       title: 'Stage 1: Planning (Won Deals)',
       value: planningCount.toString(),
+      rawNum: planningCount,
+      isCurrency: false,
       subtext: 'Kickoff & scope setup',
       icon: Sparkles,
       iconBg: 'bg-[#F3F0FF]',
@@ -489,6 +497,8 @@ export const ProjectsList: React.FC = () => {
       id: 3,
       title: 'Total Projects Delivered',
       value: totalCount.toString(),
+      rawNum: totalCount,
+      isCurrency: false,
       subtext: `${completedCount} completed successfully`,
       icon: Layers,
       iconBg: 'bg-[#EFF6FF]',
@@ -745,13 +755,13 @@ export const ProjectsList: React.FC = () => {
       {/* ========================================================= */}
       {/* 1. TOP SUMMARY METRIC CARDS WITH DYNAMIC HOVER            */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <RevealGroup className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {projectMetricCards.map((card, idx) => {
           const isHovered = hoveredMetricIndex === idx;
           const CardIcon = card.icon;
 
           return (
-            <div
+            <RevealItem
               key={card.id}
               onMouseEnter={() => setHoveredMetricIndex(idx)}
               onMouseLeave={() => setHoveredMetricIndex(null)}
@@ -795,7 +805,7 @@ export const ProjectsList: React.FC = () => {
                     isHovered ? 'text-white' : 'text-[#1A085C]'
                   }`}
                 >
-                  {card.value}
+                  <CountUp value={card.rawNum} prefix={card.isCurrency ? '₹' : ''} suffix={card.suffix || ''} />
                 </div>
                 <span
                   className={`text-[9.5px] sm:text-[10px] block truncate mt-0.5 ${
@@ -805,10 +815,10 @@ export const ProjectsList: React.FC = () => {
                   {card.subtext}
                 </span>
               </div>
-            </div>
+            </RevealItem>
           );
         })}
-      </div>
+      </RevealGroup>
 
       {/* ========================================================= */}
       {/* 2. CATEGORY CLASSIFICATION TABS & TOOLBAR                 */}
@@ -981,10 +991,11 @@ export const ProjectsList: React.FC = () => {
       {/* ========================================================= */}
       {/* 3. DYNAMIC VIEWS                                          */}
       {/* ========================================================= */}
-      {isLoading ? (
-        <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-16 flex flex-col items-center justify-center gap-2.5 shadow-2xs">
-          <RefreshCw size={22} className="animate-spin text-[#5B4CF5]" />
-          <span className="text-xs font-semibold text-[#6B7280]">Loading categorized projects...</span>
+      {isLoading && projects.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       ) : filteredProjects.length === 0 ? (
         <div className="bg-white/85 backdrop-blur-md rounded-2xl border border-white/80 p-12 text-center shadow-2xs">

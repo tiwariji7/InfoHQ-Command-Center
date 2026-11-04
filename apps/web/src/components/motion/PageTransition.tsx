@@ -36,3 +36,4 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
     </motion.div>
   );
 };
+

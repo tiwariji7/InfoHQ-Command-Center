@@ -129,3 +129,4 @@ export const chartBarGrowVariants: Variants = {
     },
   },
 };
+
