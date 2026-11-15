@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { AppContext, Bindings } from './types/env.js';
-import { requireSuperadmin } from './middleware/auth.js';
+import { requireSuperadmin, requireAuth } from './middleware/auth.js';
 import { leadsRouter } from './routes/leads.js';
 import { projectsRouter } from './routes/projects.js';
 import { paymentsRouter } from './routes/payments.js';
@@ -10,6 +10,7 @@ import { automationsRouter } from './routes/automations.js';
 import { intakeRouter } from './routes/intake.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { clientsRouter } from './routes/clients.js';
+import { teamRouter } from './routes/team.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import { autoSyncPendingRazorpayPayments } from './services/billingService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
@@ -84,8 +85,8 @@ app.get('/api/auth/config', (c) => {
   return c.json({ publishableKey });
 });
 
-// Protected: Superadmin identity check
-app.get('/api/me', requireSuperadmin, (c) => {
+// Protected: User identity and permissions check (checks allowlist & RBAC)
+app.get('/api/me', requireAuth, (c) => {
   const user = c.get('user');
   const response: MeResponse = {
     authenticated: true,
@@ -122,6 +123,9 @@ app.route('/api/overview', overviewRouter);
 
 // Protected: Automations, daily briefing & alerts router
 app.route('/api/automations', automationsRouter);
+
+// Protected: Team members and RBAC management router (Superadmin only)
+app.route('/api/team', teamRouter);
 
 // Export Cloudflare Worker fetch & scheduled cron handler
 export default {

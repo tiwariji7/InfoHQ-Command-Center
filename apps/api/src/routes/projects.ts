@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../types/env.js';
-import { requireSuperadmin } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/auth.js';
 import {
   CreateProjectSchema,
   UpdateProjectSchema,
@@ -19,8 +19,13 @@ import {
 
 export const projectsRouter = new Hono<AppContext>();
 
-// Require Superadmin authentication on all project routes
-projectsRouter.use('*', requireSuperadmin);
+// Require projects permission for base project routes
+projectsRouter.use('*', requirePermission('projects'));
+
+// Strictly require tasks module permission for task aggregation and task mutations
+projectsRouter.use('/all-tasks', requirePermission('tasks'));
+projectsRouter.use('/:id/tasks', requirePermission('tasks'));
+projectsRouter.use('/:id/tasks/*', requirePermission('tasks'));
 
 // GET /api/projects - List projects with optional status and search filter
 projectsRouter.get('/', async (c) => {

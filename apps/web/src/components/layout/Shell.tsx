@@ -11,6 +11,7 @@ import { OverviewDashboard } from '../dashboard/OverviewDashboard.js';
 import { ModulePlaceholderView } from './ModulePlaceholderView.js';
 import { CommandPalette } from './CommandPalette.js';
 import { TasksView } from '../tasks/TasksView.js';
+import { TeamRBACView } from '../team/TeamRBACView.js';
 import {
   Compass,
   Inbox,
@@ -282,15 +283,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           />
         );
       case 'team':
-        return (
-          <ModulePlaceholderView
-            moduleKey="team"
-            title="Team & Roles"
-            subtitle="Employees, assignments, permissions"
-            section="OPERATIONS"
-            onNavigateTab={handleSelectTab}
-          />
-        );
+        return <TeamRBACView />;
       case 'communications':
         return (
           <ModulePlaceholderView

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../types/env.js';
-import { requireSuperadmin } from '../middleware/auth.js';
+import { requirePermission, requireSuperadmin } from '../middleware/auth.js';
 import {
   CreateLeadSchema,
   LeadListQuerySchema,
@@ -24,8 +24,8 @@ import {
 
 export const leadsRouter = new Hono<AppContext>();
 
-// Require Superadmin authentication on all leads routes
-leadsRouter.use('*', requireSuperadmin);
+// Require leads module permission (accessible to Superadmin, Sales & Project Managers)
+leadsRouter.use('*', requirePermission('leads'));
 
 // GET /api/leads - Paginated and filtered lead list
 leadsRouter.get('/', async (c) => {
@@ -279,8 +279,8 @@ leadsRouter.patch('/:id/follow-up', async (c) => {
   }
 });
 
-// POST /api/leads/:id/auto-convert - Convert won deal to project, generate 40% advance invoice, Razorpay link, Telegram alert & Resend email
-leadsRouter.post('/:id/auto-convert', async (c) => {
+// POST /api/leads/:id/auto-convert - Convert won deal to project and generate advance invoice (Superadmin authority required)
+leadsRouter.post('/:id/auto-convert', requireSuperadmin, async (c) => {
   if (!c.env.DB) {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
   }

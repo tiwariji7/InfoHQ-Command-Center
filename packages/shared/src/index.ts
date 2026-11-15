@@ -8,21 +8,59 @@ export const HealthResponseSchema = z.object({
 
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
-export const UserRoleSchema = z.enum(['superadmin']);
+export const UserRoleSchema = z.enum([
+  'superadmin',
+  'project_manager',
+  'sales',
+  'developer',
+  'viewer',
+]);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 
-export const UserStatusSchema = z.enum(['active', 'suspended']);
+export const UserStatusSchema = z.enum(['active', 'suspended', 'invited']);
 export type UserStatus = z.infer<typeof UserStatusSchema>;
+
+export const ModulePermissionSchema = z.object({
+  dashboard: z.boolean().default(true),
+  leads: z.boolean().default(false),
+  pipeline: z.boolean().default(false),
+  clients: z.boolean().default(false),
+  projects: z.boolean().default(false),
+  tasks: z.boolean().default(false),
+  billing: z.boolean().default(false),
+  team: z.boolean().default(false),
+  settings: z.boolean().default(false),
+});
+export type ModulePermissions = z.infer<typeof ModulePermissionSchema>;
 
 export const AuthUserSchema = z.object({
   id: z.string(),
   clerkUserId: z.string(),
   email: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
   role: UserRoleSchema,
   status: UserStatusSchema,
+  permissions: ModulePermissionSchema.optional(),
+  createdAt: z.number().optional(),
+  updatedAt: z.number().optional(),
 });
 
 export type AuthUser = z.infer<typeof AuthUserSchema>;
+
+export const InviteUserSchema = z.object({
+  email: z.string().trim().email('Valid work email is required'),
+  name: z.string().trim().min(1, 'Full name is required'),
+  role: UserRoleSchema.default('viewer'),
+  permissions: ModulePermissionSchema.optional(),
+});
+export type InviteUserInput = z.infer<typeof InviteUserSchema>;
+
+export const UpdateUserPermissionsSchema = z.object({
+  role: UserRoleSchema.optional(),
+  status: UserStatusSchema.optional(),
+  permissions: ModulePermissionSchema.optional(),
+});
+export type UpdateUserPermissionsInput = z.infer<typeof UpdateUserPermissionsSchema>;
 
 export const MeResponseSchema = z.object({
   authenticated: z.literal(true),

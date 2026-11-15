@@ -506,3 +506,74 @@ export async function fetchAllTasksApi(
   );
 }
 
+// --- Team & RBAC Management API Calls ---
+
+export interface TeamMemberItem {
+  id: string;
+  clerkUserId: string;
+  email: string | null;
+  name: string;
+  role: 'superadmin' | 'project_manager' | 'sales' | 'developer' | 'viewer';
+  status: 'active' | 'suspended';
+  permissions: Record<string, boolean>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TeamInviteItem {
+  id: string;
+  email: string;
+  name: string;
+  role: 'superadmin' | 'project_manager' | 'sales' | 'developer' | 'viewer';
+  permissions: Record<string, boolean>;
+  invitedBy: string;
+  status: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export async function fetchTeamApi(
+  getToken: () => Promise<string | null>
+): Promise<{ members: TeamMemberItem[]; invitations: TeamInviteItem[] }> {
+  return fetchWithAuth<{ members: TeamMemberItem[]; invitations: TeamInviteItem[] }>('/api/team', getToken);
+}
+
+export async function inviteTeamMemberApi(
+  getToken: () => Promise<string | null>,
+  data: {
+    email: string;
+    name: string;
+    role: string;
+    permissions?: Record<string, boolean>;
+  }
+): Promise<{ success: boolean; message: string; invitation: TeamInviteItem }> {
+  return fetchWithAuth<{ success: boolean; message: string; invitation: TeamInviteItem }>('/api/team/invite', getToken, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMemberPermissionsApi(
+  getToken: () => Promise<string | null>,
+  memberId: string,
+  data: {
+    role?: string;
+    status?: 'active' | 'suspended';
+    permissions?: Record<string, boolean>;
+  }
+): Promise<{ success: boolean; message: string }> {
+  return fetchWithAuth<{ success: boolean; message: string }>(`/api/team/members/${encodeURIComponent(memberId)}`, getToken, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function revokeTeamMemberApi(
+  getToken: () => Promise<string | null>,
+  memberId: string
+): Promise<{ success: boolean; message: string }> {
+  return fetchWithAuth<{ success: boolean; message: string }>(`/api/team/members/${encodeURIComponent(memberId)}`, getToken, {
+    method: 'DELETE',
+  });
+}
+
