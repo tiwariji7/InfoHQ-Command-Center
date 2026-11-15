@@ -40,6 +40,59 @@ projectsRouter.get('/', async (c) => {
   }
 });
 
+// GET /api/projects/all-tasks - Get aggregated tasks across all projects with project context
+projectsRouter.get('/all-tasks', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  try {
+    const sql = `
+      SELECT 
+        t.id,
+        t.project_id,
+        t.title,
+        t.description,
+        t.status,
+        t.priority,
+        t.due_date,
+        t.completed_at,
+        t.created_at,
+        t.updated_at,
+        p.title as project_title,
+        p.client_name as client_name
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      ORDER BY 
+        CASE 
+          WHEN t.status = 'in_progress' THEN 1
+          WHEN t.status = 'todo' THEN 2
+          ELSE 3
+        END,
+        t.updated_at DESC
+    `;
+    const { results } = await c.env.DB.prepare(sql).all<Record<string, unknown>>();
+    const formattedTasks = (results || []).map((row) => ({
+      id: String(row.id),
+      projectId: String(row.project_id),
+      title: String(row.title),
+      description: row.description ? String(row.description) : null,
+      status: row.status,
+      priority: row.priority || 'medium',
+      dueDate: row.due_date ? Number(row.due_date) : null,
+      completedAt: row.completed_at ? Number(row.completed_at) : null,
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+      project_title: row.project_title ? String(row.project_title) : undefined,
+      client_name: row.client_name ? String(row.client_name) : undefined,
+    }));
+    return c.json({ tasks: formattedTasks });
+  } catch (err: unknown) {
+    console.error('Error fetching all tasks:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to retrieve tasks.' }, 500);
+  }
+});
+
 // POST /api/projects - Create a new project (optionally converted from a lead)
 projectsRouter.post('/', async (c) => {
   if (!c.env.DB) {

@@ -50,6 +50,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
   // Draggable window state matching Client Profile & Create Payment modals
   const { cardRef, position, handlePointerDown, resetPosition } = useDraggable('printable_invoice_modal');
+  const [includeGstBreakdown, setIncludeGstBreakdown] = useState(false);
 
   if (!isOpen) return null;
 
@@ -131,32 +132,37 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     ];
   }
 
-  // Clean Download PDF: Downloads official vector PDF identical to Telegram & Email attachment
+  // Clean Download PDF: If user has GST breakdown toggled, download direct client render matching the screen
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
+    const activeGstMode = includeGstBreakdown;
     try {
-      // 1. Primary: Download official vector PDF from backend (crisp, selectable, zero gap)
-      const token = await getToken();
-      const res = await fetch(`/api/payments/${payment.id}/invoice-pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      if (!activeGstMode) {
+        // 1. Primary: Try downloading official vector PDF from backend for standard invoice
+        try {
+          const token = await getToken();
+          const res = await fetch(`/api/payments/${payment.id}/invoice-pdf`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
 
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        return;
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            return;
+          }
+        } catch (serverErr) {
+          console.warn('[Server PDF download failed, falling back to html2pdf]:', serverErr);
+        }
       }
-      throw new Error(`Server returned ${res.status}`);
-    } catch (serverErr) {
-      console.warn('[Server PDF download fallback to html2pdf]:', serverErr);
-      // 2. Fallback: Client-side html2pdf
+
+      // 2. High-Fidelity Client-side html2pdf (preserves selected GST mode exactly as previewed)
       try {
         const html2pdf = await loadHtml2Pdf();
         const element = document.getElementById('invoice-container') || invoiceRef.current;
@@ -167,7 +173,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
         const opt = {
           margin: [0, 0, 0, 0],
-          filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
+          filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}${activeGstMode ? '_GST' : ''}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: {
             scale: 2,
@@ -181,7 +187,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
         await html2pdf().set(opt).from(element).save();
       } catch (clientErr) {
-        console.warn('[html2pdf fallback to native print]:', clientErr);
+        console.warn('[Client HTML2PDF failed, falling back to print]:', clientErr);
         window.print();
       }
     } finally {
@@ -194,8 +200,18 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     window.print();
   };
 
-  const paidAmount = isPaid ? payment.amount : 0;
-  const balanceDue = isPaid ? 0 : payment.amount;
+  // Reconciled Tax & Settlement Calculations
+  const baseAmount = payment.amount;
+  // If GST is enabled, calculate precise component breakdown (total = 18%, CGST = 9%, SGST = remainder)
+  const totalTax = includeGstBreakdown ? Math.round(baseAmount * 0.18) : 0;
+  const cgstAmount = includeGstBreakdown ? Math.round(baseAmount * 0.09) : 0;
+  const sgstAmount = totalTax - cgstAmount;
+  const effectiveTotal = baseAmount + totalTax;
+
+  // Recorded settlement remains based on actual payment received
+  const recordedSettled = isPaid ? payment.amount : 0;
+  const paidAmount = recordedSettled;
+  const balanceDue = Math.max(0, effectiveTotal - paidAmount);
 
   return (
     <div
@@ -355,6 +371,20 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 <ExternalLink size={12} />
               </a>
             )}
+
+            {/* GST Tax Invoice Toggle */}
+            <button
+              onClick={() => setIncludeGstBreakdown(!includeGstBreakdown)}
+              disabled={isGenerating}
+              className={`h-8 px-2.5 rounded-full text-[11px] font-bold border transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                includeGstBreakdown
+                  ? 'bg-purple-100 text-[#5B4CF5] border-purple-300'
+                  : 'bg-white text-[#6B7280] border-[#E5E1F0] hover:text-[#1A085C]'
+              }`}
+              title="Toggle GST Tax Breakdown (18% SAC 998314)"
+            >
+              <span>GST {includeGstBreakdown ? 'ON' : 'OFF'}</span>
+            </button>
 
             {/* 1. Eye Icon: Official View Indicator */}
             <div
@@ -673,21 +703,36 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 <div className="flex justify-between items-center text-[#4B5563]">
                   <span className="font-medium">Subtotal</span>
                   <span className="font-bold text-[#1A085C] tabular-nums">
-                    {formatCurrency(payment.amount)}
+                    {formatCurrency(baseAmount)}
                   </span>
                 </div>
 
                 {/* Tax / GST */}
                 <div className="flex justify-between items-center text-[#4B5563]">
-                  <span className="font-medium">Tax / GST</span>
-                  <span className="font-semibold text-[#1A085C]">Nil / Exempt</span>
+                  <span className="font-medium">Tax / GST (18%)</span>
+                  <span className="font-semibold text-[#1A085C]">
+                    {includeGstBreakdown ? formatCurrency(totalTax) : 'Nil / Exempt'}
+                  </span>
                 </div>
+
+                {includeGstBreakdown && (
+                  <div className="text-[10px] text-[#6B7280] space-y-0.5 pt-0.5">
+                    <div className="flex justify-between">
+                      <span>CGST (9%):</span>
+                      <span className="font-mono">{formatCurrency(cgstAmount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>SGST (9%):</span>
+                      <span className="font-mono">{formatCurrency(sgstAmount)}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Total Amount in Brand Purple */}
                 <div className="flex justify-between items-center py-1.5 border-y border-[#E9D5FF] text-sm sm:text-base font-black text-[#5B4CF5]">
                   <span>Total Amount</span>
                   <span className="tabular-nums font-black">
-                    {formatCurrency(payment.amount)}
+                    {formatCurrency(effectiveTotal)}
                   </span>
                 </div>
 

@@ -9,6 +9,8 @@ import { ProjectsList } from '../projects/ProjectsList.js';
 import { PaymentsView } from '../payments/PaymentsView.js';
 import { OverviewDashboard } from '../dashboard/OverviewDashboard.js';
 import { ModulePlaceholderView } from './ModulePlaceholderView.js';
+import { CommandPalette } from './CommandPalette.js';
+import { TasksView } from '../tasks/TasksView.js';
 import {
   Compass,
   Inbox,
@@ -71,7 +73,19 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+
+  // Global Cmd+K / Ctrl+K keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -236,15 +250,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           />
         );
       case 'tasks':
-        return (
-          <ModulePlaceholderView
-            moduleKey="tasks"
-            title="Tasks & Sprints"
-            subtitle="Assignments, priorities, progress"
-            section="DELIVERY & ENGINEERING"
-            onNavigateTab={handleSelectTab}
-          />
-        );
+        return <TasksView />;
       case 'deployments':
         return (
           <ModulePlaceholderView
@@ -574,23 +580,20 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </button>
           </div>
 
-          {/* Center Search Pill Bar (Matching the uploaded image) */}
+          {/* Center Search Pill Bar - Clicking triggers Global Command Palette */}
           <div className="hidden md:flex items-center flex-1 max-w-md lg:max-w-lg mx-4">
-            <div className="w-full relative flex items-center">
-              <div className="absolute left-3.5 text-brand-muted pointer-events-none">
-                <Search size={16} />
+            <button
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="w-full h-10 px-3.5 rounded-full bg-white border border-[#EAE6F7] text-xs sm:text-sm text-left flex items-center justify-between hover:border-[#7C5CE8] hover:shadow-xs transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5 text-brand-muted group-hover:text-[#1A085C]">
+                <Search size={16} className="text-[#7C5CE8]" />
+                <span className="text-xs text-[#6B7280]">Search leads, projects, invoices, or jump to tab...</span>
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search anything... (Leads, Clients, Projects, Invoices, Tasks...)"
-                className="w-full h-10 pl-9 pr-14 rounded-full bg-white border border-[#EAE6F7] text-xs sm:text-sm text-[#1A085C] placeholder:text-brand-muted/70 focus:bg-white focus:border-[#7C3AED] focus:ring-3 focus:ring-[#7C3AED]/15 transition-all outline-none"
-              />
-              <div className="absolute right-2.5 px-1.5 py-0.5 rounded bg-white border border-[#EAE6F7] text-[10px] font-mono text-brand-muted pointer-events-none">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F8F8FF] border border-[#EAE6F7] text-[10.5px] font-mono text-[#7C5CE8] font-bold">
                 ⌘ K
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Right Section: Date + Notifications + Profile Dropdown (Clean, Simple, Without Boxy Pill Backgrounds) */}
@@ -743,6 +746,13 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </PageTransition>
           </AnimatePresence>
         </main>
+
+        {/* Global Command Palette (⌘K) Modal */}
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          onNavigateTab={handleSelectTab}
+        />
       </div>
     </div>
   );

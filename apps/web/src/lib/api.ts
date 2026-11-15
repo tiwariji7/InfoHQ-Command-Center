@@ -497,3 +497,12 @@ export async function fetchLeadRelatedData(
   );
 }
 
+export async function fetchAllTasksApi(
+  getToken: () => Promise<string | null>
+): Promise<{ tasks: Array<ProjectTask & { project_title?: string; client_name?: string }> }> {
+  return fetchWithAuth<{ tasks: Array<ProjectTask & { project_title?: string; client_name?: string }> }>(
+    '/api/projects/all-tasks',
+    getToken
+  );
+}
+
