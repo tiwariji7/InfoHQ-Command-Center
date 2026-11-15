@@ -36,6 +36,7 @@ import {
   Mail,
   User,
   Calendar,
+  KeyRound,
 } from 'lucide-react';
 
 interface ShellProps {
@@ -57,7 +58,8 @@ interface NavSection {
 }
 
 export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health, apiError: _apiError }) => {
-  const { signOut } = useClerk();
+  const clerk = useClerk();
+  const { signOut } = clerk;
   const { user: clerkUser } = useUser();
 
   const getInitialTab = (): string => {
@@ -710,6 +712,23 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                       <span>Joined</span>
                       <span className="font-medium text-brand-heading">{userCreatedAt}</span>
                     </div>
+                  </div>
+
+                  {/* Security Profile & Passkey Actions */}
+                  <div className="pt-2 pb-1 border-b border-[#EAE6F7]">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        clerk.openUserProfile();
+                      }}
+                      className="w-full flex items-center justify-between py-2 px-2.5 rounded-xl text-xs font-semibold text-[#1A085C] hover:bg-[#F3F0FF] hover:text-[#7C5CE8] transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <KeyRound size={14} className="text-[#7C5CE8]" />
+                        <span>Security, Passkeys &amp; MFA</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-[#7C5CE8] bg-purple-100 px-1.5 py-0.5 rounded">Setup</span>
+                    </button>
                   </div>
 
                   {/* Logout Button */}
