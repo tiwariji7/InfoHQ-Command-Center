@@ -15,7 +15,7 @@ function mapDbRowToPayment(row: Record<string, unknown>): Payment {
   const expiresAt = row.expires_at
     ? Number(row.expires_at)
     : row.razorpay_payment_link_id
-    ? Number(row.created_at) + 24 * 60 * 60 * 1000
+    ? Number(row.updated_at || row.created_at) + 24 * 60 * 60 * 1000
     : null;
 
   let effectiveStatus: Payment['status'] = (row.status as Payment['status']) || 'pending';
@@ -139,13 +139,15 @@ export async function getPayments(
     summaryBindings.push(params.projectId);
   }
   const summaryWhere = summaryConditions.length > 0 ? `WHERE ${summaryConditions.join(' AND ')}` : '';
+  const summaryJoin = params.projectId ? '' : 'LEFT JOIN projects p ON payments.project_id = p.id';
   const summaryRow = await db.prepare(`
     SELECT
-      SUM(CASE WHEN status != 'failed' THEN CAST(amount AS REAL) ELSE 0 END) as total_invoiced,
-      SUM(CASE WHEN status = 'received' THEN CAST(amount AS REAL) ELSE 0 END) as total_collected,
-      SUM(CASE WHEN status = 'pending' THEN CAST(amount AS REAL) ELSE 0 END) as total_pending,
-      SUM(CASE WHEN status = 'pending' AND due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
+      SUM(CASE WHEN payments.status != 'failed' THEN CAST(payments.amount AS REAL) ELSE 0 END) as total_invoiced,
+      SUM(CASE WHEN payments.status = 'received' THEN CAST(payments.amount AS REAL) ELSE 0 END) as total_collected,
+      SUM(CASE WHEN payments.status = 'pending' THEN CAST(payments.amount AS REAL) ELSE 0 END) as total_pending,
+      SUM(CASE WHEN payments.status = 'pending' AND COALESCE(payments.due_date, p.deadline) IS NOT NULL AND COALESCE(payments.due_date, p.deadline) < ? THEN 1 ELSE 0 END) as overdue_count
     FROM payments
+    ${summaryJoin}
     ${summaryWhere}
   `).bind(now, ...summaryBindings).first<{
     total_invoiced: number | null;

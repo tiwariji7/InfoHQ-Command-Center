@@ -170,23 +170,29 @@ const SignInInner: React.FC = () => {
   const displayEmail = typedEmail || typedEmailRef.current || signIn?.identifier || '';
 
   return (
-    <div className="min-h-screen w-full bg-brand-page flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      <div className="w-full max-w-[390px] sm:max-w-[420px] bg-white rounded-[20px] sm:rounded-[24px] border border-brand-border p-6 sm:p-8 shadow-[0_8px_30px_rgba(26,8,92,0.05),0_1px_3px_rgba(26,8,92,0.02)] my-auto">
-        {/* Simple clean text branding - Info in purple/indigo gradient like Center */}
+    <div className="min-h-screen w-full bg-[#F8F8FF] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="w-full max-w-[390px] sm:max-w-[420px] bg-white rounded-[24px] border border-[#EAE6F7] p-6 sm:p-8 shadow-[0_12px_40px_rgba(26,8,92,0.06),0_1px_3px_rgba(26,8,92,0.02)] my-auto">
+        {/* Official InfoHQ Logo */}
         <div className="flex flex-col items-center text-center mb-5 sm:mb-6">
-          <div className="flex items-center justify-center select-none mb-2.5 sm:mb-3">
-            <span className="text-[24px] sm:text-[27px] font-black tracking-tight bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent">
-              info
-            </span>
-            <span className="text-[24px] sm:text-[27px] font-black tracking-tight text-brand-heading ml-0.5">
-              HQ
-            </span>
+          <div className="flex items-center justify-center select-none mb-3">
+            <img
+              src="/infohq-brandlogo.webp"
+              alt="InfoHQ Logo"
+              className="h-9 sm:h-10 w-auto object-contain"
+            />
           </div>
           <h1 className="text-[19px] sm:text-[22px] font-bold tracking-tight leading-snug">
-            <span className="text-brand-heading">Sign in to</span><br />
-            <span className="bg-gradient-to-r from-[#7C5CE8] via-[#6366F1] to-[#5B4CF5] bg-clip-text text-transparent font-bold">Info</span>
-            <span className="text-brand-heading font-bold">HQ</span>{' '}
-            <span className="bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#5B4CF5] bg-clip-text text-transparent font-bold">Command Center</span>
+            <span className="text-[#1A085C]">Sign in to</span><br />
+            <span
+              style={{
+                background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+              className="font-extrabold"
+            >
+              InfoHQ Command Center
+            </span>
           </h1>
 
           {/* Subtitle: on password page shows entered email + pencil icon; on email page shows Welcome back */}

@@ -34,18 +34,7 @@ export async function createRazorpayPaymentLink(
   const cleanKeySecret = keys.keySecret.replace(/^['"]|['"]$/g, '').trim();
   const authHeader = `Basic ${btoa(`${cleanKeyId}:${cleanKeySecret}`)}`;
 
-  // If a previous Razorpay link ID is present, cancel the previous link so it does not accept duplicate payments
-  if (previousLinkId && previousLinkId.startsWith('plink_')) {
-    try {
-      await fetch(`https://api.razorpay.com/v1/payment_links/${previousLinkId}/cancel`, {
-        method: 'POST',
-        headers: { Authorization: authHeader },
-      });
-      console.log(`[Razorpay Payment Link Cancel]: Successfully requested cancel for previous link ${previousLinkId}`);
-    } catch (cancelErr) {
-      console.warn('[Razorpay Cancel Previous Link Notice]:', cancelErr);
-    }
-  }
+// Cancellation deferred until replacement link is successfully issued (prevents orphaning active links on creation failure)
 
   // Clean Indian mobile number if provided (E.164 format with 10-15 digits)
   let contact: string | undefined = undefined;
@@ -132,6 +121,24 @@ export async function createRazorpayPaymentLink(
     }
 
     const data = (await res.json()) as { id: string; short_url: string; expire_by?: number };
+
+    // Safely retire/cancel previous link now that replacement link is successfully generated
+    if (previousLinkId && previousLinkId.startsWith('plink_')) {
+      try {
+        const cancelRes = await fetch(`https://api.razorpay.com/v1/payment_links/${previousLinkId}/cancel`, {
+          method: 'POST',
+          headers: { Authorization: authHeader },
+        });
+        if (cancelRes.ok) {
+          console.log(`[Razorpay Payment Link Cancel]: Successfully retired previous link ${previousLinkId}`);
+        } else {
+          console.warn(`[Razorpay Cancel Previous Link Notice]: Razorpay returned ${cancelRes.status} for ${previousLinkId}`);
+        }
+      } catch (cancelErr) {
+        console.warn('[Razorpay Cancel Previous Link Notice]:', cancelErr);
+      }
+    }
+
     return {
       id: data.id,
       shortUrl: data.short_url,
@@ -1442,7 +1449,7 @@ export async function handleRazorpayWebhookEvent(
         const mid = parts[1];
         if (prefix === 'p' && mid.length >= 8) {
           const rowBySuffix = await db
-            .prepare('SELECT * FROM payments WHERE id LIKE ?')
+            .prepare("SELECT * FROM payments WHERE REPLACE(id, '-', '') LIKE ?")
             .bind(`%${mid}%`)
             .first<Record<string, unknown>>();
           if (rowBySuffix) return rowBySuffix;

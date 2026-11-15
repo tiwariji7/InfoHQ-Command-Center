@@ -318,35 +318,37 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F0FA] flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-[#F8F8FF] flex flex-col lg:flex-row font-sans">
       {/* ========================================================= */}
       {/* LAPTOP / DESKTOP SIDEBAR (>= 1024px)                      */}
       {/* Whisper Pale Lavender background: #F3F0FA, scrollable     */}
       {/* ========================================================= */}
       <aside
         data-lenis-prevent
-        className={`hidden lg:flex flex-col bg-[#F3F0FA] border-r border-[#EAE6F7] h-screen sticky top-0 z-20 shrink-0 select-none transition-all duration-300 ${
+        className={`hidden lg:flex flex-col bg-[#FFFFFF] border-r border-[#EAE6F7] h-screen sticky top-0 z-20 shrink-0 select-none transition-all duration-300 ${
           sidebarCollapsed ? 'w-[76px]' : 'w-[260px] xl:w-[276px]'
         }`}
       >
-        {/* Brand Header: InfoHQ text only as requested */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#F3F0FA]">
+        {/* Brand Header: Official InfoHQ Brand Logo */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#FFFFFF]">
           {!sidebarCollapsed ? (
-            <div className="flex flex-col select-none">
-              <div className="flex items-center">
-                <span className="text-[22px] font-black tracking-tight text-[#1A085C]">
-                  info<span className="text-[#5B4CF5]">HQ</span>
-                </span>
-              </div>
-              <span className="text-[11px] font-bold text-[#6B7280] tracking-wide -mt-0.5">
-                Command Center
+            <div className="flex items-center gap-2.5 select-none py-1">
+              <img
+                src="/infohq-brandlogo.webp"
+                alt="InfoHQ Logo"
+                className="h-8 w-auto object-contain"
+              />
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200/80 shadow-2xs tracking-wider uppercase">
+                HQ
               </span>
             </div>
           ) : (
-            <div className="mx-auto flex flex-col items-center select-none">
-              <span className="text-xl font-black text-[#1A085C]">
-                i<span className="text-[#5B4CF5]">HQ</span>
-              </span>
+            <div className="mx-auto flex flex-col items-center select-none py-1">
+              <img
+                src="/favicon.webp"
+                alt="InfoHQ"
+                className="w-8 h-8 rounded-xl object-contain shadow-2xs border border-purple-100"
+              />
             </div>
           )}
         </div>
@@ -379,8 +381,8 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                     style={
                       isActive
                         ? {
-                            background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
-                            boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
+                            background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
+                            boxShadow: '0 4px 18px rgba(124, 92, 232, 0.28)',
                             color: '#FFFFFF',
                           }
                         : undefined
@@ -428,18 +430,18 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           {/* Drawer Menu */}
           <div
             data-lenis-prevent
-            className="relative w-4/5 max-w-xs bg-[#F3F0FA] h-[100dvh] max-h-screen flex flex-col z-10 shadow-2xl"
+            className="relative w-4/5 max-w-xs bg-[#FFFFFF] h-[100dvh] max-h-screen flex flex-col z-10 shadow-2xl border-r border-[#EAE6F7]"
           >
-            {/* Drawer Header */}
-            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#F3F0FA]">
-              <div className="flex flex-col select-none">
-                <div className="flex items-center">
-                  <span className="text-xl font-black tracking-tight text-[#1A085C]">
-                    info<span className="text-[#5B4CF5]">HQ</span>
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold text-[#6B7280] tracking-wide -mt-0.5">
-                  Command Center
+            {/* Drawer Header with InfoHQ Logo */}
+            <div className="h-16 flex items-center justify-between px-5 border-b border-[#EAE6F7] shrink-0 bg-[#FFFFFF]">
+              <div className="flex items-center gap-2 select-none">
+                <img
+                  src="/infohq-brandlogo.webp"
+                  alt="InfoHQ Logo"
+                  className="h-7 w-auto object-contain"
+                />
+                <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200 tracking-wider uppercase">
+                  HQ
                 </span>
               </div>
               <button
@@ -473,7 +475,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                         style={
                           isActive
                             ? {
-                                background: 'linear-gradient(90deg, #5B4CF5 0%, #E85AA0 100%)',
+                                background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
                                 boxShadow: '0 4px 14px rgba(99, 88, 240, 0.30)',
                                 color: '#FFFFFF',
                               }
@@ -502,7 +504,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             </nav>
 
             {/* Drawer Logout Footer */}
-            <div className="p-3 border-t border-[#EAE6F7] bg-[#F3F0FA] shrink-0">
+            <div className="p-3 border-t border-[#EAE6F7] bg-[#F8F8FF] shrink-0">
               <button
                 onClick={() => signOut()}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-control text-xs font-semibold text-rose-600 bg-white border border-rose-100 hover:bg-rose-50 transition-colors cursor-pointer shadow-xs"
@@ -522,7 +524,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
         {/* ========================================================= */}
         {/* TOP FLOATING NAVBAR (Inspired by Reference Image)         */}
         {/* ========================================================= */}
-        <header className="h-16 bg-[#F3F0FA]/90 backdrop-blur-md border-b border-[#EAE6F7] flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 shadow-[0_2px_12px_rgba(124,58,237,0.03)]">
+        <header className="h-16 bg-white/85 backdrop-blur-md border-b border-[#EAE6F7] flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30 shrink-0 shadow-[0_2px_12px_rgba(26,8,92,0.03)]">
           {/* Left section: Hamburger / Collapse / Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {/* 3-Lines Hamburger Button: visible on Mobile & Tablet (< 1024px) */}
@@ -535,27 +537,28 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
               <Menu size={22} className="stroke-[2.2]" />
             </button>
 
-            {/* Mobile & Tablet Brand Title */}
-            <div className="lg:hidden flex items-center gap-1 select-none">
-              <span className="text-lg font-black tracking-tight bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
-                Info
+            {/* Mobile & Tablet Brand with Official Logo */}
+            <div className="lg:hidden flex items-center gap-2 select-none">
+              <img
+                src="/infohq-brandlogo.webp"
+                alt="InfoHQ Logo"
+                className="h-6 sm:h-7 w-auto object-contain"
+              />
+              <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200 tracking-wider uppercase">
+                HQ
               </span>
-              <span className="text-lg font-black tracking-tight text-[#1A085C]">HQ</span>
             </div>
 
-            {/* Desktop Brand (Visible when sidebar is collapsed, matching mockup) */}
+            {/* Desktop Brand (Visible when sidebar is collapsed) */}
             {sidebarCollapsed && (
-              <div className="hidden lg:flex flex-col select-none pr-1">
-                <div className="flex items-center">
-                  <span className="text-[19px] font-black tracking-tight bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#5B4CF5] bg-clip-text text-transparent">
-                    Info
-                  </span>
-                  <span className="text-[19px] font-black tracking-tight text-[#1A085C] ml-0.5">
-                    HQ
-                  </span>
-                </div>
-                <span className="text-[8.5px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#FF4D8D] via-[#A855F7] to-[#7C3AED] bg-clip-text text-transparent -mt-0.5">
-                  Command Center
+              <div className="hidden lg:flex items-center gap-2 select-none pr-1">
+                <img
+                  src="/infohq-brandlogo.webp"
+                  alt="InfoHQ Logo"
+                  className="h-7 w-auto object-contain"
+                />
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-[#F3F0FF] text-[#5B4CF5] border border-purple-200 tracking-wider uppercase">
+                  Command
                 </span>
               </div>
             )}
@@ -618,7 +621,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
               aria-label="Notifications"
             >
               <Bell size={17} />
-              <span className="w-2 h-2 rounded-full bg-[#EF4444] absolute top-1.5 right-1.5 ring-1.5 ring-[#F3F0FA]" />
+              <span className="w-2 h-2 rounded-full bg-[#EF4444] absolute top-1.5 right-1.5 ring-1.5 ring-[#F8F8FF]" />
             </button>
 
             {/* Clean User Profile (Without Boxy Pill Background) */}

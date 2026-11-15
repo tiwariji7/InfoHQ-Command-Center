@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import type { DashboardOverviewResponse } from '@infohq/shared';
 import { fetchDashboardOverview, triggerAutomationAudit } from '../../lib/api.js';
@@ -54,6 +54,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   // Dynamic hover for the 3 mini tiles inside Total Revenue
   const [hoveredRevenueTile, setHoveredRevenueTile] = useState<number | null>(null);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('just now');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleSendTelegramBriefing = async () => {
     setIsSendingTelegram(true);
@@ -72,7 +74,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
+  const isFetchingRef = useRef(false);
+
   const loadDashboard = useCallback(async (isBackground = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     if (!isBackground) {
       setIsLoading(true);
       setError(null);
@@ -81,12 +88,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     try {
       const res = await fetchDashboardOverview(getToken);
       setData(res);
+      setLastSyncedTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
     } catch (err: unknown) {
       if (!isBackground) {
         console.error('Failed to load dashboard overview:', err);
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data.');
       }
     } finally {
+      isFetchingRef.current = false;
       if (!isBackground) {
         setIsLoading(false);
       }
@@ -392,21 +401,26 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
         {/* Live Data Clickable Sync + Telegram Briefing (Clean, No Pill Background) */}
         <div className="flex items-center gap-3.5 sm:gap-4 self-start sm:self-auto select-none">
-          {/* Clickable Live Data without pill background */}
+          {/* Clickable Live Data Real-time Sync */}
           <button
-            onClick={() => loadDashboard(false)}
-            disabled={isLoading}
-            className="text-xs font-bold text-[#1A085C] hover:text-[#5B4CF5] inline-flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 group py-1"
-            title="Live Data Active • Click to sync latest metrics"
+            onClick={async () => {
+              setIsRefreshing(true);
+              await loadDashboard(false);
+              setIsRefreshing(false);
+            }}
+            disabled={isLoading || isRefreshing}
+            className="text-xs font-bold text-[#1A085C] hover:text-[#5B4CF5] inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50 group py-1"
+            title={`Live Realtime Active • Auto-sync every 5s • Last: ${lastSyncedTime}`}
           >
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLoading ? 'bg-indigo-400' : 'bg-emerald-400'} opacity-75`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isLoading ? 'bg-[#5B4CF5]' : 'bg-[#10B981]'}`}></span>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLoading || isRefreshing ? 'bg-indigo-400' : 'bg-emerald-400'} opacity-75`}></span>
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLoading || isRefreshing ? 'bg-[#5B4CF5]' : 'bg-[#10B981]'}`}></span>
             </span>
-            <span className="text-xs font-bold">Live Data</span>
+            <span className="text-xs font-bold tracking-tight">Live Realtime</span>
+            <span className="text-[10px] text-[#6B7280] font-medium hidden sm:inline tabular-nums">• {lastSyncedTime}</span>
             <RefreshCw
               size={11}
-              className={`text-[#5B4CF5] transition-transform group-hover:rotate-180 duration-500 ${isLoading ? 'animate-spin' : ''}`}
+              className={`text-[#5B4CF5] transition-transform duration-500 ${isLoading || isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`}
             />
           </button>
 

@@ -418,45 +418,34 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* Top Section: Header, Meta, Items, Notes & Totals */}
           <div className="space-y-6">
             {/* ========================================================= */}
-            {/* 1. BRAND HEADER: Info (Orange Gradient), HQ (Violet BG)   */}
+            {/* 1. BRAND HEADER: InfoHQ Official Logo & Engineering Studio */}
             {/* ========================================================= */}
             <div className="space-y-3">
-              <div>
-                <h1 className="text-2xl sm:text-[26px] font-black tracking-tight leading-none flex items-center">
-                  {/* Info in Website Signature Coral-Orange Gradient */}
-                  <span
-                    style={{
-                      background: 'linear-gradient(90deg, #E8604E 0%, #FF6B4A 50%, #DD4985 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      color: '#E8604E',
-                    }}
-                  >
-                    Info
-                  </span>
-                  {/* HQ in Create Payment Link Gradient Button Background */}
-                  <span
-                    style={{
-                      background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      color: '#5B4CF5',
-                    }}
-                  >
-                    HQ
-                  </span>
-                  <span className="text-[#1A085C] ml-1.5">Pvt Ltd</span>
-                </h1>
-                <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1 tracking-tight">
-                  Engineering Studio for AI, SaaS &amp; Digital Systems
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src="/infohq-brandlogo.webp"
+                      alt="InfoHQ Logo"
+                      className="h-8 sm:h-9 w-auto object-contain"
+                    />
+                    <span className="text-[#1A085C] font-black text-sm tracking-tight hidden sm:inline">Pvt Ltd</span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1.5 tracking-tight">
+                    Engineering Studio for AI, SaaS &amp; Digital Systems
+                  </p>
+                </div>
+                <div className="text-left sm:text-right text-[10.5px] font-medium text-[#6B7280] shrink-0 leading-tight">
+                  <div className="font-semibold text-[#1A085C]">Prayagraj &bull; Pune, India</div>
+                  <div className="font-mono text-[10px] text-[#7C5CE8] mt-0.5">https://infohq.in</div>
+                </div>
               </div>
 
-              {/* Brand Purple Gradient Accent Bar */}
+              {/* Brand Signature Gradient Accent Bar */}
               <div
                 className="w-full h-[2.5px] rounded-full"
                 style={{
-                  background: 'linear-gradient(90deg, #5B4CF5 0%, #7C5CE8 50%, #E85AA0 100%)',
+                  background: 'linear-gradient(90deg, #E8604E 0%, #DD4985 35%, #914FBB 65%, #5782E0 100%)',
                 }}
               />
             </div>

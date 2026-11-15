@@ -181,10 +181,17 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     try {
       const res = await resendPaymentLinkApi(getToken, inv.id);
       alert(res.message || 'Fresh 24h payment link generated and sent to client via Email & Telegram!');
-      if (res.payment && clientDetail) {
-        setClientDetail({
-          ...clientDetail,
-          payments: clientDetail.payments.map((p) => (p.id === inv.id ? res.payment! : p)),
+      if (res.payment) {
+        setClientDetail((prev) => {
+          if (!prev) return prev;
+          const currentClientId = prev.client?.id;
+          if (payment?.clientId && currentClientId && currentClientId !== payment.clientId) {
+            return prev;
+          }
+          return {
+            ...prev,
+            payments: prev.payments.map((p) => (p.id === inv.id ? res.payment! : p)),
+          };
         });
       }
     } catch (err: unknown) {

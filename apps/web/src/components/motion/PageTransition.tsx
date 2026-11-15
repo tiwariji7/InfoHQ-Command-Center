@@ -30,7 +30,10 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
       animate="animate"
       exit="exit"
       className={className}
-      style={{ willChange: 'opacity, transform, filter' }}
+      style={{
+        // Using isolation: 'auto' so fixed drawers/modals inside don't establish a containing block after entry
+        transformStyle: 'flat',
+      }}
     >
       {children}
     </motion.div>

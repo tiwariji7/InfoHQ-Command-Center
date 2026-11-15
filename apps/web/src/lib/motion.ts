@@ -64,11 +64,15 @@ export const getPageTransitionVariants = (): Variants => {
     },
     animate: {
       opacity: 1,
-      filter: 'blur(0px)',
+      filter: 'none',
       y: 0,
       transition: {
         duration: 0.4,
         ease: 'easeOut',
+      },
+      transitionEnd: {
+        transform: 'none',
+        filter: 'none',
       },
     },
     exit: {
