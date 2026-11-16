@@ -11,6 +11,7 @@ import { intakeRouter } from './routes/intake.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { clientsRouter } from './routes/clients.js';
 import { teamRouter } from './routes/team.js';
+import { portalRouter } from './routes/portal.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import { autoSyncPendingRazorpayPayments } from './services/billingService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
@@ -97,6 +98,9 @@ app.get('/api/me', requireAuth, (c) => {
 
 // Public: Website and landing page inbound lead intake webhook
 app.route('/api/intake', intakeRouter);
+
+// Public: Client Portal (Token magic link gated, no login required for client)
+app.route('/api/portal', portalRouter);
 
 // Public: Razorpay & external payment webhooks (supports all common URL variants)
 app.route('/api/webhooks', webhooksRouter);

@@ -577,3 +577,17 @@ export async function revokeTeamMemberApi(
   });
 }
 
+// --- Client Portal (Public / Token Gated) ---
+
+export async function fetchClientPortalData(
+  token: string
+): Promise<{ success: boolean; data: import('@infohq/shared').ClientPortalData }> {
+  const url = buildUrl(`/api/portal/access?token=${encodeURIComponent(token)}`);
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error((errData as any).message || 'Invalid or expired client portal link.');
+  }
+  return res.json();
+}
+

@@ -28,6 +28,8 @@ function mapDbRowToClient(row: Record<string, unknown>): Client {
     activeProjects: row.active_projects !== undefined ? Number(row.active_projects) : undefined,
     totalInvoices: row.total_invoices !== undefined ? Number(row.total_invoices) : undefined,
     pendingAmount: row.pending_amount !== undefined ? Number(row.pending_amount) : undefined,
+    portalToken: row.portal_token ? String(row.portal_token) : null,
+    portalEnabled: row.portal_enabled !== undefined ? Boolean(row.portal_enabled) : true,
   };
 }
 
@@ -299,11 +301,30 @@ export async function getClientByIdOrName(
   client.totalPaid = payments.filter((p) => p.status === 'received').reduce((sum, p) => sum + p.amount, 0);
   client.pendingAmount = Math.max(0, client.totalBilled - client.totalPaid);
 
+  // Auto-generate portal token atomically if missing
+  let portalToken = clientRow.portal_token ? String(clientRow.portal_token) : null;
+  if (!portalToken) {
+    const candidateToken = `pt_${crypto.randomUUID().replace(/-/g, '')}`;
+    await db
+      .prepare('UPDATE clients SET portal_token = ? WHERE id = ? AND portal_token IS NULL')
+      .bind(candidateToken, clientRow.id)
+      .run();
+    const updated = await db
+      .prepare('SELECT portal_token FROM clients WHERE id = ?')
+      .bind(clientRow.id)
+      .first<{ portal_token: string | null }>();
+    portalToken = updated?.portal_token ? String(updated.portal_token) : candidateToken;
+    client.portalToken = portalToken;
+  }
+
+  const portalUrl = `https://commandcenter.infohq.in/portal?token=${portalToken}`;
+
   return {
     client,
     projects,
     payments,
     lead,
+    portalUrl,
   };
 }
 

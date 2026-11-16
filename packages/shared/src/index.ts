@@ -482,6 +482,8 @@ export const ClientSchema = z.object({
   activeProjects: z.number().optional(),
   totalInvoices: z.number().optional(),
   pendingAmount: z.number().optional(),
+  portalToken: z.string().nullable().optional(),
+  portalEnabled: z.boolean().optional(),
 });
 
 export type Client = z.infer<typeof ClientSchema>;
@@ -511,6 +513,44 @@ export interface ClientDetailResponse {
   projects: Project[];
   payments: Payment[];
   lead?: Lead | null;
+  portalUrl?: string;
+}
+
+export interface ClientPortalData {
+  client: {
+    id: string;
+    name: string;
+    company: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+  overview: {
+    totalBilled: number;
+    totalPaid: number;
+    totalPending: number;
+    activeProjectsCount: number;
+  };
+  projects: Array<{
+    id: string;
+    title: string;
+    status: ProjectStatus;
+    startDate: number | null;
+    targetDate: number | null;
+    totalTasks: number;
+    completedTasks: number;
+    description: string | null;
+  }>;
+  invoices: Array<{
+    id: string;
+    title: string;
+    invoiceNumber: string | null;
+    amount: number;
+    status: PaymentStatus;
+    dueDate: number | null;
+    paidAt: number | null;
+    createdAt: number;
+    razorpayPaymentLinkUrl: string | null;
+  }>;
 }
 
 // --- Dashboard & Analytics Models ---

@@ -5,9 +5,26 @@ import type { HealthResponse, AuthUser } from '@infohq/shared';
 import { SignInCard } from './components/auth/SignInCard.js';
 import { AccessRestrictedScreen } from './components/auth/AccessRestrictedScreen.js';
 import { Shell } from './components/layout/Shell.js';
+import { ClientPortalView } from './components/portal/ClientPortalView.js';
 import Lenis from 'lenis';
 
 export const App: React.FC = () => {
+  // Check if current route is for Client Portal (token-gated magic link, bypasses Clerk login)
+  const [portalToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, '?'));
+    const token =
+      urlParams.get('token') ||
+      urlParams.get('portal_token') ||
+      hashParams.get('token') ||
+      hashParams.get('portal_token');
+    const isPortalPath = window.location.pathname.startsWith('/portal');
+    if (token) return token;
+    if (isPortalPath) return '';
+    return null;
+  });
+
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user: clerkUser } = useUser();
 
@@ -128,6 +145,11 @@ export const App: React.FC = () => {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Render public token-gated Client Portal immediately without requiring Clerk login
+  if (portalToken !== null) {
+    return <ClientPortalView token={portalToken} />;
+  }
 
   if (!isLoaded && !initTimeoutReached) {
     return (

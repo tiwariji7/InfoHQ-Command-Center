@@ -46,6 +46,14 @@ import {
 
   RefreshCw,
 
+  Globe,
+
+  Copy,
+
+  Check,
+
+  ExternalLink,
+
 } from 'lucide-react';
 
 
@@ -207,6 +215,8 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
   useEffect(() => {
 
+    setClientDetail(null);
+
     if (!payment) return;
 
     const identifier = payment.clientId || payment.clientName;
@@ -254,6 +264,32 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
   const initials = getInitials(clientName);
 
   const clientId = clientDetail?.client?.id || payment?.clientId || (payment ? `CLT-2026-${payment.id.slice(-4).toUpperCase()}` : 'CLT-2026-00001');
+
+  const isMatchingClient =
+    clientDetail?.client &&
+    (Boolean(payment?.clientId && clientDetail.client.id === payment.clientId) ||
+      Boolean(payment?.clientName && clientDetail.client.name.toLowerCase() === payment.clientName.toLowerCase()));
+
+  const clientPortalUrl =
+    isMatchingClient
+      ? clientDetail?.portalUrl ||
+        (clientDetail?.client?.portalToken
+          ? `${typeof window !== 'undefined' ? window.location.origin : 'https://commandcenter.infohq.in'}/portal?token=${clientDetail.client.portalToken}`
+          : null)
+      : null;
+  const [portalCopied, setPortalCopied] = useState(false);
+
+  const handleCopyPortalLink = async () => {
+    if (!clientPortalUrl) return;
+    try {
+      await navigator.clipboard.writeText(clientPortalUrl);
+      setPortalCopied(true);
+      setTimeout(() => setPortalCopied(false), 2000);
+    } catch (err) {
+      console.warn('Clipboard write failed, showing prompt fallback:', err);
+      window.prompt('Copy client portal magic link:', clientPortalUrl);
+    }
+  };
 
 
 
@@ -748,6 +784,49 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           {activeTab === 'overview' && (
 
             <>
+
+              {/* ========================================================= */}
+
+              {/* CLIENT SELF-SERVE PORTAL MAGIC LINK                       */}
+
+              {/* ========================================================= */}
+
+              {clientPortalUrl && (
+                <div className="p-3.5 bg-gradient-to-r from-purple-50/90 to-indigo-50/90 rounded-2xl border border-purple-200/80 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#1A085C]">
+                      <Globe size={14} className="text-[#7C5CE8]" />
+                      <span>Client Self-Serve Portal</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-100 text-[#7C5CE8] font-bold tracking-tight">
+                        No Login Required
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#6B7280] truncate mt-0.5 font-medium">
+                      Share this private link with client to track milestones &amp; pay invoices.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyPortalLink}
+                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-[#7C5CE8] border border-purple-200 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                      title="Copy Magic Link for Client"
+                    >
+                      {portalCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      <span>{portalCopied ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                    <a
+                      href={clientPortalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-xl bg-white hover:bg-purple-50 text-[#6B7280] hover:text-[#1A085C] border border-[#E5E1F0] transition-all cursor-pointer shadow-2xs"
+                      title="Open Client Portal in New Tab"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                </div>
+              )}
 
               {/* ========================================================= */}
 
