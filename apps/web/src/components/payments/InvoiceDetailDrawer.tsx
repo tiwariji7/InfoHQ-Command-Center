@@ -111,10 +111,16 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
     }
   };
 
-  // Close on Escape
+  // Close on Escape (Ignores Escape if higher modal dialog is active)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && payment) {
+        if (
+          document.querySelector('.printable-modal-overlay') ||
+          document.querySelector('[role="dialog"][aria-modal="true"]:not([aria-label="Invoice Dossier Drawer"])')
+        ) {
+          return;
+        }
         onClose();
       }
     }
@@ -191,18 +197,19 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
 
   return (
     <>
-      {/* Dim Smooth Backdrop */}
+      {/* Floating Side Drawer Container (pointer-events-none so screen is never captured; background stays interactive and won't cancel card) */}
       <div
-        className="fixed inset-0 bg-[#1A085C]/25 backdrop-blur-[2px] z-50 transition-opacity animate-in fade-in duration-200"
-        onClick={onClose}
-      />
-
-      {/* Floating Side Drawer Panel */}
-      <div
-        className="fixed top-0 right-0 bottom-0 w-full sm:w-[500px] max-w-full bg-white z-50 shadow-[-12px_0_40px_rgba(26,8,92,0.18)] border-l border-[#E5E1F0] flex flex-col animate-in slide-in-from-right duration-200"
-        role="dialog"
-        aria-modal="true"
+        className="fixed inset-0 z-40 overflow-hidden pointer-events-none flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+        role="region"
+        aria-label="Invoice Dossier Drawer"
       >
+        {/* Floating Side Drawer Panel */}
+        <div
+          className="pointer-events-auto relative w-full sm:w-[500px] max-w-full h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          role="dialog"
+          aria-label="Invoice Dossier Drawer"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* ========================================================= */}
         {/* 1. DRAWER TOP HEADER                                      */}
         {/* ========================================================= */}
@@ -799,6 +806,7 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
             Close Invoice
           </button>
         </div>
+      </div>
       </div>
 
       {/* Printable Real PDF Invoice Modal */}

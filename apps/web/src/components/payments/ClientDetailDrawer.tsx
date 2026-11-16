@@ -160,20 +160,21 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
 
 
-  // Escape key handler
-
+  // Escape key handler (Ignores Escape if higher modal dialog is active)
   useEffect(() => {
-
     function handleKeyDown(e: KeyboardEvent) {
-
-      if (e.key === 'Escape') onClose();
-
+      if (e.key === 'Escape') {
+        if (
+          document.querySelector('.printable-modal-overlay') ||
+          document.querySelector('[role="dialog"][aria-modal="true"]:not([aria-label="Client Profile Drawer"])')
+        ) {
+          return;
+        }
+        onClose();
+      }
     }
-
     window.addEventListener('keydown', handleKeyDown);
-
     return () => window.removeEventListener('keydown', handleKeyDown);
-
   }, [onClose]);
 
 
@@ -474,35 +475,19 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
 
   return (
-
     <div
-
-      className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity"
-
-      role="dialog"
-
-      aria-modal="true"
-
+      className="fixed inset-0 z-40 overflow-hidden pointer-events-none flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+      role="region"
+      aria-label="Client Profile Drawer"
       data-lenis-prevent="true"
-
-      onClick={onClose}
-
     >
-
       {/* Side Popup Card (Compact popup feel, rounded-3xl, draggable from all 4 sides) */}
-
       <div
-
         ref={cardRef}
-
-        className="popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
-
+        className="pointer-events-auto popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
-
         data-lenis-prevent="true"
-
         onClick={(e) => e.stopPropagation()}
-
       >
 
         {/* ========================================================= */}

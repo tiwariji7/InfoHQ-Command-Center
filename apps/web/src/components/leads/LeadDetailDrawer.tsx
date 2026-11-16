@@ -131,10 +131,13 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
   const [noteInput, setNoteInput] = useState('');
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
-  // Close on Escape
+  // Close on Escape (Ignores Escape if higher modal is open)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && leadId) {
+        if (document.querySelector('[role="dialog"][aria-modal="true"]:not([aria-label="Lead Dossier Drawer"])')) {
+          return;
+        }
         onClose();
       }
     }
@@ -329,14 +332,17 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
   return (
     <div
       data-lenis-prevent
-      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity overflow-hidden"
-      role="dialog"
-      aria-modal="true"
+      className="fixed inset-0 z-40 flex justify-end pointer-events-none transition-opacity overflow-hidden"
+      role="region"
+      aria-label="Lead Dossier Drawer"
     >
       {/* Compact, Professional Drawer: 410px wide on desktop (not half-screen!) */}
       <div
         data-lenis-prevent
-        className="w-full sm:w-[410px] md:w-[420px] max-w-full bg-white shadow-[-8px_0_30px_rgba(26,8,92,0.08)] h-[100dvh] max-h-screen flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 border-l border-[#EDE8F5]"
+        className="pointer-events-auto w-full sm:w-[410px] md:w-[420px] max-w-full bg-white shadow-[-8px_0_30px_rgba(26,8,92,0.08)] h-[100dvh] max-h-screen flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 border-l border-[#EDE8F5]"
+        role="dialog"
+        aria-label="Lead Dossier Drawer"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* 1. DRAWER COMPACT HEADER                                  */}
@@ -720,19 +726,21 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
 
       {/* Auto-Convert Won Deal & Generate Advance Invoice Modal */}
       {isConvertModalOpen && lead && (
-        <AutoConvertWonDealModal
-          isOpen={isConvertModalOpen}
-          onClose={() => setIsConvertModalOpen(false)}
-          lead={lead}
-          onSuccess={() => {
-            setIsConvertModalOpen(false);
-            setLead((prev) => (prev ? { ...prev, stage: 'won' } : null));
-            loadData();
-            if (onLeadUpdated && lead) {
-              onLeadUpdated({ ...lead, stage: 'won' });
-            }
-          }}
-        />
+        <div className="pointer-events-auto">
+          <AutoConvertWonDealModal
+            isOpen={isConvertModalOpen}
+            onClose={() => setIsConvertModalOpen(false)}
+            lead={lead}
+            onSuccess={() => {
+              setIsConvertModalOpen(false);
+              setLead((prev) => (prev ? { ...prev, stage: 'won' } : null));
+              loadData();
+              if (onLeadUpdated && lead) {
+                onLeadUpdated({ ...lead, stage: 'won' });
+              }
+            }}
+          />
+        </div>
       )}
     </div>
   );

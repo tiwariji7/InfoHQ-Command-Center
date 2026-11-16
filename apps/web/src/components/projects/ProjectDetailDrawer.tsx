@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type {
   Project,
@@ -84,6 +84,11 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   // Billing & Payments state
   const [projectPayments, setProjectPayments] = useState<Payment[]>([]);
   const [isPaymentsLoading, setIsPaymentsLoading] = useState(false);
+  const paymentsRequestProjectRef = useRef<string | null>(null);
+  const currentProjectIdRef = useRef<string | null>(projectId);
+  useLayoutEffect(() => {
+    currentProjectIdRef.current = projectId;
+  }, [projectId]);
   const [isCreatePaymentOpen, setIsCreatePaymentOpen] = useState(false);
   const [recordPaymentTarget, setRecordPaymentTarget] = useState<Payment | null>(null);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Payment | null>(null);
@@ -200,8 +205,8 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
   // Load project details
   useEffect(() => {
+    setProjectData(null);
     if (!projectId) {
-      setProjectData(null);
       return;
     }
 
@@ -211,17 +216,17 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
     fetchProjectDetail(getToken, projectId)
       .then((data) => {
-        if (isMounted) {
+        if (isMounted && currentProjectIdRef.current === projectId) {
           setProjectData(data);
         }
       })
       .catch((err: unknown) => {
-        if (isMounted) {
+        if (isMounted && currentProjectIdRef.current === projectId) {
           setError(err instanceof Error ? err.message : 'Failed to load project details.');
         }
       })
       .finally(() => {
-        if (isMounted) {
+        if (isMounted && currentProjectIdRef.current === projectId) {
           setIsLoading(false);
         }
       });
@@ -234,37 +239,87 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   // Load project payments
   const loadProjectPayments = useCallback(async () => {
     if (!projectId) return;
+    const requestedProjectId = projectId;
+    if (currentProjectIdRef.current !== requestedProjectId) return;
+    paymentsRequestProjectRef.current = requestedProjectId;
     setIsPaymentsLoading(true);
     try {
-      const res = await fetchPayments(getToken, { projectId });
-      setProjectPayments(res.payments);
+      const res = await fetchPayments(getToken, { projectId: requestedProjectId });
+      if (
+        paymentsRequestProjectRef.current === requestedProjectId &&
+        currentProjectIdRef.current === requestedProjectId
+      ) {
+        setProjectPayments(res.payments);
+      }
     } catch (err: unknown) {
       console.error('Failed to load project payments:', err);
     } finally {
-      setIsPaymentsLoading(false);
+      if (
+        paymentsRequestProjectRef.current === requestedProjectId &&
+        currentProjectIdRef.current === requestedProjectId
+      ) {
+        setIsPaymentsLoading(false);
+      }
     }
   }, [projectId, getToken]);
 
   useEffect(() => {
     if (projectId) {
+      setProjectPayments([]);
       loadProjectPayments();
     }
   }, [projectId, loadProjectPayments]);
 
-  // Handle escape key
+  // Handle escape key (Scoped hierarchically: child modals close first, parent closes last)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && projectId) {
-        onClose();
+      if (e.key === 'Escape') {
+        if (isEditClientModalOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsEditClientModalOpen(false);
+          return;
+        }
+        if (selectedInvoiceForPrint) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedInvoiceForPrint(null);
+          return;
+        }
+        if (recordPaymentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          setRecordPaymentTarget(null);
+          return;
+        }
+        if (isCreatePaymentOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsCreatePaymentOpen(false);
+          return;
+        }
+        if (projectId) {
+          onClose();
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [projectId, onClose]);
+  }, [
+    projectId,
+    onClose,
+    isEditClientModalOpen,
+    selectedInvoiceForPrint,
+    recordPaymentTarget,
+    isCreatePaymentOpen,
+  ]);
 
   // Derived values (Always declared unconditionally before any early return)
-  const project = projectData?.project;
-  const tasks = useMemo(() => projectData?.tasks || [], [projectData]);
+  const project = projectData?.project?.id === projectId ? projectData.project : null;
+  const tasks = useMemo(
+    () => (projectData?.project?.id === projectId ? projectData?.tasks || [] : []),
+    [projectData, projectId]
+  );
 
   const filteredTasks = useMemo(() => {
     if (taskFilter === 'active') return tasks.filter((t) => t.status !== 'done');
@@ -406,15 +461,16 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     if (!project || !newTaskTitle.trim()) return;
 
     setIsAddingTask(true);
+    const targetProjectId = project.id;
     try {
-      const res = await createTaskApi(getToken, project.id, {
+      const res = await createTaskApi(getToken, targetProjectId, {
         title: newTaskTitle.trim(),
         priority: newTaskPriority,
         status: 'todo',
       });
 
       setProjectData((prev) => {
-        if (!prev) return null;
+        if (!prev || prev.project.id !== targetProjectId) return prev;
         const updatedTasks = [...prev.tasks, res.task];
         const completedCount = updatedTasks.filter((t) => t.status === 'done').length;
         const updatedProject = {
@@ -429,8 +485,10 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
         };
       });
 
-      setNewTaskTitle('');
-      setNewTaskPriority('medium');
+      if (currentProjectIdRef.current === targetProjectId) {
+        setNewTaskTitle('');
+        setNewTaskPriority('medium');
+      }
     } catch (err: unknown) {
       console.error('Failed to create task:', err);
     } finally {
@@ -541,18 +599,17 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
   return (
     <>
-      {/* Outer Modal Container (Matches Payment page Client Profile size exactly, rounded-3xl, centered/right-docked) */}
+      {/* Outer Floating Drawer Container (pointer-events-none so screen is never captured; background stays interactive and won't cancel card) */}
       <div
-        className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
-        role="dialog"
-        aria-modal="true"
+        className="fixed inset-0 z-40 overflow-hidden pointer-events-none flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+        role="region"
+        aria-label="Project Details Drawer"
         data-lenis-prevent="true"
-        onClick={onClose}
       >
         {/* Floating Popup Card (Compact popup feel, rounded-3xl, draggable from all 4 sides) */}
         <div
           ref={cardRef}
-          className="popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          className="pointer-events-auto popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
           style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
           data-lenis-prevent="true"
           onClick={(e) => e.stopPropagation()}
@@ -1460,18 +1517,24 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
         payment={recordPaymentTarget}
       />
 
-      {/* Edit Client Profile Modal */}
+      {/* Edit Client Profile Modal (Dedicated Centered Dialog, z-60) */}
       {isEditClientModalOpen && (
         <div
           data-lenis-prevent="true"
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 pointer-events-auto"
           role="dialog"
           aria-modal="true"
-          onClick={() => setIsEditClientModalOpen(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.target === e.currentTarget) {
+              setIsEditClientModalOpen(false);
+            }
+          }}
         >
           <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="h-13 px-5 border-b border-slate-200 flex items-center justify-between bg-[#F8F7FF]">
@@ -1483,7 +1546,10 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setIsEditClientModalOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditClientModalOpen(false);
+                }}
                 className="w-7 h-7 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-purple-100 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X size={15} />
@@ -1570,7 +1636,10 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsEditClientModalOpen(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditClientModalOpen(false);
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-[#6B7280] hover:text-[#1A085C] bg-white border border-[#E5E1F0] cursor-pointer"
                 >
                   Cancel

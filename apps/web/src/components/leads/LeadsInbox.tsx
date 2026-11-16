@@ -67,8 +67,8 @@ export const LeadsInbox: React.FC = () => {
 
   // Fetch linked client, converted projects and invoices when lead is selected
   useEffect(() => {
+    setLeadRelated(null);
     if (!selectedLead) {
-      setLeadRelated(null);
       return;
     }
     let isMounted = true;
@@ -84,10 +84,13 @@ export const LeadsInbox: React.FC = () => {
     };
   }, [getToken, selectedLead]);
 
-  // Close profile drawer on Esc key
+  // Close profile drawer on Esc key (Ignores Escape if higher modal is open)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (document.querySelector('[role="dialog"][aria-modal="true"]:not([aria-label="Lead Profile Drawer"])')) {
+          return;
+        }
         setSelectedLead(null);
       }
     };
@@ -700,18 +703,19 @@ export const LeadsInbox: React.FC = () => {
       {/* ========================================================= */}
       {selectedLead && (
         <div
-          className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
+          className="fixed inset-0 z-40 overflow-hidden pointer-events-none flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+          role="region"
+          aria-label="Lead Profile Drawer"
           data-lenis-prevent="true"
-          onClick={() => setSelectedLead(null)}
         >
           {/* Side Drawer Popup (Matches Payment page Client Profile size exactly, rounded-3xl, draggable from all 4 sides) */}
           <div
             ref={leadCardRef}
-            className="popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            className="pointer-events-auto popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
             style={{ transform: `translate3d(${leadPos.x}px, ${leadPos.y}px, 0)` }}
             data-lenis-prevent="true"
+            role="dialog"
+            aria-label="Lead Profile Drawer"
             onClick={(e) => e.stopPropagation()}
           >
             {/* ========================================================= */}

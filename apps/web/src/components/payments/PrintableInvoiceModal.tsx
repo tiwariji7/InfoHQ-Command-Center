@@ -72,6 +72,18 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     setEditNotes(payment.notes || '');
   }, [payment]);
 
+  // Escape key handler
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   // Payment Status resolution
@@ -227,10 +239,15 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   return (
     <div
       data-lenis-prevent="true"
-      className="printable-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
+      className="printable-modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer, never blank page */}
       <style>{`
@@ -322,6 +339,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
         className="popup-card relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* 4-SIDE DRAG GRIPS (Left & Right Edge Drag Strips)         */}

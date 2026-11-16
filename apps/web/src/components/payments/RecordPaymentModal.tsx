@@ -48,6 +48,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
         onClose();
       }
     }
@@ -96,11 +97,21 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      <div className="bg-white rounded-card shadow-modal max-w-md w-full border border-brand-border my-6 overflow-hidden flex flex-col">
+      <div
+        className="bg-white rounded-card shadow-modal max-w-md w-full border border-brand-border my-6 overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-white shrink-0">
           <div>

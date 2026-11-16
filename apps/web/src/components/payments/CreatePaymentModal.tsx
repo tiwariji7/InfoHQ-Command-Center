@@ -92,7 +92,10 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
   // Escape key handler
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && isOpen) onClose();
+      if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
+        onClose();
+      }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -361,11 +364,15 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-60 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       data-lenis-prevent="true"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       {/* Floating Popup Card (Matches Profile Card layout, rounded-3xl, 4-side draggable) */}
       <div
@@ -374,6 +381,7 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
         data-lenis-prevent="true"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* 4-SIDE DRAG GRIPS (Left & Right Edge Drag Strips)         */}

@@ -686,7 +686,6 @@ export const PaymentsView: React.FC = () => {
         payment={selectedInvoiceForDetail}
         onClose={() => setSelectedInvoiceForDetail(null)}
         onRecordPayment={(py) => {
-          setSelectedInvoiceForDetail(null);
           setSelectedPaymentForRecord(py);
         }}
         onDeletePayment={handleDelete}
