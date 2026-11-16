@@ -6,6 +6,7 @@ import {
   getClients,
   getClientByIdOrName,
   createOrGetClient,
+  updateClient,
 } from '../services/clientService.js';
 
 export const clientsRouter = new Hono<AppContext>();
@@ -81,6 +82,44 @@ clientsRouter.post('/', async (c) => {
   } catch (err: unknown) {
     console.error('Error creating client:', err instanceof Error ? err.message : err);
     return c.json({ error: 'internal_error', message: 'Failed to create client.' }, 500);
+  }
+});
+
+// PATCH /api/clients/:idOrName - Update client profile (name, email, phone, company, address)
+clientsRouter.patch('/:idOrName', async (c) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
+  }
+
+  const idOrName = c.req.param('idOrName');
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'bad_request', message: 'Malformed JSON payload.' }, 400);
+  }
+
+  const parseResult = UpdateClientSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json(
+      {
+        error: 'validation_error',
+        message: 'Invalid client update input.',
+        details: parseResult.error.format(),
+      },
+      400
+    );
+  }
+
+  try {
+    const updated = await updateClient(c.env.DB, idOrName, parseResult.data);
+    if (!updated) {
+      return c.json({ error: 'not_found', message: 'Client not found.' }, 404);
+    }
+    return c.json({ success: true, data: updated });
+  } catch (err: unknown) {
+    console.error('Error updating client:', err instanceof Error ? err.message : err);
+    return c.json({ error: 'internal_error', message: 'Failed to update client.' }, 500);
   }
 });
 

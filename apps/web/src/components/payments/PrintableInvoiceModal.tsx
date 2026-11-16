@@ -538,35 +538,18 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* Top Section: Header, Meta, Items, Notes & Totals */}
           <div className="space-y-6">
             {/* ========================================================= */}
-            {/* 1. BRAND HEADER: InfoHQ Official Typography Logo (No Favicon) */}
+            {/* 1. BRAND HEADER: InfoHQ Text Logo (Without Favicon)       */}
             {/* ========================================================= */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-1.5 select-none">
-                    <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none flex items-center">
-                      <span
-                        style={{
-                          background: 'linear-gradient(90deg, #E8604E 0%, #FF6B4A 50%, #DD4985 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          color: '#E8604E',
-                        }}
-                      >
-                        Info
-                      </span>
-                      <span
-                        style={{
-                          background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          color: '#5B4CF5',
-                        }}
-                      >
-                        HQ
-                      </span>
-                    </div>
-                    <span className="text-[#1A085C] font-black text-sm tracking-tight">Pvt Ltd</span>
+                  <div className="flex items-center gap-2 select-none">
+                    <img
+                      src="/infohq-logo-text.png"
+                      alt="InfoHQ"
+                      className="h-8 sm:h-9 w-auto object-contain"
+                    />
+                    <span className="text-[#1A085C] font-black text-sm tracking-tight hidden sm:inline">Pvt Ltd</span>
                   </div>
                   <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1.5 tracking-tight">
                     Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -859,30 +842,17 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* ========================================================= */}
           {/* 6. PINNED FOOTER SIGN-OFF (Strictly at Bottom of A4)      */}
           {/* ========================================================= */}
-          <div className="mt-auto pt-5 border-t border-[#E5E7EB] text-center text-xs space-y-1.5 shrink-0">
-            <p className="font-bold text-[#1A085C] text-xs sm:text-[13px] flex items-center justify-center gap-1">
-              <span
-                style={{
-                  background: 'linear-gradient(90deg, #E8604E 0%, #FF6B4A 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  color: '#E8604E',
-                }}
-              >
-                Info
-              </span>
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  color: '#5B4CF5',
-                }}
-              >
-                HQ
-              </span>{' '}
-              <span className="text-[#1A085C]">Pvt Ltd</span> &nbsp;•&nbsp; Prayagraj &amp; Pune, India
-            </p>
+          <div className="mt-auto pt-4 border-t border-[#E5E7EB] text-center text-xs space-y-1.5 shrink-0">
+            <div className="flex items-center justify-center gap-1.5 pb-0.5">
+              <img
+                src="/infohq-logo-text.png"
+                alt="InfoHQ"
+                className="h-4.5 sm:h-5 w-auto object-contain"
+              />
+              <span className="text-[#1A085C] font-black text-xs">Pvt Ltd</span>
+              <span className="text-[#9CA3AF] mx-1">•</span>
+              <span className="text-[#4B5563] font-semibold text-xs">Prayagraj &amp; Pune, India</span>
+            </div>
             <p className="text-[11px] font-medium text-[#4B5563]">
               billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; https://infohq.in
             </p>

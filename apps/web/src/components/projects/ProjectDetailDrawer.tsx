@@ -17,6 +17,8 @@ import {
   fetchPayments,
   deletePaymentApi,
   syncRazorpayPaymentApi,
+  updateClientApi,
+  fetchClientDetail,
 } from '../../lib/api.js';
 import {
   X,
@@ -41,6 +43,8 @@ import {
   Zap,
   FileText,
   RefreshCw,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import { useDraggable } from '../../lib/useDraggable.js';
 import { CreatePaymentModal } from '../payments/CreatePaymentModal.js';
@@ -87,6 +91,112 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
   // Status updating state
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Edit Client Profile State
+  const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false);
+  const [clientEditName, setClientEditName] = useState('');
+  const [clientEditCompany, setClientEditCompany] = useState('');
+  const [clientEditEmail, setClientEditEmail] = useState('');
+  const [clientEditPhone, setClientEditPhone] = useState('');
+  const [clientEditAddress, setClientEditAddress] = useState('');
+  const [initialAddress, setInitialAddress] = useState<string | null>(null);
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [clientEditError, setClientEditError] = useState<string | null>(null);
+
+  const handleOpenClientEdit = async () => {
+    if (!project) return;
+    setClientEditName(project.clientName || '');
+    setClientEditCompany(project.company || '');
+    setClientEditEmail(project.clientEmail || '');
+    setClientEditPhone(project.clientPhone || '');
+    setClientEditAddress('');
+    setInitialAddress(null);
+    setClientEditError(null);
+    setIsEditClientModalOpen(true);
+
+    const idOrName = project.clientId || project.clientName;
+    if (idOrName) {
+      try {
+        const clientRes = await fetchClientDetail(getToken, idOrName);
+        if (clientRes?.client?.address) {
+          setClientEditAddress(clientRes.client.address);
+          setInitialAddress(clientRes.client.address);
+        }
+      } catch {
+        // Gracefully keep initial values
+      }
+    }
+  };
+
+  const handleSaveClientProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project) return;
+    if (!clientEditName.trim()) {
+      setClientEditError('Client Name is required.');
+      return;
+    }
+    const identifier = project.clientId || project.clientName;
+    if (!identifier) {
+      setClientEditError('No valid client identifier found.');
+      return;
+    }
+
+    const savedProjectId = projectId;
+    setIsSavingClient(true);
+    setClientEditError(null);
+    try {
+      const payload: {
+        name: string;
+        company?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+      } = {
+        name: clientEditName.trim(),
+        company: clientEditCompany.trim(),
+        email: clientEditEmail.trim(),
+        phone: clientEditPhone.trim(),
+      };
+
+      // Only pass address if loaded or modified by user
+      if (initialAddress !== null || clientEditAddress.trim()) {
+        payload.address = clientEditAddress.trim();
+      }
+
+      const res = await updateClientApi(getToken, identifier, payload);
+
+      const updatedProj: Project = {
+        ...(projectData?.project && projectData.project.id === savedProjectId ? projectData.project : project),
+        clientName: res.data.name,
+        clientEmail: res.data.email,
+        clientPhone: res.data.phone,
+        company: res.data.company ?? undefined,
+      };
+
+      if (projectId === savedProjectId) {
+        setProjectData((prev) => {
+          if (!prev || prev.project.id !== savedProjectId) return prev;
+          return {
+            ...prev,
+            project: {
+              ...prev.project,
+              clientName: res.data.name,
+              clientEmail: res.data.email,
+              clientPhone: res.data.phone,
+              company: res.data.company ?? undefined,
+            },
+          };
+        });
+      }
+
+      onProjectUpdated(updatedProj);
+      setIsEditClientModalOpen(false);
+    } catch (err: unknown) {
+      setClientEditError(err instanceof Error ? err.message : 'Failed to update client profile.');
+    } finally {
+      setIsSavingClient(false);
+    }
+  };
 
   // Load project details
   useEffect(() => {
@@ -528,6 +638,15 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                     {project?.clientName || project?.title || 'Project Dossier'}
                   </h3>
                   {renderStatusText(project?.status)}
+                  <button
+                    type="button"
+                    onClick={handleOpenClientEdit}
+                    className="h-6 px-2 rounded-full bg-purple-50 hover:bg-purple-100 text-[#5B4CF5] text-[10.5px] font-bold inline-flex items-center gap-1 border border-purple-200 transition-colors cursor-pointer"
+                    title="Edit Client Profile"
+                  >
+                    <Edit3 size={11} />
+                    <span>Edit Client</span>
+                  </button>
                 </div>
 
                 <div className="text-[11px] text-[#6B7280] font-medium truncate mt-0.5">
@@ -810,6 +929,14 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
                               {project.clientId}
                             </span>
                           )}
+                          <button
+                            type="button"
+                            onClick={handleOpenClientEdit}
+                            className="text-[#5B4CF5] hover:text-[#4338CA] p-0.5 rounded hover:bg-purple-100 transition-colors cursor-pointer"
+                            title="Edit Client Profile"
+                          >
+                            <Edit3 size={12} />
+                          </button>
                         </div>
                       </div>
 
@@ -1332,6 +1459,135 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
         }}
         payment={recordPaymentTarget}
       />
+
+      {/* Edit Client Profile Modal */}
+      {isEditClientModalOpen && (
+        <div
+          data-lenis-prevent="true"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsEditClientModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="h-13 px-5 border-b border-slate-200 flex items-center justify-between bg-[#F8F7FF]">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-purple-100 text-[#5B4CF5] flex items-center justify-center">
+                  <User size={15} />
+                </div>
+                <h3 className="text-sm font-black text-[#1A085C]">Edit Client Profile</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditClientModalOpen(false)}
+                className="w-7 h-7 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-purple-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveClientProfile} className="p-5 space-y-3.5 text-xs">
+              {clientEditError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{clientEditError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#1A085C] text-[11px] block">
+                  Client Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={clientEditName}
+                  onChange={(e) => setClientEditName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-3 py-2 rounded-xl border border-[#E5E1F0] bg-[#FAF8FF] text-xs font-medium text-[#1A085C] focus:bg-white focus:outline-hidden focus:border-[#5B4CF5]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#1A085C] text-[11px] block">
+                  Company / Organization
+                </label>
+                <input
+                  type="text"
+                  value={clientEditCompany}
+                  onChange={(e) => setClientEditCompany(e.target.value)}
+                  placeholder="e.g. Acme Innovations"
+                  className="w-full px-3 py-2 rounded-xl border border-[#E5E1F0] bg-[#FAF8FF] text-xs font-medium text-[#1A085C] focus:bg-white focus:outline-hidden focus:border-[#5B4CF5]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-[#1A085C] text-[11px] block">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={clientEditEmail}
+                    onChange={(e) => setClientEditEmail(e.target.value)}
+                    placeholder="client@example.com"
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E1F0] bg-[#FAF8FF] text-xs font-medium text-[#1A085C] focus:bg-white focus:outline-hidden focus:border-[#5B4CF5]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-[#1A085C] text-[11px] block">
+                    Phone / WhatsApp
+                  </label>
+                  <input
+                    type="tel"
+                    value={clientEditPhone}
+                    onChange={(e) => setClientEditPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E1F0] bg-[#FAF8FF] text-xs font-medium text-[#1A085C] focus:bg-white focus:outline-hidden focus:border-[#5B4CF5]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#1A085C] text-[11px] block">
+                  Address / City
+                </label>
+                <input
+                  type="text"
+                  value={clientEditAddress}
+                  onChange={(e) => setClientEditAddress(e.target.value)}
+                  placeholder="e.g. Pune, Maharashtra"
+                  className="w-full px-3 py-2 rounded-xl border border-[#E5E1F0] bg-[#FAF8FF] text-xs font-medium text-[#1A085C] focus:bg-white focus:outline-hidden focus:border-[#5B4CF5]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditClientModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#6B7280] hover:text-[#1A085C] bg-white border border-[#E5E1F0] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingClient || !clientEditName.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#5B4CF5] to-[#7C5CE8] hover:brightness-105 disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  {isSavingClient ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  <span>{isSavingClient ? 'Saving...' : 'Save Profile'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };

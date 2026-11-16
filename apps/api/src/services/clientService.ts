@@ -328,3 +328,97 @@ export async function getClientByIdOrName(
   };
 }
 
+export async function updateClient(
+  db: D1Database,
+  idOrName: string,
+  input: UpdateClientInput
+): Promise<Client | null> {
+  const existing = await db
+    .prepare('SELECT * FROM clients WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1')
+    .bind(idOrName, idOrName)
+    .first<Record<string, unknown>>();
+
+  if (!existing) {
+    return null;
+  }
+
+  const now = Date.now();
+  const sets: string[] = ['updated_at = ?'];
+  const binds: unknown[] = [now];
+
+  let newName: string | undefined;
+  let newEmail: string | null | undefined;
+  let newPhone: string | null | undefined;
+  let newCompany: string | null | undefined;
+
+  if (input.name !== undefined) {
+    newName = input.name.trim();
+    sets.push('name = ?');
+    binds.push(newName);
+  }
+  if (input.email !== undefined) {
+    newEmail = input.email.trim() ? input.email.trim() : null;
+    sets.push('email = ?');
+    binds.push(newEmail);
+  }
+  if (input.phone !== undefined) {
+    newPhone = input.phone.trim() ? input.phone.trim() : null;
+    sets.push('phone = ?');
+    binds.push(newPhone);
+  }
+  if (input.company !== undefined) {
+    newCompany = input.company.trim() ? input.company.trim() : null;
+    sets.push('company = ?');
+    binds.push(newCompany);
+  }
+  if (input.address !== undefined) {
+    sets.push('address = ?');
+    binds.push(input.address.trim() ? input.address.trim() : null);
+  }
+  if (input.status !== undefined) {
+    sets.push('status = ?');
+    binds.push(input.status);
+  }
+
+  binds.push(existing.id);
+
+  await db
+    .prepare(`UPDATE clients SET ${sets.join(', ')} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  const finalName = newName ?? String(existing.name);
+  const finalEmail = newEmail !== undefined ? newEmail : (existing.email ? String(existing.email) : null);
+  const finalPhone = newPhone !== undefined ? newPhone : (existing.phone ? String(existing.phone) : null);
+  const finalCompany = newCompany !== undefined ? newCompany : (existing.company ? String(existing.company) : null);
+
+  // Sync client fields to linked projects (Strict client_id or unassigned name fallback)
+  await db
+    .prepare(`
+      UPDATE projects
+      SET client_name = ?, client_email = ?, client_phone = ?, company = ?
+      WHERE client_id = ? OR (client_id IS NULL AND LOWER(client_name) = LOWER(?))
+    `)
+    .bind(finalName, finalEmail, finalPhone, finalCompany, existing.id, String(existing.name))
+    .run();
+
+  // If client name changed, also synchronize client_name in payments
+  if (newName !== undefined && newName !== String(existing.name)) {
+    await db
+      .prepare(`
+        UPDATE payments
+        SET client_name = ?
+        WHERE client_id = ? OR (client_id IS NULL AND LOWER(client_name) = LOWER(?))
+      `)
+      .bind(finalName, existing.id, String(existing.name))
+      .run();
+  }
+
+  const updatedRow = await db
+    .prepare('SELECT * FROM clients WHERE id = ?')
+    .bind(existing.id)
+    .first<Record<string, unknown>>();
+
+  return updatedRow ? mapDbRowToClient(updatedRow) : null;
+}
+
