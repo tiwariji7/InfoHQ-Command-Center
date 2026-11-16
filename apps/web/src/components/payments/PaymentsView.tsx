@@ -698,6 +698,10 @@ export const PaymentsView: React.FC = () => {
           isOpen={Boolean(selectedInvoiceForPrint)}
           onClose={() => setSelectedInvoiceForPrint(null)}
           payment={selectedInvoiceForPrint}
+          onPaymentUpdated={(updated) => {
+            setPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setSelectedInvoiceForPrint((current) => (current && current.id === updated.id ? updated : current));
+          }}
         />
       )}
 

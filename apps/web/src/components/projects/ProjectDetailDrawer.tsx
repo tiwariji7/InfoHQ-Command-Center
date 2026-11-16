@@ -1316,6 +1316,10 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
           isOpen={Boolean(selectedInvoiceForPrint)}
           onClose={() => setSelectedInvoiceForPrint(null)}
           payment={selectedInvoiceForPrint}
+          onPaymentUpdated={(updated) => {
+            setSelectedInvoiceForPrint((current) => (current && current.id === updated.id ? updated : current));
+            setProjectPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          }}
         />
       )}
 

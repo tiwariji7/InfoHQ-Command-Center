@@ -315,7 +315,6 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   };
 
   drawSummaryLine('Subtotal', formattedAmt);
-  drawSummaryLine('Tax / GST', 'Nil / Exempt');
 
   // Total Amount highlight bar
   page.drawLine({ start: { x: sumBoxX + 14, y: sumRowY + 4 }, end: { x: sumBoxX + boxW - 14, y: sumRowY + 4 }, thickness: 0.8, color: colorBorder });
@@ -411,7 +410,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   page.drawText(fLine2, { x: (width - fLine2W) / 2, y: 41, size: 8.5, font: fontRegular, color: colorMuted });
 
   // Line 3: legal note
-  const fLine3 = 'This is a computer-generated tax invoice verified by InfoHQ Command Center.';
+  const fLine3 = 'This is a computer-generated invoice verified by InfoHQ Command Center.';
   const fLine3W = fontRegular.widthOfTextAtSize(fLine3, 7.5);
   page.drawText(fLine3, { x: (width - fLine3W) / 2, y: 29, size: 7.5, font: fontRegular, color: colorSubtle });
 

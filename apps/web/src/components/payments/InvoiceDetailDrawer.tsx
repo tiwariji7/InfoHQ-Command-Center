@@ -810,6 +810,9 @@ export const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({
             ...payment,
             razorpayPaymentLinkUrl: localPaymentLink || payment.razorpayPaymentLinkUrl,
           }}
+          onPaymentUpdated={(updated) => {
+            onRecordPayment(updated);
+          }}
         />
       )}
     </>

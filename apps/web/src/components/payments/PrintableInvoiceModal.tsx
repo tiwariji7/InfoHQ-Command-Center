@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Payment } from '@infohq/shared';
+import { updatePaymentApi } from '../../lib/api.js';
 import {
   X,
   Printer,
@@ -9,13 +10,17 @@ import {
   ExternalLink,
   Loader2,
   GripHorizontal,
+  Edit3,
+  Save,
+  Check,
 } from 'lucide-react';
-import { useDraggable } from '../../lib/useDraggable';
+import { useDraggable } from '../../lib/useDraggable.js';
 
 interface PrintableInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   payment: Payment;
+  onPaymentUpdated?: (updated: Payment) => void;
 }
 
 // Dynamic script loader for html2pdf.js via CDN
@@ -43,6 +48,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   isOpen,
   onClose,
   payment,
+  onPaymentUpdated,
 }) => {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -50,21 +56,35 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
   // Draggable window state matching Client Profile & Create Payment modals
   const { cardRef, position, handlePointerDown, resetPosition } = useDraggable('printable_invoice_modal');
-  const [includeGstBreakdown, setIncludeGstBreakdown] = useState(false);
+
+  // Local payment state for immediate update reflection
+  const [currentPayment, setCurrentPayment] = useState<Payment>(payment);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(payment.title || '');
+  const [editNotes, setEditNotes] = useState(payment.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentPayment(payment);
+    setEditTitle(payment.title || '');
+    setEditNotes(payment.notes || '');
+  }, [payment]);
 
   if (!isOpen) return null;
 
   // Payment Status resolution
-  const statusLower = (payment.status || '').toLowerCase();
+  const statusLower = (currentPayment.status || '').toLowerCase();
   const isPaid = statusLower === 'received' || statusLower === 'paid' || statusLower === 'completed';
   const isRefunded = statusLower === 'refunded';
   const isFailed = statusLower === 'failed';
-  const expiresAt = payment.expiresAt || (payment.razorpayPaymentLinkId ? payment.createdAt + 24 * 60 * 60 * 1000 : null);
+  const expiresAt = currentPayment.expiresAt || (currentPayment.razorpayPaymentLinkId ? currentPayment.createdAt + 24 * 60 * 60 * 1000 : null);
   const isExpired = !isPaid && (statusLower === 'expired' || (expiresAt ? expiresAt < Date.now() : false));
   const isUnpaid = !isPaid && !isRefunded && !isFailed && !isExpired;
 
-  const invoiceCode = payment.invoiceNumber || `INV-2026-${payment.id.slice(-4).toUpperCase()}`;
-  const clientId = payment.clientId || `CLT-2026-${payment.id.slice(-4).toUpperCase()}`;
+  const invoiceCode = currentPayment.invoiceNumber || `INV-2026-${currentPayment.id.slice(-4).toUpperCase()}`;
+  const clientId = currentPayment.clientId || `CLT-2026-${currentPayment.id.slice(-4).toUpperCase()}`;
 
   const formatCurrency = (amt: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -84,9 +104,9 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     }).format(new Date(timestamp));
   };
 
-  const clientName = payment.clientName || 'Valued Client';
-  const clientEmail = payment.clientEmail || '—';
-  const clientPhone = payment.clientPhone || '—';
+  const clientName = currentPayment.clientName || 'Valued Client';
+  const clientEmail = currentPayment.clientEmail || '—';
+  const clientPhone = currentPayment.clientPhone || '—';
 
   // Format real payment method from Razorpay
   const formatPaymentMethod = (method?: string | null): string => {
@@ -100,21 +120,21 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   };
 
   const paymentMode = isPaid
-    ? formatPaymentMethod(payment.paymentMethod)
+    ? formatPaymentMethod(currentPayment.paymentMethod)
     : 'Online Checkout / UPI';
 
   // Real Razorpay Transaction Ref ID
-  const transactionRef = payment.razorpayPaymentId
-    ? payment.razorpayPaymentId
+  const transactionRef = currentPayment.razorpayPaymentId
+    ? currentPayment.razorpayPaymentId
     : isPaid
-    ? (payment.id.startsWith('pay_') ? payment.id : `pay_${payment.id.replace(/[^a-zA-Z0-9]/g, '').slice(-14)}`)
+    ? (currentPayment.id.startsWith('pay_') ? currentPayment.id : `pay_${currentPayment.id.replace(/[^a-zA-Z0-9]/g, '').slice(-14)}`)
     : 'Pending Online Checkout';
 
   // Parse custom items or derive from payment
   let items: Array<{ num: number; desc: string; qty: number; rate: number; amount: number }> = [];
-  if (payment.itemsJson) {
+  if (currentPayment.itemsJson) {
     try {
-      items = JSON.parse(payment.itemsJson);
+      items = JSON.parse(currentPayment.itemsJson);
     } catch {
       // fallback
     }
@@ -124,72 +144,70 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     items = [
       {
         num: 1,
-        desc: payment.title || 'Project Milestone Delivery',
+        desc: currentPayment.title || 'Project Milestone Delivery',
         qty: 1,
-        rate: payment.amount,
-        amount: payment.amount,
+        rate: currentPayment.amount,
+        amount: currentPayment.amount,
       },
     ];
   }
 
-  // Clean Download PDF: If user has GST breakdown toggled, download direct client render matching the screen
+  // Handle saving inline invoice edits
+  const handleSaveInvoiceEdit = async () => {
+    if (!editTitle.trim()) {
+      setSaveError('Milestone Title is required.');
+      return;
+    }
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const res = await updatePaymentApi(getToken, currentPayment.id, {
+        title: editTitle.trim(),
+        notes: editNotes.trim(),
+      });
+      setCurrentPayment(res.payment);
+      onPaymentUpdated?.(res.payment);
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setIsEditing(false);
+      }, 700);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save changes.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Clean Download PDF: Direct client render of #invoice-container matching screen 1:1
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
-    const activeGstMode = includeGstBreakdown;
     try {
-      if (!activeGstMode) {
-        // 1. Primary: Try downloading official vector PDF from backend for standard invoice
-        try {
-          const token = await getToken();
-          const res = await fetch(`/api/payments/${payment.id}/invoice-pdf`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
-
-          if (res.ok) {
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            return;
-          }
-        } catch (serverErr) {
-          console.warn('[Server PDF download failed, falling back to html2pdf]:', serverErr);
-        }
-      }
-
-      // 2. High-Fidelity Client-side html2pdf (preserves selected GST mode exactly as previewed)
-      try {
-        const html2pdf = await loadHtml2Pdf();
-        const element = document.getElementById('invoice-container') || invoiceRef.current;
-        if (!element) {
-          window.print();
-          return;
-        }
-
-        const opt = {
-          margin: [0, 0, 0, 0],
-          filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}${activeGstMode ? '_GST' : ''}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#FFFFFF',
-            windowWidth: 794,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        };
-
-        await html2pdf().set(opt).from(element).save();
-      } catch (clientErr) {
-        console.warn('[Client HTML2PDF failed, falling back to print]:', clientErr);
+      const html2pdf = await loadHtml2Pdf();
+      const element = document.getElementById('invoice-container') || invoiceRef.current;
+      if (!element) {
         window.print();
+        return;
       }
+
+      const opt = {
+        margin: [0, 0, 0, 0],
+        filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#FFFFFF',
+          windowWidth: 794,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (clientErr) {
+      console.warn('[Client HTML2PDF failed, falling back to print]:', clientErr);
+      window.print();
     } finally {
       setIsGenerating(false);
     }
@@ -200,18 +218,11 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     window.print();
   };
 
-  // Reconciled Tax & Settlement Calculations
-  const baseAmount = payment.amount;
-  // If GST is enabled, calculate precise component breakdown (total = 18%, CGST = 9%, SGST = remainder)
-  const totalTax = includeGstBreakdown ? Math.round(baseAmount * 0.18) : 0;
-  const cgstAmount = includeGstBreakdown ? Math.round(baseAmount * 0.09) : 0;
-  const sgstAmount = totalTax - cgstAmount;
-  const effectiveTotal = baseAmount + totalTax;
-
-  // Recorded settlement remains based on actual payment received
-  const recordedSettled = isPaid ? payment.amount : 0;
+  // Reconciled Financials (No GST)
+  const baseAmount = currentPayment.amount;
+  const recordedSettled = isPaid ? currentPayment.amount : 0;
   const paidAmount = recordedSettled;
-  const balanceDue = Math.max(0, effectiveTotal - paidAmount);
+  const balanceDue = Math.max(0, baseAmount - paidAmount);
 
   return (
     <div
@@ -221,7 +232,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
       aria-modal="true"
       onClick={onClose}
     >
-      {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer, never blank */}
+      {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer, never blank page */}
       <style>{`
         @media print {
           @page {
@@ -285,10 +296,11 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           #invoice-container {
             position: relative !important;
             width: 210mm !important;
+            max-width: 210mm !important;
             min-height: 297mm !important;
-            height: 297mm !important;
+            max-height: 297mm !important;
             box-sizing: border-box !important;
-            padding: 14mm 16mm 12mm 16mm !important;
+            padding: 12mm 14mm 10mm 14mm !important;
             margin: 0 auto !important;
             display: flex !important;
             flex-direction: column !important;
@@ -299,6 +311,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             overflow: hidden !important;
             page-break-after: avoid !important;
             page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -357,11 +370,11 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             <span>Move</span>
           </div>
 
-          {/* Right: Icon-only Action Controls */}
+          {/* Right: Action Controls */}
           <div className="flex items-center gap-2" data-no-drag="true">
-            {payment.razorpayPaymentLinkUrl && !isPaid && (
+            {currentPayment.razorpayPaymentLinkUrl && !isPaid && (
               <a
-                href={payment.razorpayPaymentLinkUrl}
+                href={currentPayment.razorpayPaymentLinkUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="h-8 px-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-2xs mr-1"
@@ -372,18 +385,25 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
               </a>
             )}
 
-            {/* GST Tax Invoice Toggle */}
+            {/* Edit Invoice Button */}
             <button
-              onClick={() => setIncludeGstBreakdown(!includeGstBreakdown)}
+              type="button"
+              onClick={() => {
+                setEditTitle(currentPayment.title || '');
+                setEditNotes(currentPayment.notes || '');
+                setSaveError(null);
+                setIsEditing(!isEditing);
+              }}
               disabled={isGenerating}
-              className={`h-8 px-2.5 rounded-full text-[11px] font-bold border transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                includeGstBreakdown
+              className={`h-8 px-2.5 rounded-full text-[11px] font-bold border transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                isEditing
                   ? 'bg-purple-100 text-[#5B4CF5] border-purple-300'
-                  : 'bg-white text-[#6B7280] border-[#E5E1F0] hover:text-[#1A085C]'
+                  : 'bg-white text-[#6B7280] border-[#E5E1F0] hover:text-[#1A085C] hover:bg-slate-50'
               }`}
-              title="Toggle GST Tax Breakdown (18% SAC 998314)"
+              title="Edit Milestone Title & Description"
             >
-              <span>GST {includeGstBreakdown ? 'ON' : 'OFF'}</span>
+              <Edit3 size={13} />
+              <span>{isEditing ? 'Close Edit' : 'Edit'}</span>
             </button>
 
             {/* 1. Eye Icon: Official View Indicator */}
@@ -396,6 +416,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
             {/* 2. Download Icon: High Quality PDF Export */}
             <button
+              type="button"
               onClick={handleDownloadPdf}
               disabled={isGenerating}
               style={{
@@ -414,6 +435,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
             {/* 3. Print Icon: Native Clean Print */}
             <button
+              type="button"
               onClick={handlePrintOnly}
               className="w-8 h-8 rounded-full bg-white border border-[#E5E1F0] text-[#1A085C] hover:bg-slate-50 hover:text-[#5B4CF5] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
               title="Print Invoice"
@@ -423,6 +445,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
 
             {/* 4. Close Icon */}
             <button
+              type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-full text-[#6B7280] hover:text-[#1A085C] hover:bg-purple-100/60 flex items-center justify-center transition-colors cursor-pointer ml-1"
               title="Close"
@@ -431,6 +454,73 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* ========================================================= */}
+        {/* INLINE EDIT PANEL (Hidden on Print)                       */}
+        {/* ========================================================= */}
+        {isEditing && (
+          <div className="print-hidden-control p-4 sm:p-5 bg-[#F8F7FF] border-b border-purple-200 space-y-3 shrink-0 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#1A085C] flex items-center gap-1.5">
+                <Edit3 size={14} className="text-[#5B4CF5]" />
+                <span>Edit Invoice Details</span>
+              </span>
+              {saveError && <span className="text-[11px] text-rose-600 font-medium">{saveError}</span>}
+              {saveSuccess && (
+                <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                  <Check size={13} /> Updated successfully!
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-[#1A085C] text-[11px] block">
+                  Payment Description / Milestone Title *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="e.g. Architecture Sprint Delivery"
+                  className="w-full px-3 py-1.5 rounded-xl border border-[#E5E1F0] bg-white text-xs font-medium text-[#1A085C] focus:outline-hidden focus:border-[#5B4CF5]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#1A085C] text-[11px] block">
+                  Description / Deliverables &amp; Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Scope of work, deliverables summary, or payment instructions..."
+                  className="w-full px-3 py-1.5 rounded-xl border border-[#E5E1F0] bg-white text-xs font-medium text-[#1A085C] focus:outline-hidden focus:border-[#5B4CF5]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[#6B7280] hover:text-[#1A085C] bg-white border border-[#E5E1F0] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSaving || !editTitle.trim()}
+                onClick={handleSaveInvoiceEdit}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#5B4CF5] to-[#7C5CE8] hover:brightness-105 disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ========================================================= */}
         {/* Printable Invoice Sheet Container: id="invoice-container" */}
@@ -448,18 +538,35 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* Top Section: Header, Meta, Items, Notes & Totals */}
           <div className="space-y-6">
             {/* ========================================================= */}
-            {/* 1. BRAND HEADER: InfoHQ Official Logo & Engineering Studio */}
+            {/* 1. BRAND HEADER: InfoHQ Official Typography Logo (No Favicon) */}
             {/* ========================================================= */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src="/infohq-brandlogo.webp"
-                      alt="InfoHQ Logo"
-                      className="h-8 sm:h-9 w-auto object-contain"
-                    />
-                    <span className="text-[#1A085C] font-black text-sm tracking-tight hidden sm:inline">Pvt Ltd</span>
+                  <div className="flex items-center gap-1.5 select-none">
+                    <div className="text-2xl sm:text-[28px] font-black tracking-tight leading-none flex items-center">
+                      <span
+                        style={{
+                          background: 'linear-gradient(90deg, #E8604E 0%, #FF6B4A 50%, #DD4985 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          color: '#E8604E',
+                        }}
+                      >
+                        Info
+                      </span>
+                      <span
+                        style={{
+                          background: 'linear-gradient(135deg, #5B4CF5 0%, #7C5CE8 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          color: '#5B4CF5',
+                        }}
+                      >
+                        HQ
+                      </span>
+                    </div>
+                    <span className="text-[#1A085C] font-black text-sm tracking-tight">Pvt Ltd</span>
                   </div>
                   <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1.5 tracking-tight">
                     Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -488,7 +595,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 INVOICE
               </h2>
 
-              {/* Clean plain typography - no pill background */}
+              {/* Clean plain typography */}
               <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#6B7280]">
                 <span>Invoice No.</span>
                 <span
@@ -519,7 +626,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                   <div className="text-xs font-medium text-[#374151]">{clientPhone}</div>
                 )}
 
-                {/* Clean Account ID text without pill background */}
+                {/* Account ID */}
                 <div className="pt-1.5 text-xs">
                   <span className="text-[#6B7280] font-semibold mr-1.5">Account ID:</span>
                   <span className="font-mono font-bold text-[#1A085C]">{clientId}</span>
@@ -537,14 +644,14 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 <div className="grid grid-cols-[110px_12px_1fr] items-center">
                   <span className="text-[#6B7280] font-semibold">Issue Date</span>
                   <span className="text-[#9CA3AF] font-bold">:</span>
-                  <span className="font-bold text-[#1A085C]">{formatISTDate(payment.createdAt)}</span>
+                  <span className="font-bold text-[#1A085C]">{formatISTDate(currentPayment.createdAt)}</span>
                 </div>
 
                 <div className="grid grid-cols-[110px_12px_1fr] items-center">
                   <span className="text-[#6B7280] font-semibold">Payment Date</span>
                   <span className="text-[#9CA3AF] font-bold">:</span>
                   <span className="font-bold text-[#1A085C]">
-                    {isPaid ? formatISTDate(payment.paidAt || payment.createdAt) : 'Pending'}
+                    {isPaid ? formatISTDate(currentPayment.paidAt || currentPayment.createdAt) : 'Pending'}
                   </span>
                 </div>
 
@@ -611,23 +718,34 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             {/* 5. PAYMENT TERMS & TOTALS CALCULATION WITH CLEAN STAMP    */}
             {/* ========================================================= */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start pt-1">
-              {/* Left Box: Only User-Entered Description & Terms (Zero Fake Boilerplate) */}
+              {/* Left Box: Payment Description & Notes */}
               <div className="p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2.5 text-xs min-h-[140px]">
-                <h4 className="text-xs sm:text-[13px] font-extrabold text-[#1A085C] tracking-tight">
-                  Payment Terms &amp; Notes
-                </h4>
-                {payment.title || payment.notes ? (
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs sm:text-[13px] font-extrabold text-[#1A085C] tracking-tight">
+                    Payment Terms &amp; Notes
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="print-hidden-control text-[11px] font-bold text-[#5B4CF5] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    <span>Edit</span>
+                  </button>
+                </div>
+
+                {currentPayment.title || currentPayment.notes ? (
                   <div className="space-y-2 text-[11px] leading-relaxed text-[#4B5563]">
-                    {payment.title && (
+                    {currentPayment.title && (
                       <div className="space-y-0.5">
                         <span className="font-bold text-[#1A085C] block">Payment Description / Milestone:</span>
-                        <p className="text-[#374151] font-medium">{payment.title}</p>
+                        <p className="text-[#374151] font-medium">{currentPayment.title}</p>
                       </div>
                     )}
-                    {payment.notes && (
+                    {currentPayment.notes && (
                       <div className="space-y-0.5 pt-1.5 border-t border-[#E9D5FF]/60">
                         <span className="font-bold text-[#1A085C] block">Terms &amp; Notes:</span>
-                        <p className="text-[#374151] whitespace-pre-line">{payment.notes}</p>
+                        <p className="text-[#374151] whitespace-pre-line">{currentPayment.notes}</p>
                       </div>
                     )}
                   </div>
@@ -638,9 +756,9 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 )}
               </div>
 
-              {/* Right Box: Totals & Authentic Stamp (Centered between labels and numbers) */}
+              {/* Right Box: Totals & Authentic Stamp (Clean, No GST) */}
               <div className="relative p-4 rounded-xl bg-[#FAF8FF] border border-[#E9D5FF] space-y-2 text-xs min-h-[140px]">
-                {/* Rotated Stamp: Placed right in the middle, avoiding both labels on left and amounts on right */}
+                {/* Rotated Stamp */}
                 <div className="absolute right-24 sm:right-28 bottom-2.5 pointer-events-none select-none z-10">
                   {isPaid && (
                     <div
@@ -707,32 +825,11 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                   </span>
                 </div>
 
-                {/* Tax / GST */}
-                <div className="flex justify-between items-center text-[#4B5563]">
-                  <span className="font-medium">Tax / GST (18%)</span>
-                  <span className="font-semibold text-[#1A085C]">
-                    {includeGstBreakdown ? formatCurrency(totalTax) : 'Nil / Exempt'}
-                  </span>
-                </div>
-
-                {includeGstBreakdown && (
-                  <div className="text-[10px] text-[#6B7280] space-y-0.5 pt-0.5">
-                    <div className="flex justify-between">
-                      <span>CGST (9%):</span>
-                      <span className="font-mono">{formatCurrency(cgstAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>SGST (9%):</span>
-                      <span className="font-mono">{formatCurrency(sgstAmount)}</span>
-                    </div>
-                  </div>
-                )}
-
                 {/* Total Amount in Brand Purple */}
                 <div className="flex justify-between items-center py-1.5 border-y border-[#E9D5FF] text-sm sm:text-base font-black text-[#5B4CF5]">
                   <span>Total Amount</span>
                   <span className="tabular-nums font-black">
-                    {formatCurrency(effectiveTotal)}
+                    {formatCurrency(baseAmount)}
                   </span>
                 </div>
 
@@ -762,8 +859,8 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* ========================================================= */}
           {/* 6. PINNED FOOTER SIGN-OFF (Strictly at Bottom of A4)      */}
           {/* ========================================================= */}
-          <div className="mt-8 pt-5 border-t border-[#E5E7EB] text-center text-xs space-y-1 shrink-0">
-            <p className="font-bold text-[#1A085C] text-xs sm:text-sm">
+          <div className="mt-auto pt-5 border-t border-[#E5E7EB] text-center text-xs space-y-1.5 shrink-0">
+            <p className="font-bold text-[#1A085C] text-xs sm:text-[13px] flex items-center justify-center gap-1">
               <span
                 style={{
                   background: 'linear-gradient(90deg, #E8604E 0%, #FF6B4A 100%)',
@@ -784,13 +881,13 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
               >
                 HQ
               </span>{' '}
-              <span className="text-[#1A085C]">Pvt Ltd</span> &nbsp;•&nbsp; Prayagraj, Uttar Pradesh, India
+              <span className="text-[#1A085C]">Pvt Ltd</span> &nbsp;•&nbsp; Prayagraj &amp; Pune, India
             </p>
             <p className="text-[11px] font-medium text-[#4B5563]">
-              billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; infohq.in
+              billing@infohq.in &nbsp;&nbsp;|&nbsp;&nbsp; https://infohq.in
             </p>
-            <p className="text-[10px] text-[#9CA3AF] pt-1">
-              This is a computer-generated tax invoice verified by InfoHQ Command Center.
+            <p className="text-[10px] text-[#9CA3AF]">
+              This is a computer-generated invoice verified by InfoHQ Command Center.
             </p>
           </div>
         </div>
@@ -798,4 +895,3 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     </div>
   );
 };
-
