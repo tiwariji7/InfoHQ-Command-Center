@@ -280,6 +280,14 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             display: none !important;
           }
           /* Keep #root visible but hide everything inside except printable overlay */
+          html, body {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            background: #FFFFFF !important;
+          }
           body * {
             visibility: hidden;
           }
@@ -294,41 +302,46 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             visibility: hidden !important;
           }
           .printable-modal-overlay {
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
+            width: 210mm !important;
+            height: 297mm !important;
             display: block !important;
             padding: 0 !important;
             margin: 0 !important;
             background: #FFFFFF !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             backdrop-filter: none !important;
             z-index: 999999 !important;
           }
           .popup-card {
-            position: static !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            max-width: 210mm !important;
+            max-height: 297mm !important;
             transform: none !important;
-            max-width: 100% !important;
-            max-height: none !important;
-            height: auto !important;
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             background: #FFFFFF !important;
           }
           #invoice-container {
-            position: relative !important;
-            width: 100% !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
             max-width: 210mm !important;
-            height: 296mm !important;
-            max-height: 296mm !important;
+            max-height: 297mm !important;
             box-sizing: border-box !important;
-            padding: 10mm 12mm !important;
-            margin: 0 auto !important;
+            padding: 12mm 14mm 14mm 14mm !important;
+            margin: 0 !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
@@ -339,6 +352,13 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
             page-break-after: avoid !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+          }
+          #invoice-footer {
+            position: absolute !important;
+            bottom: 12mm !important;
+            left: 14mm !important;
+            right: 14mm !important;
+            margin-top: 0 !important;
           }
         }
       `}</style>
@@ -870,7 +890,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           {/* ========================================================= */}
           {/* 6. PINNED FOOTER SIGN-OFF (Strictly at Bottom of A4)      */}
           {/* ========================================================= */}
-          <div className="mt-auto pt-4 border-t border-[#E5E7EB] text-center text-xs space-y-1.5 shrink-0">
+          <div id="invoice-footer" className="mt-auto pt-4 border-t border-[#E5E7EB] text-center text-xs space-y-1.5 shrink-0">
             <div className="flex items-center justify-center gap-1.5 pb-0.5">
               <img
                 src="/infohq-logo-text.png"

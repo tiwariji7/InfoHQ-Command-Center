@@ -215,8 +215,16 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       inviteLink,
     }, 201);
   } catch (err: unknown) {
-    console.error('Failed to issue team invitation:', err instanceof Error ? err.message : err);
-    return c.json({ error: 'internal_error', message: 'Failed to issue invitation.' }, 500);
+    const errorDetails = err instanceof Error ? { message: err.message, stack: err.stack } : String(err);
+    console.error('Failed to issue team invitation:', errorDetails);
+    return c.json(
+      {
+        error: 'internal_error',
+        message: err instanceof Error ? `Failed to issue invitation: ${err.message}` : 'Failed to issue invitation.',
+        details: err instanceof Error ? err.message : String(err),
+      },
+      500
+    );
   }
 });
 
