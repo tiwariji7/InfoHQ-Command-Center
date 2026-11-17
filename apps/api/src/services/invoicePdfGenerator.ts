@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
+import { INFO_HQ_LOGO_BASE64 } from './logoBase64.js';
 
 export interface InvoicePdfOptions {
   invoiceNumber: string;
@@ -70,13 +71,38 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const marginX = 45;
   const contentW = width - marginX * 2; // 505.28 pt
 
-  // 1. BRAND HEADER (Info in Coral, HQ in Violet)
-  let y = height - 48; // 793.89
-  page.drawText('Info', { x: marginX, y, size: 24, font: fontBold, color: colorCoral });
-  const infoW = fontBold.widthOfTextAtSize('Info', 24);
-  page.drawText('HQ', { x: marginX + infoW, y, size: 24, font: fontBold, color: colorViolet });
+  // Embed InfoHQ official PNG logo
+  let logoImg: any = null;
+  try {
+    const rawBytes = Uint8Array.from(atob(INFO_HQ_LOGO_BASE64), c => c.charCodeAt(0));
+    logoImg = await pdfDoc.embedPng(rawBytes);
+  } catch (imgErr) {
+    console.warn('[PDF Generation]: Failed to embed PNG logo, falling back to text typography', imgErr);
+  }
 
-  y -= 18;
+  // 1. BRAND HEADER (InfoHQ Logo Image + Studio Subtitle)
+  let y = height - 42; // 799.89
+
+  if (logoImg) {
+    // 320x86 ratio: width 110pt, height ~29.5pt
+    const logoW = 110;
+    const logoH = (logoImg.height / logoImg.width) * logoW;
+    y = height - 36 - logoH;
+    page.drawImage(logoImg, {
+      x: marginX,
+      y,
+      width: logoW,
+      height: logoH,
+    });
+    y -= 14;
+  } else {
+    y = height - 48;
+    page.drawText('Info', { x: marginX, y, size: 24, font: fontBold, color: colorCoral });
+    const infoW = fontBold.widthOfTextAtSize('Info', 24);
+    page.drawText('HQ', { x: marginX + infoW, y, size: 24, font: fontBold, color: colorViolet });
+    y -= 18;
+  }
+
   page.drawText('Engineering Studio for AI, SaaS & Digital Systems', {
     x: marginX,
     y,
@@ -84,6 +110,14 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     font: fontRegular,
     color: colorMuted,
   });
+
+  // Top right address in header matching web modal
+  const headerRightText1 = 'Prayagraj • Pune, India';
+  const headerRightText2 = 'https://infohq.in';
+  const hr1W = fontBold.widthOfTextAtSize(headerRightText1, 9);
+  const hr2W = fontRegular.widthOfTextAtSize(headerRightText2, 8.5);
+  page.drawText(headerRightText1, { x: marginX + contentW - hr1W, y: y + 14, size: 9, font: fontBold, color: colorNavy });
+  page.drawText(headerRightText2, { x: marginX + contentW - hr2W, y, size: 8.5, font: fontRegular, color: colorPurple });
 
   // 3-Tone Brand Gradient Bar across full content width
   y -= 14;
@@ -390,17 +424,34 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     color: rgb(229 / 255, 231 / 255, 235 / 255),
   });
 
-  // Line 1: Info (Coral), HQ (Violet) & Address (Navy)
+  // Line 1: Logo or Text InfoHQ & Address (Navy)
   const fLine1Y = 54;
-  const fInfoW = fontBold.widthOfTextAtSize('Info', 9.5);
-  const fHqW = fontBold.widthOfTextAtSize('HQ', 9.5);
-  const fText = '   •   Prayagraj & Pune, India';
-  const fTotalW = fInfoW + fHqW + fontBold.widthOfTextAtSize(fText, 9.5);
-  const fStart1X = (width - fTotalW) / 2;
+  if (logoImg) {
+    const fLogoW = 54;
+    const fLogoH = (logoImg.height / logoImg.width) * fLogoW;
+    const fText = ' •   Prayagraj & Pune, India';
+    const fTextW = fontBold.widthOfTextAtSize(fText, 9.5);
+    const fTotalW = fLogoW + fTextW;
+    const fStartX = (width - fTotalW) / 2;
 
-  page.drawText('Info', { x: fStart1X, y: fLine1Y, size: 9.5, font: fontBold, color: colorCoral });
-  page.drawText('HQ', { x: fStart1X + fInfoW, y: fLine1Y, size: 9.5, font: fontBold, color: colorViolet });
-  page.drawText(fText, { x: fStart1X + fInfoW + fHqW, y: fLine1Y, size: 9.5, font: fontBold, color: colorNavy });
+    page.drawImage(logoImg, {
+      x: fStartX,
+      y: fLine1Y - 2,
+      width: fLogoW,
+      height: fLogoH,
+    });
+    page.drawText(fText, { x: fStartX + fLogoW, y: fLine1Y + 2, size: 9.5, font: fontBold, color: colorNavy });
+  } else {
+    const fInfoW = fontBold.widthOfTextAtSize('Info', 9.5);
+    const fHqW = fontBold.widthOfTextAtSize('HQ', 9.5);
+    const fText = '   •   Prayagraj & Pune, India';
+    const fTotalW = fInfoW + fHqW + fontBold.widthOfTextAtSize(fText, 9.5);
+    const fStart1X = (width - fTotalW) / 2;
+
+    page.drawText('Info', { x: fStart1X, y: fLine1Y, size: 9.5, font: fontBold, color: colorCoral });
+    page.drawText('HQ', { x: fStart1X + fInfoW, y: fLine1Y, size: 9.5, font: fontBold, color: colorViolet });
+    page.drawText(fText, { x: fStart1X + fInfoW + fHqW, y: fLine1Y, size: 9.5, font: fontBold, color: colorNavy });
+  }
 
   // Line 2: email | website
   const fLine2 = 'billing@infohq.in   |   infohq.in';
