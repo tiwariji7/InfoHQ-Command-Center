@@ -22,7 +22,7 @@ teamRouter.get('/', requireSuperadmin, async (c) => {
 
     const invitesResult = await db
       .prepare(
-        'SELECT id, email, name, role, permissions_json, invited_by, status, created_at, expires_at FROM user_invitations WHERE status = "pending" ORDER BY created_at DESC'
+        'SELECT id, email, name, role, permissions_json, invited_by, status, token, created_at, expires_at FROM user_invitations WHERE status = "pending" ORDER BY created_at DESC'
       )
       .all<Record<string, unknown>>();
 
@@ -40,19 +40,24 @@ teamRouter.get('/', requireSuperadmin, async (c) => {
       updatedAt: Number(row.updated_at),
     }));
 
-    const formattedInvites = (invitesResult.results || []).map((row) => ({
-      id: String(row.id),
-      email: String(row.email),
-      name: String(row.name),
-      role: row.role as UserRole,
-      permissions: row.permissions_json
-        ? JSON.parse(String(row.permissions_json))
-        : DEFAULT_ROLE_PERMISSIONS[(row.role as UserRole) || 'viewer'],
-      invitedBy: String(row.invited_by),
-      status: row.status,
-      createdAt: Number(row.created_at),
-      expiresAt: Number(row.expires_at),
-    }));
+    const formattedInvites = (invitesResult.results || []).map((row) => {
+      const cleanEmail = String(row.email).toLowerCase();
+      const inviteToken = row.token ? String(row.token) : '';
+      return {
+        id: String(row.id),
+        email: cleanEmail,
+        name: String(row.name),
+        role: row.role as UserRole,
+        permissions: row.permissions_json
+          ? JSON.parse(String(row.permissions_json))
+          : DEFAULT_ROLE_PERMISSIONS[(row.role as UserRole) || 'viewer'],
+        invitedBy: String(row.invited_by),
+        status: row.status,
+        createdAt: Number(row.created_at),
+        expiresAt: Number(row.expires_at),
+        inviteLink: `https://commandcenter.infohq.in/?invite_token=${inviteToken}&email=${encodeURIComponent(cleanEmail)}#/sign-up`,
+      };
+    });
 
     return c.json({
       members: formattedUsers,
@@ -91,6 +96,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
   }
 
   const { email, name, role, permissions } = parseResult.data;
+  const cleanEmail = email.toLowerCase().trim();
   const user = c.get('user');
   const invitedBy = user?.name || user?.email || 'Superadmin';
 
@@ -99,7 +105,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
   const inviteId = `inv_${now}`;
   const token = `invtoken_${crypto.randomUUID()}`;
   const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days validity
-  const inviteLink = `https://commandcenter.infohq.in/?invite_token=${token}&email=${encodeURIComponent(email.toLowerCase())}#/sign-up`;
+  const inviteLink = `https://commandcenter.infohq.in/?invite_token=${token}&email=${encodeURIComponent(cleanEmail)}#/sign-up`;
 
   try {
     // 1. Insert or update user_invitations in D1
@@ -117,7 +123,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       )
       .bind(
         inviteId,
-        email.toLowerCase(),
+        cleanEmail,
         name,
         role,
         JSON.stringify(effectivePermissions),
@@ -128,29 +134,53 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       )
       .run();
 
-    // 2. Pre-authorize user in users table with 'active' status on pending Clerk ID
-    await db
-      .prepare(
-        `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
-         ON CONFLICT(clerk_user_id) DO UPDATE SET
-           name = excluded.name,
-           role = excluded.role,
-           permissions_json = excluded.permissions_json,
-           status = 'active',
-           updated_at = excluded.updated_at`
-      )
-      .bind(
-        `usr_${now}`,
-        `pending_${email.toLowerCase()}`,
-        email.toLowerCase(),
-        name,
-        role,
-        JSON.stringify(effectivePermissions),
-        now,
-        now
-      )
-      .run();
+    // 2. Pre-authorize user in users table with 'active' status
+    const existingUser = await db
+      .prepare('SELECT id, clerk_user_id, role FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1')
+      .bind(cleanEmail)
+      .first<{ id: string; clerk_user_id: string; role: string }>();
+
+    if (existingUser?.role === 'superadmin' || (user && user.email?.toLowerCase() === cleanEmail)) {
+      return c.json(
+        {
+          error: 'invalid_action',
+          message: 'Cannot invite or change role of an existing Superadmin.',
+        },
+        400
+      );
+    }
+
+    if (existingUser) {
+      await db
+        .prepare(
+          `UPDATE users SET name = ?, role = ?, permissions_json = ?, status = 'active', updated_at = ? WHERE id = ?`
+        )
+        .bind(name, role, JSON.stringify(effectivePermissions), now, existingUser.id)
+        .run();
+    } else {
+      await db
+        .prepare(
+          `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
+           ON CONFLICT(clerk_user_id) DO UPDATE SET
+             name = excluded.name,
+             role = excluded.role,
+             permissions_json = excluded.permissions_json,
+             status = 'active',
+             updated_at = excluded.updated_at`
+        )
+        .bind(
+          `usr_${now}`,
+          `pending_${cleanEmail}`,
+          cleanEmail,
+          name,
+          role,
+          JSON.stringify(effectivePermissions),
+          now,
+          now
+        )
+        .run();
+    }
 
     // 3. Register invitation in Clerk Backend API if key is present
     if (c.env.CLERK_SECRET_KEY) {
@@ -163,7 +193,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            email_address: email.toLowerCase(),
+            email_address: cleanEmail,
             redirect_url: inviteLink,
             ignore_existing: true,
           }),
@@ -180,40 +210,45 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
 
     // 4. Send official invitation email from Super Admin <superadmin@infohq.in> via Resend
     let emailSent = false;
-    if (c.env.RESEND_API_KEY && c.executionCtx) {
-      c.executionCtx.waitUntil(
-        sendTeamInvitationEmailViaResend(
+    if (c.env.RESEND_API_KEY) {
+      try {
+        emailSent = await sendTeamInvitationEmailViaResend(
           {
             name,
-            email: email.toLowerCase(),
+            email: cleanEmail,
             role,
             invitedBy,
             inviteLink,
             expiresAt,
           },
           c.env.RESEND_API_KEY
-        )
-      );
-      emailSent = true;
+        );
+      } catch (err) {
+        console.warn('[Resend Team Invite Exception]:', err);
+        emailSent = false;
+      }
     }
 
-    return c.json({
-      success: true,
-      message: emailSent
-        ? `Invitation email dispatched to ${email} from Super Admin <superadmin@infohq.in>.`
-        : `Invitation created for ${email}. You can provide the invite link manually.`,
-      emailSent,
-      invitation: {
-        id: inviteId,
-        email: email.toLowerCase(),
-        name,
-        role,
-        permissions: effectivePermissions,
-        invitedBy,
-        expiresAt,
+    return c.json(
+      {
+        success: true,
+        message: emailSent
+          ? `Invitation email dispatched to ${cleanEmail} from Super Admin <superadmin@infohq.in>.`
+          : `Invitation created for ${cleanEmail}. You can provide the invite link manually.`,
+        emailSent,
+        invitation: {
+          id: inviteId,
+          email: cleanEmail,
+          name,
+          role,
+          permissions: effectivePermissions,
+          invitedBy,
+          expiresAt,
+        },
+        inviteLink,
       },
-      inviteLink,
-    }, 201);
+      201
+    );
   } catch (err: unknown) {
     const errorDetails = err instanceof Error ? { message: err.message, stack: err.stack } : String(err);
     console.error('Failed to issue team invitation:', errorDetails);

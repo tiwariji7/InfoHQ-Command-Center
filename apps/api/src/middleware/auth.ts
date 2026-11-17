@@ -105,9 +105,16 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
   let claims: { sub: string; email?: string } | null = null;
   try {
     const verified = await verifyToken(token, { secretKey });
+    const rawClaims = verified as unknown as Record<string, unknown>;
+    const extractedEmail =
+      (typeof rawClaims.email === 'string' && rawClaims.email) ||
+      (typeof rawClaims.email_address === 'string' && rawClaims.email_address) ||
+      (typeof rawClaims.primary_email_address === 'string' && rawClaims.primary_email_address) ||
+      undefined;
+
     claims = {
       sub: verified.sub,
-      email: (verified as unknown as { email?: string }).email,
+      email: extractedEmail,
     };
   } catch {
     return c.json(
@@ -134,9 +141,46 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
 
   let userRole: UserRole = 'viewer';
   let userName = 'Member';
-  let userEmail: string | null = claims.email || null;
+  let userEmail: string | null = claims.email ? claims.email.trim() : null;
   let isAuthorized = false;
   let customPermissions: ModulePermissions | null = null;
+
+  // If email was not embedded in token claims, fetch from Clerk User API
+  if (!userEmail && secretKey) {
+    try {
+      const cleanClerkKey = secretKey.replace(/^['"]|['"]$/g, '').trim();
+      const clerkUserRes = await fetch(`https://api.clerk.com/v1/users/${authenticatedClerkId}`, {
+        headers: {
+          Authorization: `Bearer ${cleanClerkKey}`,
+        },
+      });
+      if (clerkUserRes.ok) {
+        const clerkUserData = (await clerkUserRes.json()) as {
+          email_addresses?: Array<{ id: string; email_address: string }>;
+          primary_email_address_id?: string;
+          first_name?: string;
+          last_name?: string;
+        };
+        const primaryEmailObj =
+          clerkUserData.email_addresses?.find(
+            (e) => e.id === clerkUserData.primary_email_address_id
+          ) || clerkUserData.email_addresses?.[0];
+
+        if (primaryEmailObj?.email_address) {
+          userEmail = primaryEmailObj.email_address.trim();
+        }
+        const fullName = [clerkUserData.first_name, clerkUserData.last_name]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        if (fullName) {
+          userName = fullName;
+        }
+      }
+    } catch (err) {
+      console.warn('[Clerk User API Lookup Warning]:', err);
+    }
+  }
 
   // 1. Direct Master Superadmin bypass
   if (configuredSuperadminId && authenticatedClerkId === configuredSuperadminId) {
@@ -186,6 +230,29 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
             // fallback to default
           }
         }
+      } else if (isAuthorized && userRole === 'superadmin') {
+        // Ensure Superadmin is registered in users table for team roster listing
+        const now = Date.now();
+        await db
+          .prepare(
+            `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 'superadmin', 'active', '{}', ?, ?)
+             ON CONFLICT(clerk_user_id) DO UPDATE SET
+               name = excluded.name,
+               email = excluded.email,
+               role = 'superadmin',
+               status = 'active',
+               updated_at = excluded.updated_at`
+          )
+          .bind(
+            `usr_${now}`,
+            authenticatedClerkId,
+            userEmail ? userEmail.toLowerCase() : null,
+            userName,
+            now,
+            now
+          )
+          .run();
       } else if (!isAuthorized && userEmail) {
         const now = Date.now();
         // Check if there is an existing pending placeholder or if it was suspended
@@ -221,7 +288,13 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
           }>();
 
         if (invite) {
-          // Register or link into users table with their permanent Clerk user ID first
+          // Delete any temporary placeholder record before inserting
+          await db
+            .prepare('DELETE FROM users WHERE clerk_user_id = ? OR (clerk_user_id LIKE "pending_%" AND LOWER(email) = LOWER(?))')
+            .bind(`pending_${userEmail.toLowerCase()}`, userEmail.toLowerCase())
+            .run();
+
+          // Register or link into users table with their permanent Clerk user ID
           await db
             .prepare(
               `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
@@ -244,12 +317,6 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
               now,
               now
             )
-            .run();
-
-          // Delete any temporary placeholder record
-          await db
-            .prepare('DELETE FROM users WHERE clerk_user_id = ?')
-            .bind(`pending_${userEmail.toLowerCase()}`)
             .run();
 
           // Mark invitation as accepted

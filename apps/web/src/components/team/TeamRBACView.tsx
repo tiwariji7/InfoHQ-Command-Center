@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Lock,
   Smartphone,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 const MODULES = [
@@ -61,6 +63,7 @@ export const TeamRBACView: React.FC = () => {
 
   // Edit Permissions Modal
   const [editingMember, setEditingMember] = useState<TeamMemberItem | null>(null);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
 
   const loadTeam = useCallback(async () => {
     setIsLoading(true);
@@ -94,7 +97,18 @@ export const TeamRBACView: React.FC = () => {
         role: inviteRole,
         permissions: invitePerms,
       });
-      alert(res.message);
+
+      let copyNotice = '';
+      if (res.inviteLink && typeof navigator !== 'undefined' && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(res.inviteLink);
+          copyNotice = '\n\n📋 Invite link has also been copied to your clipboard.';
+        } catch {
+          // ignore clipboard permission error
+        }
+      }
+
+      alert(`${res.message}${copyNotice}`);
       setIsInviteOpen(false);
       setInviteEmail('');
       setInviteName('');
@@ -152,6 +166,21 @@ export const TeamRBACView: React.FC = () => {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to revoke member.');
     }
+  };
+
+  const handleCopyInviteLink = async (inv: TeamInviteItem) => {
+    if (!inv.inviteLink) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(inv.inviteLink);
+        setCopiedInviteId(inv.id);
+        setTimeout(() => setCopiedInviteId(null), 2500);
+        return;
+      }
+    } catch {
+      // Fallback if clipboard API permissions are denied or unavailable
+    }
+    window.prompt('Copy invitation signup link:', inv.inviteLink);
   };
 
   return (
@@ -501,14 +530,35 @@ export const TeamRBACView: React.FC = () => {
             </h2>
           </div>
           {invitations.map((inv) => (
-            <div key={inv.id} className="p-4 flex items-center justify-between">
+            <div key={inv.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-[#1A085C] block">{inv.name}</span>
                 <span className="text-[11px] text-[#6B7280] font-mono">{inv.email} • Role: {inv.role}</span>
               </div>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                Awaiting Sign In
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  Awaiting Sign In
+                </span>
+                {inv.inviteLink && (
+                  <button
+                    onClick={() => handleCopyInviteLink(inv)}
+                    className="h-7 px-2.5 rounded-lg border border-[#EAE6F7] text-[11px] font-semibold text-[#5B4CF5] hover:bg-[#F8F8FF] inline-flex items-center gap-1.5 transition-colors"
+                    title="Copy unique signup link"
+                  >
+                    {copiedInviteId === inv.id ? (
+                      <>
+                        <Check size={12} className="text-emerald-600" />
+                        <span className="text-emerald-600 font-bold">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -530,6 +530,7 @@ export interface TeamInviteItem {
   status: string;
   createdAt: number;
   expiresAt: number;
+  inviteLink?: string;
 }
 
 export async function fetchTeamApi(
@@ -546,8 +547,8 @@ export async function inviteTeamMemberApi(
     role: string;
     permissions?: Record<string, boolean>;
   }
-): Promise<{ success: boolean; message: string; invitation: TeamInviteItem }> {
-  return fetchWithAuth<{ success: boolean; message: string; invitation: TeamInviteItem }>('/api/team/invite', getToken, {
+): Promise<{ success: boolean; message: string; invitation: TeamInviteItem; inviteLink?: string }> {
+  return fetchWithAuth<{ success: boolean; message: string; invitation: TeamInviteItem; inviteLink?: string }>('/api/team/invite', getToken, {
     method: 'POST',
     body: JSON.stringify(data),
   });
