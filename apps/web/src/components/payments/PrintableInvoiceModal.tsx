@@ -597,7 +597,6 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                       alt="InfoHQ"
                       className="h-8 sm:h-9 w-auto object-contain"
                     />
-                    <span className="text-[#1A085C] font-black text-sm tracking-tight hidden sm:inline">Pvt Ltd</span>
                   </div>
                   <p className="text-[11px] sm:text-xs font-semibold text-[#4B5563] mt-1.5 tracking-tight">
                     Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -897,7 +896,6 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
                 alt="InfoHQ"
                 className="h-4.5 sm:h-5 w-auto object-contain"
               />
-              <span className="text-[#1A085C] font-black text-xs">Pvt Ltd</span>
               <span className="text-[#9CA3AF] mx-1">•</span>
               <span className="text-[#4B5563] font-semibold text-xs">Prayagraj &amp; Pune, India</span>
             </div>

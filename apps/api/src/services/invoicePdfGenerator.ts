@@ -70,13 +70,11 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const marginX = 45;
   const contentW = width - marginX * 2; // 505.28 pt
 
-  // 1. BRAND HEADER (Info in Coral, HQ in Violet, Pvt Ltd in Navy)
+  // 1. BRAND HEADER (Info in Coral, HQ in Violet)
   let y = height - 48; // 793.89
   page.drawText('Info', { x: marginX, y, size: 24, font: fontBold, color: colorCoral });
   const infoW = fontBold.widthOfTextAtSize('Info', 24);
   page.drawText('HQ', { x: marginX + infoW, y, size: 24, font: fontBold, color: colorViolet });
-  const hqW = fontBold.widthOfTextAtSize('HQ', 24);
-  page.drawText(' Pvt Ltd', { x: marginX + infoW + hqW, y, size: 16, font: fontBold, color: colorNavy });
 
   y -= 18;
   page.drawText('Engineering Studio for AI, SaaS & Digital Systems', {
@@ -392,11 +390,11 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
     color: rgb(229 / 255, 231 / 255, 235 / 255),
   });
 
-  // Line 1: Info (Coral), HQ (Violet), Pvt Ltd & Address (Navy)
+  // Line 1: Info (Coral), HQ (Violet) & Address (Navy)
   const fLine1Y = 54;
   const fInfoW = fontBold.widthOfTextAtSize('Info', 9.5);
   const fHqW = fontBold.widthOfTextAtSize('HQ', 9.5);
-  const fText = ' Pvt Ltd   •   Prayagraj & Pune, India';
+  const fText = '   •   Prayagraj & Pune, India';
   const fTotalW = fInfoW + fHqW + fontBold.widthOfTextAtSize(fText, 9.5);
   const fStart1X = (width - fTotalW) / 2;
 

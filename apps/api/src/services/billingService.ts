@@ -400,7 +400,7 @@ export async function sendInvoiceEmailViaResend(
     <!-- Header -->
     <div style="padding: 28px 32px 20px; border-bottom: 1px solid #EAE6F7;" class="inner-padding">
       <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; color: #1A085C;">
-        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 18px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
+        Info<span style="color: #7C5CE8;">HQ</span>
       </h1>
       <div style="font-size: 13px; font-weight: 500; color: #6B7280; margin-top: 3px;">
         Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -512,7 +512,7 @@ export async function sendInvoiceEmailViaResend(
     <!-- Footer (Location, email and website omitted as requested) -->
     <div style="border-top: 1px solid #EAE6F7; padding: 22px 32px 28px; text-align: center; background-color: #FAFAFD;" class="inner-padding">
       <div style="font-size: 14px; font-weight: 800; color: #1A085C; letter-spacing: -0.01em;">
-        Info<span style="color: #7C5CE8;">HQ</span> Pvt Ltd
+        Info<span style="color: #7C5CE8;">HQ</span>
       </div>
       <div style="font-size: 12px; color: #6B7280; margin-top: 3px;">
         Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -669,7 +669,7 @@ export async function sendPaymentReceiptEmailViaResend(
     <!-- Brand Header -->
     <div style="padding-bottom: 18px; border-bottom: 2px solid #5B4CF5;">
       <h2 style="margin: 0; font-size: 22px; font-weight: 900; color: #1A085C; letter-spacing: -0.01em;">
-        Info<span style="color: #7C5CE8;">HQ</span> <span style="font-size: 16px; font-weight: 700; color: #1A085C;">Pvt Ltd</span>
+        Info<span style="color: #7C5CE8;">HQ</span>
       </h2>
       <p style="margin: 4px 0 0 0; font-size: 12px; color: #6B7280;">
         Engineering Studio for AI, SaaS &amp; Digital Systems
@@ -726,7 +726,7 @@ export async function sendPaymentReceiptEmailViaResend(
 
     <!-- Simple Minimal Footer -->
     <div style="border-top: 1px solid #E5E7EB; padding-top: 18px; margin-top: 24px; font-size: 11.5px; color: #9CA3AF; text-align: center; line-height: 1.5;">
-      InfoHQ Pvt Ltd • Prayagraj, Uttar Pradesh, India • <a href="https://infohq.in" style="color: #5B4CF5; text-decoration: none;">infohq.in</a><br>
+      InfoHQ • Prayagraj, Uttar Pradesh, India • <a href="https://infohq.in" style="color: #5B4CF5; text-decoration: none;">infohq.in</a><br>
       For any billing queries, contact us at <a href="mailto:billing@infohq.in" style="color: #5B4CF5; text-decoration: none;">billing@infohq.in</a>
     </div>
 

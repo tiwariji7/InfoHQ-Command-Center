@@ -162,7 +162,7 @@ export async function sendTeamInvitationEmailViaResend(
     <!-- Footer -->
     <div style="border-top: 1px solid #EAE6F7; padding: 22px 36px; text-align: center; background-color: #FAFAFD;">
       <div style="font-size: 13px; font-weight: 800; color: #1A085C;">
-        Info<span style="color: #7C5CE8;">HQ</span> Pvt Ltd
+        Info<span style="color: #7C5CE8;">HQ</span>
       </div>
       <div style="font-size: 11.5px; color: #6B7280; margin-top: 2px;">
         Super Admin Security Operations &bull; Prayagraj &amp; Pune, India
