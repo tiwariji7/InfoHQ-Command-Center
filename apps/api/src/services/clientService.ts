@@ -333,10 +333,97 @@ export async function updateClient(
   idOrName: string,
   input: UpdateClientInput
 ): Promise<Client | null> {
-  const existing = await db
+  const cleanTerm = idOrName.trim();
+  let existing = await db
     .prepare('SELECT * FROM clients WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1')
-    .bind(idOrName, idOrName)
+    .bind(cleanTerm, cleanTerm)
     .first<Record<string, unknown>>();
+
+  let sourceMatchedName: string | null = null;
+
+  // If not found in clients, check if this is a project's clientName or lead's name and create or link the client record
+  if (!existing) {
+    const projectMatch = await db
+      .prepare('SELECT id, client_id, client_name, client_email, client_phone, company, lead_id FROM projects WHERE LOWER(client_name) = LOWER(?) LIMIT 1')
+      .bind(cleanTerm)
+      .first<Record<string, unknown>>();
+
+    if (projectMatch?.client_id) {
+      existing = await db
+        .prepare('SELECT * FROM clients WHERE id = ? LIMIT 1')
+        .bind(String(projectMatch.client_id))
+        .first<Record<string, unknown>>();
+    }
+
+    if (!existing && projectMatch?.lead_id) {
+      const linkedLead = await db
+        .prepare('SELECT client_id FROM leads WHERE id = ? LIMIT 1')
+        .bind(String(projectMatch.lead_id))
+        .first<Record<string, unknown>>();
+      if (linkedLead?.client_id) {
+        existing = await db
+          .prepare('SELECT * FROM clients WHERE id = ? LIMIT 1')
+          .bind(String(linkedLead.client_id))
+          .first<Record<string, unknown>>();
+      }
+    }
+
+    const leadMatch = !projectMatch && !existing
+      ? await db
+          .prepare('SELECT id, client_id, name, email, phone, company FROM leads WHERE LOWER(name) = LOWER(?) LIMIT 1')
+          .bind(cleanTerm)
+          .first<Record<string, unknown>>()
+      : null;
+
+    if (!existing && leadMatch?.client_id) {
+      existing = await db
+        .prepare('SELECT * FROM clients WHERE id = ? LIMIT 1')
+        .bind(String(leadMatch.client_id))
+        .first<Record<string, unknown>>();
+    }
+
+    if (projectMatch || leadMatch) {
+      sourceMatchedName = projectMatch ? String(projectMatch.client_name) : String(leadMatch!.name);
+    }
+
+    if (!existing) {
+      if (!projectMatch && !leadMatch) {
+        return null;
+      }
+
+      const baseName = sourceMatchedName!;
+      const baseEmail = (projectMatch?.client_email ? String(projectMatch.client_email) : leadMatch?.email ? String(leadMatch.email) : null) || null;
+      const basePhone = (projectMatch?.client_phone ? String(projectMatch.client_phone) : leadMatch?.phone ? String(leadMatch.phone) : null) || null;
+      const baseCompany = (projectMatch?.company ? String(projectMatch.company) : leadMatch?.company ? String(leadMatch.company) : null) || null;
+      const baseLeadId = (projectMatch?.lead_id ? String(projectMatch.lead_id) : leadMatch?.id ? String(leadMatch.id) : null);
+
+      const created = await createOrGetClient(db, {
+        name: baseName,
+        email: baseEmail,
+        phone: basePhone,
+        company: baseCompany,
+        sourceLeadId: baseLeadId,
+      });
+
+      if (projectMatch?.id) {
+        await db
+          .prepare('UPDATE projects SET client_id = ? WHERE id = ? AND client_id IS NULL')
+          .bind(created.id, String(projectMatch.id))
+          .run();
+      }
+      if (leadMatch?.id) {
+        await db
+          .prepare('UPDATE leads SET client_id = ? WHERE id = ? AND client_id IS NULL')
+          .bind(created.id, String(leadMatch.id))
+          .run();
+      }
+
+      existing = await db
+        .prepare('SELECT * FROM clients WHERE id = ? LIMIT 1')
+        .bind(created.id)
+        .first<Record<string, unknown>>();
+    }
+  }
 
   if (!existing) {
     return null;
@@ -350,6 +437,7 @@ export async function updateClient(
   let newEmail: string | null | undefined;
   let newPhone: string | null | undefined;
   let newCompany: string | null | undefined;
+  let newAddress: string | null | undefined;
 
   if (input.name !== undefined) {
     newName = input.name.trim();
@@ -372,8 +460,9 @@ export async function updateClient(
     binds.push(newCompany);
   }
   if (input.address !== undefined) {
+    newAddress = input.address.trim() ? input.address.trim() : null;
     sets.push('address = ?');
-    binds.push(input.address.trim() ? input.address.trim() : null);
+    binds.push(newAddress);
   }
   if (input.status !== undefined) {
     sets.push('status = ?');
@@ -382,37 +471,53 @@ export async function updateClient(
 
   binds.push(existing.id);
 
-  await db
-    .prepare(`UPDATE clients SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...binds)
-    .run();
+  const clientId = String(existing.id);
+  const oldName = String(existing.name);
+  const altOldName = sourceMatchedName || oldName;
 
-  const finalName = newName ?? String(existing.name);
-  const finalEmail = newEmail !== undefined ? newEmail : (existing.email ? String(existing.email) : null);
-  const finalPhone = newPhone !== undefined ? newPhone : (existing.phone ? String(existing.phone) : null);
-  const finalCompany = newCompany !== undefined ? newCompany : (existing.company ? String(existing.company) : null);
-
-  // Sync client fields to linked projects (Strict client_id or unassigned name fallback)
-  await db
-    .prepare(`
+  // Run atomic batch update across clients, projects, payments, and leads.
+  // Synchronized values are read directly from the updated clients row inside the batch to avoid race conditions.
+  await db.batch([
+    // 1. Update client record
+    db.prepare(`UPDATE clients SET ${sets.join(', ')} WHERE id = ?`).bind(...binds),
+    // 2. Sync client fields to linked projects AND link client_id
+    db.prepare(`
       UPDATE projects
-      SET client_name = ?, client_email = ?, client_phone = ?, company = ?
-      WHERE client_id = ? OR (client_id IS NULL AND LOWER(client_name) = LOWER(?))
-    `)
-    .bind(finalName, finalEmail, finalPhone, finalCompany, existing.id, String(existing.name))
-    .run();
-
-  // If client name changed, also synchronize client_name in payments
-  if (newName !== undefined && newName !== String(existing.name)) {
-    await db
-      .prepare(`
-        UPDATE payments
-        SET client_name = ?
-        WHERE client_id = ? OR (client_id IS NULL AND LOWER(client_name) = LOWER(?))
-      `)
-      .bind(finalName, existing.id, String(existing.name))
-      .run();
-  }
+      SET client_name = (SELECT name FROM clients WHERE id = ?),
+          client_email = (SELECT email FROM clients WHERE id = ?),
+          client_phone = (SELECT phone FROM clients WHERE id = ?),
+          company = (SELECT company FROM clients WHERE id = ?),
+          client_id = ?,
+          updated_at = ?
+      WHERE client_id = ? OR (client_id IS NULL AND (LOWER(client_name) = LOWER(?) OR LOWER(client_name) = LOWER(?)))
+    `).bind(clientId, clientId, clientId, clientId, clientId, now, clientId, oldName, altOldName),
+    // 3. Sync client fields to linked payments AND link client_id
+    db.prepare(`
+      UPDATE payments
+      SET client_name = (SELECT name FROM clients WHERE id = ?),
+          client_email = (SELECT email FROM clients WHERE id = ?),
+          client_phone = (SELECT phone FROM clients WHERE id = ?),
+          company = (SELECT company FROM clients WHERE id = ?),
+          client_id = ?,
+          updated_at = ?
+      WHERE client_id = ? 
+         OR (client_id IS NULL AND (LOWER(client_name) = LOWER(?) OR LOWER(client_name) = LOWER(?)))
+         OR project_id IN (SELECT id FROM projects WHERE client_id = ?)
+    `).bind(clientId, clientId, clientId, clientId, clientId, now, clientId, oldName, altOldName, clientId),
+    // 4. Sync client fields to linked leads AND link client_id
+    db.prepare(`
+      UPDATE leads
+      SET name = (SELECT name FROM clients WHERE id = ?),
+          email = (SELECT email FROM clients WHERE id = ?),
+          phone = (SELECT phone FROM clients WHERE id = ?),
+          company = (SELECT company FROM clients WHERE id = ?),
+          client_id = ?,
+          updated_at = ?
+      WHERE client_id = ? 
+         OR (client_id IS NULL AND (LOWER(name) = LOWER(?) OR LOWER(name) = LOWER(?)))
+         OR id = ?
+    `).bind(clientId, clientId, clientId, clientId, clientId, now, clientId, oldName, altOldName, existing.source_lead_id || '')
+  ]);
 
   const updatedRow = await db
     .prepare('SELECT * FROM clients WHERE id = ?')

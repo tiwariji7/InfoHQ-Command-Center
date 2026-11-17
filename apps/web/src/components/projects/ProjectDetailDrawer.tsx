@@ -85,6 +85,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   const [projectPayments, setProjectPayments] = useState<Payment[]>([]);
   const [isPaymentsLoading, setIsPaymentsLoading] = useState(false);
   const paymentsRequestProjectRef = useRef<string | null>(null);
+  const paymentsRequestIdRef = useRef(0);
   const currentProjectIdRef = useRef<string | null>(projectId);
   useLayoutEffect(() => {
     currentProjectIdRef.current = projectId;
@@ -172,6 +173,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
 
       const updatedProj: Project = {
         ...(projectData?.project && projectData.project.id === savedProjectId ? projectData.project : project),
+        clientId: res.data.id,
         clientName: res.data.name,
         clientEmail: res.data.email,
         clientPhone: res.data.phone,
@@ -185,6 +187,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
             ...prev,
             project: {
               ...prev.project,
+              clientId: res.data.id,
               clientName: res.data.name,
               clientEmail: res.data.email,
               clientPhone: res.data.phone,
@@ -195,6 +198,8 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
       }
 
       onProjectUpdated(updatedProj);
+      // Reload project payments and client data to immediately reflect changes in current drawer
+      loadProjectPayments();
       setIsEditClientModalOpen(false);
     } catch (err: unknown) {
       setClientEditError(err instanceof Error ? err.message : 'Failed to update client profile.');
@@ -242,11 +247,13 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
     if (!projectId) return;
     const requestedProjectId = projectId;
     if (currentProjectIdRef.current !== requestedProjectId) return;
+    const requestId = ++paymentsRequestIdRef.current;
     paymentsRequestProjectRef.current = requestedProjectId;
     setIsPaymentsLoading(true);
     try {
       const res = await fetchPayments(getToken, { projectId: requestedProjectId });
       if (
+        requestId === paymentsRequestIdRef.current &&
         paymentsRequestProjectRef.current === requestedProjectId &&
         currentProjectIdRef.current === requestedProjectId
       ) {
@@ -256,6 +263,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
       console.error('Failed to load project payments:', err);
     } finally {
       if (
+        requestId === paymentsRequestIdRef.current &&
         paymentsRequestProjectRef.current === requestedProjectId &&
         currentProjectIdRef.current === requestedProjectId
       ) {
