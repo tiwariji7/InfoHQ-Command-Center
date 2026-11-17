@@ -119,11 +119,15 @@ export const AutoConvertWonDealModal: React.FC<AutoConvertDealModalProps> = ({
   return (
     <div
       data-lenis-prevent
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto pointer-events-none"
       role="dialog"
       aria-modal="true"
     >
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EDE8F5] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div
+        className="pointer-events-auto relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EDE8F5] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="h-16 px-6 border-b border-[#EDE8F5] flex items-center justify-between bg-gradient-to-r from-white to-[#FAF9FD]">
           <div className="flex items-center gap-3">

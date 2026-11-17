@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SignIn, useSignIn } from '@clerk/clerk-react';
-import { KeyRound, Pencil } from 'lucide-react';
+import { SignIn, SignUp, useSignIn } from '@clerk/clerk-react';
+import { KeyRound, Pencil, UserCheck } from 'lucide-react';
 import { AuthErrorBoundary } from './AuthErrorBoundary.js';
 import './clerk-auth.css';
 
@@ -13,6 +13,26 @@ const SignInInner: React.FC = () => {
   const [typedEmail, setTypedEmail] = useState<string>('');
   const typedEmailRef = React.useRef<string>('');
   const [isPasswordScreen, setIsPasswordScreen] = useState<boolean>(false);
+
+  const [isSignUpMode, setIsSignUpMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      return (
+        url.searchParams.has('invite_token') ||
+        window.location.hash.includes('sign-up') ||
+        url.searchParams.get('mode') === 'sign-up'
+      );
+    }
+    return false;
+  });
+
+  const [inviteEmailFromUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('email') || '';
+    }
+    return '';
+  });
 
   // Clear any legacy sessionStorage email from previous builds
   useEffect(() => {
@@ -196,7 +216,11 @@ const SignInInner: React.FC = () => {
           </h1>
 
           {/* Subtitle: on password page shows entered email + pencil icon; on email page shows Welcome back */}
-          {isPasswordScreen ? (
+          {isSignUpMode ? (
+            <p className="mt-1.5 text-xs sm:text-[13px] text-brand-muted">
+              Invited Employee: Enter your work email &amp; create your initial password.
+            </p>
+          ) : isPasswordScreen ? (
             <div className="mt-2 inline-flex items-center justify-center gap-1.5 py-1 px-3 bg-brand-subtle rounded-full border border-brand-border animate-fadeIn">
               <span className="text-xs sm:text-[13px] font-medium text-brand-heading max-w-[210px] sm:max-w-[250px] truncate">
                 {displayEmail}
@@ -218,49 +242,131 @@ const SignInInner: React.FC = () => {
           )}
         </div>
 
-        {/* Clerk Sign In component customized with brand tokens */}
+        {/* Invited banner if url has email */}
+        {inviteEmailFromUrl && isSignUpMode && (
+          <div className="mb-4 p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs text-[#1A085C] flex items-center gap-2">
+            <UserCheck size={14} className="text-[#5B4CF5] shrink-0" />
+            <span>
+              Invitation active for <strong>{inviteEmailFromUrl}</strong>. Set your password below.
+            </span>
+          </div>
+        )}
+
+        {/* Clerk Sign In / Sign Up component customized with brand tokens */}
         <AuthErrorBoundary>
-          <SignIn
-            routing="hash"
-            appearance={{
-              layout: {
-                socialButtonsVariant: 'blockButton',
-                logoPlacement: 'none',
-                showOptionalFields: false,
-              },
-              variables: {
-                colorPrimary: '#7C5CE8',
-                colorText: '#1A085C',
-                colorTextSecondary: '#6B7280',
-                colorBackground: '#FFFFFF',
-                colorInputBackground: '#FFFFFF',
-                colorInputText: '#1A085C',
-                borderRadius: '12px',
-                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-              },
-              elements: {
-                rootBox: 'w-full flex justify-center',
-                cardBox: 'w-full shadow-none border-none p-0 bg-transparent',
-                card: 'w-full shadow-none border-none bg-transparent p-0 gap-4 sm:gap-5',
-                header: 'hidden',
-                headerTitle: 'hidden',
-                headerSubtitle: 'hidden',
-                socialButtons: 'hidden',
-                dividerRow: 'hidden',
-                form: 'gap-3.5 sm:gap-4',
-                formField: 'gap-1.5',
-                formFieldLabel: 'text-xs sm:text-[13px] font-semibold text-brand-heading tracking-tight block text-left mb-1.5',
-                formFieldInput: 'h-11 sm:h-12 rounded-control border border-brand-border bg-white text-brand-heading text-xs sm:text-sm px-3.5 sm:px-4 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 transition-all',
-                formButtonPrimary: 'h-11 sm:h-12 rounded-control text-white font-semibold text-xs sm:text-sm tracking-wide shadow-md transition-all',
-                formFieldAction: 'text-xs font-medium text-[#5B4CF5] hover:text-brand-primary hover:underline transition-colors',
-                footer: 'pt-2.5 sm:pt-3 pb-0 justify-center border-none bg-transparent',
-                footerAction: 'hidden',
-                footerPages: 'text-[11px] sm:text-xs text-brand-muted flex items-center justify-center gap-1.5 opacity-85 hover:opacity-100 transition-opacity',
-                footerPagesLink: 'text-brand-muted font-medium hover:text-brand-heading',
-              },
-            }}
-          />
+          {isSignUpMode ? (
+            <SignUp
+              routing="hash"
+              initialValues={{ emailAddress: inviteEmailFromUrl || typedEmail }}
+              appearance={{
+                layout: {
+                  socialButtonsVariant: 'blockButton',
+                  logoPlacement: 'none',
+                  showOptionalFields: false,
+                },
+                variables: {
+                  colorPrimary: '#7C5CE8',
+                  colorText: '#1A085C',
+                  colorTextSecondary: '#6B7280',
+                  colorBackground: '#FFFFFF',
+                  colorInputBackground: '#FFFFFF',
+                  colorInputText: '#1A085C',
+                  borderRadius: '12px',
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                },
+                elements: {
+                  rootBox: 'w-full flex justify-center',
+                  cardBox: 'w-full shadow-none border-none p-0 bg-transparent',
+                  card: 'w-full shadow-none border-none bg-transparent p-0 gap-4 sm:gap-5',
+                  header: 'hidden',
+                  headerTitle: 'hidden',
+                  headerSubtitle: 'hidden',
+                  socialButtons: 'hidden',
+                  dividerRow: 'hidden',
+                  form: 'gap-3.5 sm:gap-4',
+                  formField: 'gap-1.5',
+                  formFieldLabel:
+                    'text-xs sm:text-[13px] font-semibold text-brand-heading tracking-tight block text-left mb-1.5',
+                  formFieldInput:
+                    'h-11 sm:h-12 rounded-control border border-brand-border bg-white text-brand-heading text-xs sm:text-sm px-3.5 sm:px-4 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 transition-all',
+                  formButtonPrimary:
+                    'h-11 sm:h-12 rounded-control text-white font-semibold text-xs sm:text-sm tracking-wide shadow-md transition-all',
+                  formFieldAction:
+                    'text-xs font-medium text-[#5B4CF5] hover:text-brand-primary hover:underline transition-colors',
+                  footer: 'hidden',
+                  footerAction: 'hidden',
+                },
+              }}
+            />
+          ) : (
+            <SignIn
+              routing="hash"
+              appearance={{
+                layout: {
+                  socialButtonsVariant: 'blockButton',
+                  logoPlacement: 'none',
+                  showOptionalFields: false,
+                },
+                variables: {
+                  colorPrimary: '#7C5CE8',
+                  colorText: '#1A085C',
+                  colorTextSecondary: '#6B7280',
+                  colorBackground: '#FFFFFF',
+                  colorInputBackground: '#FFFFFF',
+                  colorInputText: '#1A085C',
+                  borderRadius: '12px',
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                },
+                elements: {
+                  rootBox: 'w-full flex justify-center',
+                  cardBox: 'w-full shadow-none border-none p-0 bg-transparent',
+                  card: 'w-full shadow-none border-none bg-transparent p-0 gap-4 sm:gap-5',
+                  header: 'hidden',
+                  headerTitle: 'hidden',
+                  headerSubtitle: 'hidden',
+                  socialButtons: 'hidden',
+                  dividerRow: 'hidden',
+                  form: 'gap-3.5 sm:gap-4',
+                  formField: 'gap-1.5',
+                  formFieldLabel:
+                    'text-xs sm:text-[13px] font-semibold text-brand-heading tracking-tight block text-left mb-1.5',
+                  formFieldInput:
+                    'h-11 sm:h-12 rounded-control border border-brand-border bg-white text-brand-heading text-xs sm:text-sm px-3.5 sm:px-4 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 transition-all',
+                  formButtonPrimary:
+                    'h-11 sm:h-12 rounded-control text-white font-semibold text-xs sm:text-sm tracking-wide shadow-md transition-all',
+                  formFieldAction:
+                    'text-xs font-medium text-[#5B4CF5] hover:text-brand-primary hover:underline transition-colors',
+                  footer: 'pt-2.5 sm:pt-3 pb-0 justify-center border-none bg-transparent',
+                  footerAction: 'hidden',
+                  footerPages:
+                    'text-[11px] sm:text-xs text-brand-muted flex items-center justify-center gap-1.5 opacity-85 hover:opacity-100 transition-opacity',
+                  footerPagesLink: 'text-brand-muted font-medium hover:text-brand-heading',
+                },
+              }}
+            />
+          )}
         </AuthErrorBoundary>
+
+        {/* Toggle between Sign In and Set Initial Password */}
+        <div className="mt-4 pt-3 border-t border-brand-border text-center">
+          {isSignUpMode ? (
+            <button
+              type="button"
+              onClick={() => setIsSignUpMode(false)}
+              className="text-xs font-semibold text-[#5B4CF5] hover:text-brand-primary transition-colors cursor-pointer"
+            >
+              Already activated your password? <strong>Sign In &rarr;</strong>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsSignUpMode(true)}
+              className="text-xs font-semibold text-brand-muted hover:text-brand-heading transition-colors cursor-pointer"
+            >
+              Invited by Super Admin? <span className="text-[#5B4CF5] font-bold">Set initial password &rarr;</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

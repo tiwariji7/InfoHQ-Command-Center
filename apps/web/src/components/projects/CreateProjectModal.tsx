@@ -138,11 +138,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-white rounded-card shadow-modal max-w-xl w-full border border-brand-border my-6 overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        className="pointer-events-auto bg-white rounded-card shadow-modal max-w-xl w-full border border-brand-border my-6 overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between bg-white shrink-0">
           <div>

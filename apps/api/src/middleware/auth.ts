@@ -145,34 +145,6 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
     userName = 'Shivam Tiwari (Superadmin)';
   }
 
-  // 1.1 If userEmail is not in token claims, fetch user email from Clerk backend API
-  if (!userEmail && secretKey) {
-    try {
-      const clerkRes = await fetch(`https://api.clerk.com/v1/users/${authenticatedClerkId}`, {
-        headers: { Authorization: `Bearer ${secretKey}` },
-      });
-      if (clerkRes.ok) {
-        const clerkUserData = (await clerkRes.json()) as {
-          first_name?: string;
-          last_name?: string;
-          email_addresses?: Array<{ email_address: string; id: string }>;
-          primary_email_address_id?: string;
-        };
-        const primary = clerkUserData.email_addresses?.find(
-          (e) => e.id === clerkUserData.primary_email_address_id
-        ) || clerkUserData.email_addresses?.[0];
-        if (primary?.email_address) {
-          userEmail = primary.email_address;
-        }
-        if (clerkUserData.first_name) {
-          userName = `${clerkUserData.first_name} ${clerkUserData.last_name || ''}`.trim();
-        }
-      }
-    } catch (clerkErr) {
-      console.warn('[Clerk User Fetch Notice]:', clerkErr);
-    }
-  }
-
   // 2. D1 Database RBAC & Allowlist Check
   const db = c.env.DB || c.env.COMMAND_DB;
   if (db) {
@@ -215,12 +187,29 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
           }
         }
       } else if (!isAuthorized && userEmail) {
-        // Check if there is an accepted invitation for this email
+        const now = Date.now();
+        // Check if there is an existing pending placeholder or if it was suspended
+        const placeholderUser = await db
+          .prepare('SELECT id, status FROM users WHERE clerk_user_id = ?')
+          .bind(`pending_${userEmail.toLowerCase()}`)
+          .first<{ id: string; status: string }>();
+
+        if (placeholderUser && placeholderUser.status === 'suspended') {
+          return c.json(
+            {
+              error: 'account_suspended',
+              message: 'Your account has been suspended by the Superadmin.',
+            },
+            403
+          );
+        }
+
+        // Check if there is a pending or accepted invitation for this email (must not be expired)
         const invite = await db
           .prepare(
-            'SELECT id, email, name, role, permissions_json, status FROM user_invitations WHERE LOWER(email) = LOWER(?) AND status = "accepted"'
+            'SELECT id, email, name, role, permissions_json, status, expires_at FROM user_invitations WHERE LOWER(email) = LOWER(?) AND (status = "accepted" OR (status = "pending" AND expires_at > ?))'
           )
-          .bind(userEmail)
+          .bind(userEmail, now)
           .first<{
             id: string;
             email: string;
@@ -228,9 +217,47 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
             role: string;
             permissions_json: string;
             status: string;
+            expires_at: number;
           }>();
 
         if (invite) {
+          // Register or link into users table with their permanent Clerk user ID first
+          await db
+            .prepare(
+              `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, "active", ?, ?, ?)
+               ON CONFLICT(clerk_user_id) DO UPDATE SET
+                 email = excluded.email,
+                 name = excluded.name,
+                 role = excluded.role,
+                 status = "active",
+                 permissions_json = excluded.permissions_json,
+                 updated_at = excluded.updated_at`
+            )
+            .bind(
+              `usr_${now}`,
+              authenticatedClerkId,
+              userEmail.toLowerCase(),
+              invite.name,
+              invite.role,
+              invite.permissions_json,
+              now,
+              now
+            )
+            .run();
+
+          // Delete any temporary placeholder record
+          await db
+            .prepare('DELETE FROM users WHERE clerk_user_id = ?')
+            .bind(`pending_${userEmail.toLowerCase()}`)
+            .run();
+
+          // Mark invitation as accepted
+          await db
+            .prepare('UPDATE user_invitations SET status = "accepted" WHERE LOWER(email) = LOWER(?)')
+            .bind(userEmail.toLowerCase())
+            .run();
+
           isAuthorized = true;
           userRole = (invite.role as UserRole) || 'viewer';
           userName = invite.name;
@@ -241,24 +268,6 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
               // fallback
             }
           }
-
-          // Register into users table
-          const now = Date.now();
-          await db
-            .prepare(
-              'INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, "active", ?, ?, ?)'
-            )
-            .bind(
-              `usr_${now}`,
-              authenticatedClerkId,
-              userEmail,
-              userName,
-              userRole,
-              invite.permissions_json,
-              now,
-              now
-            )
-            .run();
         }
       }
     } catch (err) {
@@ -299,7 +308,7 @@ export const requireAuth = createMiddleware<AppContext>(async (c, next) => {
  */
 export const requireSuperadmin = createMiddleware<AppContext>(async (c, next) => {
   let forbiddenResponse: Response | null = null;
-  const authResult = await requireAuth(c, async () => {
+  const authRejection = await requireAuth(c, async () => {
     const user = c.get('user');
     if (!user || user.role !== 'superadmin') {
       forbiddenResponse = c.json(
@@ -313,7 +322,7 @@ export const requireSuperadmin = createMiddleware<AppContext>(async (c, next) =>
     }
     await next();
   });
-  if (authResult) return authResult;
+  if (authRejection) return authRejection;
   if (forbiddenResponse) return forbiddenResponse;
 });
 
@@ -323,7 +332,7 @@ export const requireSuperadmin = createMiddleware<AppContext>(async (c, next) =>
 export function requirePermission(moduleKey: keyof ModulePermissions) {
   return createMiddleware<AppContext>(async (c, next) => {
     let authResponse: Response | null = null;
-    const authResult = await requireAuth(c, async () => {
+    const authRejection = await requireAuth(c, async () => {
       const user = c.get('user');
       if (!user) {
         authResponse = c.json({ error: 'unauthorized', message: 'User not authenticated.' }, 401);
@@ -345,7 +354,7 @@ export function requirePermission(moduleKey: keyof ModulePermissions) {
         403
       );
     });
-    if (authResult) return authResult;
+    if (authRejection) return authRejection;
     if (authResponse) return authResponse;
   });
 }

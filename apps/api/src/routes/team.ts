@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../types/env.js';
 import { requireSuperadmin, requireAuth, DEFAULT_ROLE_PERMISSIONS } from '../middleware/auth.js';
 import { InviteUserSchema, UpdateUserPermissionsSchema, UserRole } from '@infohq/shared';
+import { sendTeamInvitationEmailViaResend } from '../services/teamInviteService.js';
 
 export const teamRouter = new Hono<AppContext>();
 
@@ -98,6 +99,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
   const inviteId = `inv_${now}`;
   const token = `invtoken_${crypto.randomUUID()}`;
   const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days validity
+  const inviteLink = `https://commandcenter.infohq.in/?invite_token=${token}&email=${encodeURIComponent(email.toLowerCase())}#/sign-up`;
 
   try {
     // 1. Insert or update user_invitations in D1
@@ -126,7 +128,7 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       )
       .run();
 
-    // 2. Pre-authorize user in users table with 'invited' status
+    // 2. Pre-authorize user in users table with 'active' status on pending Clerk ID
     await db
       .prepare(
         `INSERT INTO users (id, clerk_user_id, email, name, role, status, permissions_json, created_at, updated_at)
@@ -150,18 +152,67 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       )
       .run();
 
+    // 3. Register invitation in Clerk Backend API if key is present
+    if (c.env.CLERK_SECRET_KEY) {
+      try {
+        const cleanClerkKey = c.env.CLERK_SECRET_KEY.replace(/^['"]|['"]$/g, '').trim();
+        const clerkRes = await fetch('https://api.clerk.com/v1/invitations', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cleanClerkKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email_address: email.toLowerCase(),
+            redirect_url: inviteLink,
+            ignore_existing: true,
+          }),
+        });
+
+        if (!clerkRes.ok) {
+          const clerkErr = await clerkRes.text();
+          console.warn('[Clerk API Invitation Warning]:', clerkErr);
+        }
+      } catch (clerkErr) {
+        console.warn('[Clerk API Invitation Exception]:', clerkErr);
+      }
+    }
+
+    // 4. Send official invitation email from Super Admin <superadmin@infohq.in> via Resend
+    let emailSent = false;
+    if (c.env.RESEND_API_KEY && c.executionCtx) {
+      c.executionCtx.waitUntil(
+        sendTeamInvitationEmailViaResend(
+          {
+            name,
+            email: email.toLowerCase(),
+            role,
+            invitedBy,
+            inviteLink,
+            expiresAt,
+          },
+          c.env.RESEND_API_KEY
+        )
+      );
+      emailSent = true;
+    }
+
     return c.json({
       success: true,
-      message: `Invitation issued for ${name} (${email}). They can now sign in with Google or Email.`,
+      message: emailSent
+        ? `Invitation email dispatched to ${email} from Super Admin <superadmin@infohq.in>.`
+        : `Invitation created for ${email}. You can provide the invite link manually.`,
+      emailSent,
       invitation: {
         id: inviteId,
-        email,
+        email: email.toLowerCase(),
         name,
         role,
         permissions: effectivePermissions,
         invitedBy,
         expiresAt,
       },
+      inviteLink,
     }, 201);
   } catch (err: unknown) {
     console.error('Failed to issue team invitation:', err instanceof Error ? err.message : err);
@@ -237,7 +288,29 @@ teamRouter.delete('/members/:id', requireSuperadmin, async (c) => {
 
   const memberId = c.req.param('id');
   try {
+    // Find the member record first to identify email/clerk_user_id
+    const targetUser = await db
+      .prepare('SELECT id, clerk_user_id, email FROM users WHERE id = ? OR clerk_user_id = ?')
+      .bind(memberId, memberId)
+      .first<{ id: string; clerk_user_id: string; email: string | null }>();
+
+    // Delete user record
     await db.prepare('DELETE FROM users WHERE id = ? OR clerk_user_id = ?').bind(memberId, memberId).run();
+
+    // Invalidate any matching pending invitations so removed members cannot restore access
+    if (targetUser?.email) {
+      await db
+        .prepare('DELETE FROM user_invitations WHERE LOWER(email) = LOWER(?)')
+        .bind(targetUser.email)
+        .run();
+    } else if (memberId.startsWith('pending_')) {
+      const emailPart = memberId.replace('pending_', '');
+      await db
+        .prepare('DELETE FROM user_invitations WHERE LOWER(email) = LOWER(?)')
+        .bind(emailPart)
+        .run();
+    }
+
     return c.json({ success: true, message: 'Member access revoked.' });
   } catch (err: unknown) {
     console.error('Failed to revoke member:', err instanceof Error ? err.message : err);

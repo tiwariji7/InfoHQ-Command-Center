@@ -97,18 +97,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-[70] pointer-events-none flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
     >
       <div
-        className="bg-white rounded-card shadow-modal max-w-md w-full border border-brand-border my-6 overflow-hidden flex flex-col"
+        className="pointer-events-auto bg-white rounded-card shadow-modal max-w-md w-full border border-brand-border my-6 overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >

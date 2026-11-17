@@ -41,12 +41,16 @@ export const LostReasonModal: React.FC<LostReasonModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-heading/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-labelledby="lost-dialog-title"
     >
-      <div className="bg-white rounded-card w-full max-w-md border border-brand-border shadow-xl overflow-hidden">
+      <div
+        className="pointer-events-auto bg-white rounded-card w-full max-w-md border border-brand-border shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-chip bg-red-50 text-brand-destructive flex items-center justify-center">

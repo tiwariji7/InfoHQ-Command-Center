@@ -364,20 +364,15 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-60 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end items-center sm:pr-5 p-3 transition-opacity animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
+      className="fixed inset-0 z-50 overflow-hidden pointer-events-none flex justify-center sm:justify-end items-center sm:pr-14 p-3 transition-opacity animate-in fade-in duration-200"
+      role="region"
+      aria-label="Create Payment Link Drawer"
       data-lenis-prevent="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
     >
       {/* Floating Popup Card (Matches Profile Card layout, rounded-3xl, 4-side draggable) */}
       <div
         ref={cardRef}
-        className="popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="pointer-events-auto popup-card relative w-full sm:w-[420px] max-w-[420px] h-[calc(100vh-2.5rem)] max-h-[820px] bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(26,8,92,0.30)] border border-[#E5E1F0] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
         data-lenis-prevent="true"
         onClick={(e) => e.stopPropagation()}

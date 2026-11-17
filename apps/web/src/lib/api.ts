@@ -577,6 +577,23 @@ export async function revokeTeamMemberApi(
   });
 }
 
+export async function downloadInvoicePdfApi(
+  getToken: () => Promise<string | null>,
+  paymentId: string
+): Promise<Blob> {
+  const token = await getToken();
+  const url = buildUrl(`/api/payments/${encodeURIComponent(paymentId)}/invoice-pdf`);
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error((errData as any).message || 'Failed to download invoice PDF.');
+  }
+  return res.blob();
+}
+
 // --- Client Portal (Public / Token Gated) ---
 
 export async function fetchClientPortalData(

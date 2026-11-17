@@ -144,12 +144,16 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({ isOpen, onClose, onS
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-heading/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div className="bg-white rounded-card w-full max-w-lg border border-brand-border shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        className="pointer-events-auto bg-white rounded-card w-full max-w-lg border border-brand-border shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border">
           <h2 id="modal-title" className="text-lg font-semibold text-brand-heading">

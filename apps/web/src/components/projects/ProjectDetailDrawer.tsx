@@ -206,6 +206,7 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
   // Load project details
   useEffect(() => {
     setProjectData(null);
+    setIsEditClientModalOpen(false);
     if (!projectId) {
       return;
     }
@@ -1521,15 +1522,9 @@ export const ProjectDetailDrawer: React.FC<ProjectDetailDrawerProps> = ({
       {isEditClientModalOpen && (
         <div
           data-lenis-prevent="true"
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 pointer-events-auto"
+          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 pointer-events-none"
           role="dialog"
           aria-modal="true"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (e.target === e.currentTarget) {
-              setIsEditClientModalOpen(false);
-            }
-          }}
         >
           <div
             className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"

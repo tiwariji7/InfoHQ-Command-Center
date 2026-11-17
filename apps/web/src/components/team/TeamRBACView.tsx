@@ -228,8 +228,8 @@ export const TeamRBACView: React.FC = () => {
 
       {/* Invite Member Modal */}
       {isInviteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white rounded-2xl border border-[#EAE6F7] p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-lg bg-white rounded-2xl border border-[#EAE6F7] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-[#EAE6F7]">
               <div className="flex items-center gap-2">
                 <UserPlus size={18} className="text-[#7C5CE8]" />

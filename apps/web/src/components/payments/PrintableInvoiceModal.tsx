@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { Payment } from '@infohq/shared';
-import { updatePaymentApi } from '../../lib/api.js';
+import { updatePaymentApi, downloadInvoicePdfApi } from '../../lib/api.js';
 import {
   X,
   Printer,
@@ -191,35 +191,51 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
     }
   };
 
-  // Clean Download PDF: Direct client render of #invoice-container matching screen 1:1
+  // Clean Download PDF: Downloads pristine vector PDF from API with fallback to client render
   const handleDownloadPdf = async () => {
     setIsGenerating(true);
+    const pdfFilename = `${invoiceCode}_${(clientName || 'Client').replace(/\s+/g, '_')}.pdf`;
     try {
-      const html2pdf = await loadHtml2Pdf();
-      const element = document.getElementById('invoice-container') || invoiceRef.current;
-      if (!element) {
+      // 1. Primary: Download official vector PDF from backend API
+      const blob = await downloadInvoicePdfApi(getToken, currentPayment.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = pdfFilename;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      return;
+    } catch (apiErr) {
+      console.warn('[Backend PDF Download failed, attempting client fallback]:', apiErr);
+      try {
+        const html2pdf = await loadHtml2Pdf();
+        const element = document.getElementById('invoice-container') || invoiceRef.current;
+        if (!element) {
+          window.print();
+          return;
+        }
+
+        const opt = {
+          margin: [0, 0, 0, 0],
+          filename: pdfFilename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#FFFFFF',
+            windowWidth: 794,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
+
+        await html2pdf().set(opt).from(element).save();
+      } catch (clientErr) {
+        console.warn('[Client HTML2PDF failed, falling back to print]:', clientErr);
         window.print();
-        return;
       }
-
-      const opt = {
-        margin: [0, 0, 0, 0],
-        filename: `${invoiceCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#FFFFFF',
-          windowWidth: 794,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-
-      await html2pdf().set(opt).from(element).save();
-    } catch (clientErr) {
-      console.warn('[Client HTML2PDF failed, falling back to print]:', clientErr);
-      window.print();
     } finally {
       setIsGenerating(false);
     }
@@ -239,15 +255,9 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
   return (
     <div
       data-lenis-prevent="true"
-      className="printable-modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto"
+      className="printable-modal-overlay fixed inset-0 z-[70] flex items-center justify-center pointer-events-none p-2 sm:p-4 md:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
     >
       {/* Print-specific style: Exact A4 full-page, zero bottom gap, pinned footer, never blank page */}
       <style>{`
@@ -312,12 +322,12 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
           }
           #invoice-container {
             position: relative !important;
-            width: 210mm !important;
+            width: 100% !important;
             max-width: 210mm !important;
-            min-height: 297mm !important;
-            max-height: 297mm !important;
+            height: 296mm !important;
+            max-height: 296mm !important;
             box-sizing: border-box !important;
-            padding: 12mm 14mm 10mm 14mm !important;
+            padding: 10mm 12mm !important;
             margin: 0 auto !important;
             display: flex !important;
             flex-direction: column !important;
@@ -337,7 +347,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({
       <div
         ref={cardRef}
         style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
-        className="popup-card relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="pointer-events-auto popup-card relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >

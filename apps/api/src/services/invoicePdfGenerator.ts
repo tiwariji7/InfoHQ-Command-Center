@@ -191,7 +191,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   }
 
   // Draw Items Rows (Wrapped by words so no text is ever clipped or truncated with ...)
-  items.slice(0, 5).forEach((item: any, idx) => {
+  items.forEach((item: any, idx) => {
     const itemNum = String(item.num || idx + 1);
     const itemDesc = String(item.desc || item.description || item.title || item.name || 'Milestone Delivery').trim();
     const itemQty = String(item.qty || item.quantity || 1);
@@ -396,7 +396,7 @@ export async function generateInvoicePdf(data: InvoicePdfOptions): Promise<Uint8
   const fLine1Y = 54;
   const fInfoW = fontBold.widthOfTextAtSize('Info', 9.5);
   const fHqW = fontBold.widthOfTextAtSize('HQ', 9.5);
-  const fText = ' Pvt Ltd   •   Prayagraj, Uttar Pradesh, India';
+  const fText = ' Pvt Ltd   •   Prayagraj & Pune, India';
   const fTotalW = fInfoW + fHqW + fontBold.widthOfTextAtSize(fText, 9.5);
   const fStart1X = (width - fTotalW) / 2;
 
