@@ -30,6 +30,7 @@ export const ModulePermissionSchema = z.object({
   billing: z.boolean().default(false),
   team: z.boolean().default(false),
   settings: z.boolean().default(false),
+  logs: z.boolean().default(false),
 });
 export type ModulePermissions = z.infer<typeof ModulePermissionSchema>;
 
@@ -723,4 +724,61 @@ export interface MorningBriefingDigest {
   }>;
   recentAlerts: AutomationAlert[];
   latestCronLog?: AutomationLog | null;
+}
+
+// --- Enterprise Audit Logs & Telemetry Models ---
+
+export const AuditLogActionSchema = z.enum([
+  'USER_LOGIN',
+  'USER_LOGOUT',
+  'LEAD_CREATED',
+  'LEAD_UPDATED',
+  'LEAD_STAGE_CHANGED',
+  'LEAD_DELETED',
+  'LEAD_CONVERTED',
+  'CLIENT_CREATED',
+  'CLIENT_UPDATED',
+  'CLIENT_ARCHIVED',
+  'PROJECT_CREATED',
+  'PROJECT_UPDATED',
+  'PROJECT_STATUS_CHANGED',
+  'PROJECT_DELETED',
+  'TASK_CREATED',
+  'TASK_UPDATED',
+  'TASK_COMPLETED',
+  'TASK_DELETED',
+  'INVOICE_CREATED',
+  'INVOICE_UPDATED',
+  'INVOICE_RECORDED',
+  'PAYMENT_CAPTURED_RAZORPAY',
+  'TEAM_MEMBER_INVITED',
+  'TEAM_MEMBER_PERMISSIONS_UPDATED',
+  'TEAM_MEMBER_STATUS_CHANGED',
+  'TEAM_MEMBER_REVOKED',
+  'SETTINGS_UPDATED',
+  'SYSTEM_MAINTENANCE',
+]);
+export type AuditLogAction = z.infer<typeof AuditLogActionSchema>;
+
+export interface AuditLogItem {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  actorEmail: string | null;
+  actorRole: UserRole;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  summary: string;
+  detailsJson: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: number;
+}
+
+export interface AuditLogListResponse {
+  logs: AuditLogItem[];
+  totalCount: number;
+  retentionDays: number;
 }

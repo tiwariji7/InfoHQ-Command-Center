@@ -3,6 +3,7 @@ import type { AppContext } from '../types/env.js';
 import { requireSuperadmin, requireAuth, DEFAULT_ROLE_PERMISSIONS } from '../middleware/auth.js';
 import { InviteUserSchema, UpdateUserPermissionsSchema, UserRole } from '@infohq/shared';
 import { sendTeamInvitationEmailViaResend } from '../services/teamInviteService.js';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const teamRouter = new Hono<AppContext>();
 
@@ -229,6 +230,36 @@ teamRouter.post('/invite', requireSuperadmin, async (c) => {
       }
     }
 
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      db,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'TEAM_MEMBER_INVITED',
+        entityType: 'team',
+        entityId: inviteId,
+        entityName: name,
+        summary: `${invitedBy} officially invited ${name} (${cleanEmail}) as ${role.toUpperCase()}`,
+        details: {
+          name,
+          email: cleanEmail,
+          role,
+          permissions: effectivePermissions,
+          emailDispatched: emailSent,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json(
       {
         success: true,
@@ -315,6 +346,30 @@ teamRouter.patch('/members/:id', requireSuperadmin, async (c) => {
       .bind(...bindings, memberId)
       .run();
 
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      db,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'TEAM_MEMBER_PERMISSIONS_UPDATED',
+        entityType: 'team',
+        entityId: memberId,
+        summary: `${user?.name || 'Superadmin'} updated access control & permissions for team member (ID: ${memberId})`,
+        details: { memberId, role, status, permissions },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, message: 'Permissions successfully updated.' });
   } catch (err: unknown) {
     console.error('Failed to update member permissions:', err instanceof Error ? err.message : err);
@@ -333,9 +388,9 @@ teamRouter.delete('/members/:id', requireSuperadmin, async (c) => {
   try {
     // Find the member record first to identify email/clerk_user_id
     const targetUser = await db
-      .prepare('SELECT id, clerk_user_id, email FROM users WHERE id = ? OR clerk_user_id = ?')
+      .prepare('SELECT id, clerk_user_id, email, name FROM users WHERE id = ? OR clerk_user_id = ?')
       .bind(memberId, memberId)
-      .first<{ id: string; clerk_user_id: string; email: string | null }>();
+      .first<{ id: string; clerk_user_id: string; email: string | null; name: string | null }>();
 
     // Delete user record
     await db.prepare('DELETE FROM users WHERE id = ? OR clerk_user_id = ?').bind(memberId, memberId).run();
@@ -353,6 +408,31 @@ teamRouter.delete('/members/:id', requireSuperadmin, async (c) => {
         .bind(emailPart)
         .run();
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      db,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'TEAM_MEMBER_REVOKED',
+        entityType: 'team',
+        entityId: memberId,
+        entityName: targetUser?.name || targetUser?.email || memberId,
+        summary: `${user?.name || 'Superadmin'} revoked workspace access for ${targetUser?.name || targetUser?.email || memberId}`,
+        details: { memberId, email: targetUser?.email, name: targetUser?.name },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
 
     return c.json({ success: true, message: 'Member access revoked.' });
   } catch (err: unknown) {

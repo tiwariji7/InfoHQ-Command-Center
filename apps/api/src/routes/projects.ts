@@ -16,6 +16,7 @@ import {
   updateTask,
   deleteTask,
 } from '../services/projectService.js';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const projectsRouter = new Hono<AppContext>();
 
@@ -127,6 +128,31 @@ projectsRouter.post('/', async (c) => {
 
   try {
     const project = await createProject(c.env.DB, parseResult.data, user?.clerkUserId || 'superadmin');
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'PROJECT_CREATED',
+        entityType: 'projects',
+        entityId: project.id,
+        entityName: project.title,
+        summary: `${user?.name || 'Superadmin'} created new project "${project.title}" for client ${project.clientName}`,
+        details: { title: project.title, clientName: project.clientName, budget: project.budget, targetDate: project.targetDate },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ project }, 201);
   } catch (err: unknown) {
     console.error('Error creating project:', err instanceof Error ? err.message : err);
@@ -184,6 +210,35 @@ projectsRouter.patch('/:id', async (c) => {
     if (!updated) {
       return c.json({ error: 'not_found', message: 'Project not found.' }, 404);
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    const isStatusChange = parseResult.data.status !== undefined;
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: isStatusChange ? 'PROJECT_STATUS_CHANGED' : 'PROJECT_UPDATED',
+        entityType: 'projects',
+        entityId: projectId,
+        entityName: updated.title,
+        summary: isStatusChange
+          ? `${user?.name || 'Superadmin'} updated project "${updated.title}" status to ${updated.status?.toUpperCase()}`
+          : `${user?.name || 'Superadmin'} updated project "${updated.title}"`,
+        details: { projectId, changes: parseResult.data, status: updated.status },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ project: updated });
   } catch (err: unknown) {
     console.error('Error updating project:', err instanceof Error ? err.message : err);

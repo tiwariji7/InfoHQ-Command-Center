@@ -8,6 +8,7 @@ import {
   createOrGetClient,
   updateClient,
 } from '../services/clientService.js';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const clientsRouter = new Hono<AppContext>();
 
@@ -78,6 +79,32 @@ clientsRouter.post('/', async (c) => {
 
   try {
     const client = await createOrGetClient(c.env.DB, parseResult.data);
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'CLIENT_CREATED',
+        entityType: 'clients',
+        entityId: client.id,
+        entityName: client.name,
+        summary: `${user?.name || 'Superadmin'} created new client record: ${client.name} (${client.id})`,
+        details: { name: client.name, email: client.email, phone: client.phone, company: client.company },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: client }, 201);
   } catch (err: unknown) {
     console.error('Error creating client:', err instanceof Error ? err.message : err);
@@ -116,6 +143,32 @@ clientsRouter.patch('/:idOrName', async (c) => {
     if (!updated) {
       return c.json({ error: 'not_found', message: 'Client not found.' }, 404);
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'CLIENT_PROFILE_UPDATED',
+        entityType: 'clients',
+        entityId: updated.id,
+        entityName: updated.name,
+        summary: `${user?.name || 'Superadmin'} updated client profile: ${updated.name} (${updated.id})`,
+        details: { changedFields: parseResult.data, currentEmail: updated.email, currentPhone: updated.phone },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: updated });
   } catch (err: unknown) {
     console.error('Error updating client:', err instanceof Error ? err.message : err);

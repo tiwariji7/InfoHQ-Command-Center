@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from '../types/env.js';
 import { LeadSourceSchema } from '@infohq/shared';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const intakeRouter = new Hono<AppContext>();
 
@@ -239,6 +240,36 @@ async function handleInboundLead(c: Context<AppContext>) {
           .catch((err) => console.error('[Telegram Intake] Error sending alert:', err))
       );
     }
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Website Inbound Form';
+    await logAuditEvent(
+      db,
+      c.env,
+      {
+        actor: {
+          id: 'public_visitor',
+          name: clientName,
+          email: normalizedEmail,
+          role: 'viewer',
+        },
+        action: 'LEAD_RECEIVED_INBOUND',
+        entityType: 'leads',
+        entityId: finalLeadId,
+        entityName: clientName,
+        summary: `New inbound inquiry from ${clientName} (${normalizedEmail || normalizedPhone || 'Website Visitor'}) for ${serviceNeeded}`,
+        details: {
+          serviceNeeded,
+          company: data.company?.trim(),
+          phone: normalizedPhone,
+          budget: data.budget?.trim(),
+          isRepeatLead,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
 
     return c.json(
       {

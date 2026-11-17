@@ -30,6 +30,7 @@ import type {
   ClientDetailResponse,
   CreateClientInput,
   UpdateClientInput,
+  AuditLogListResponse,
 } from '@infohq/shared';
 
 function buildUrl(endpoint: string): string {
@@ -608,4 +609,36 @@ export async function fetchClientPortalData(
   }
   return res.json();
 }
+
+// --- Enterprise Audit Logs & Telemetry API ---
+
+export async function fetchAuditLogsApi(
+  getToken: () => Promise<string | null>,
+  params?: {
+    search?: string;
+    action?: string;
+    entityType?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<AuditLogListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set('search', params.search);
+  if (params?.action) query.set('action', params.action);
+  if (params?.entityType) query.set('entityType', params.entityType);
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.offset) query.set('offset', String(params.offset));
+
+  const qs = query.toString();
+  return fetchWithAuth<AuditLogListResponse>(`/api/logs${qs ? `?${qs}` : ''}`, getToken);
+}
+
+export async function testAuditLogTelemetryApi(
+  getToken: () => Promise<string | null>
+): Promise<{ success: boolean; message: string }> {
+  return fetchWithAuth<{ success: boolean; message: string }>('/api/logs/test', getToken, {
+    method: 'POST',
+  });
+}
+
 

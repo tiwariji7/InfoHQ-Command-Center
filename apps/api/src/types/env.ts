@@ -13,6 +13,8 @@ export interface Bindings {
   ADMIN_NOTIFY_WEBHOOK?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
+  TELEGRAM_LOGS_CHAT_ID?: string;
+  telegram_logs_chat_id?: string;
   RESEND_API_KEY?: string;
   ADMIN_EMAIL?: string;
   RAZORPAY_KEY_ID?: string;

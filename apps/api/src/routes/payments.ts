@@ -25,6 +25,7 @@ import {
   recordPaymentReceived,
   deletePayment,
 } from '../services/paymentService.js';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const paymentsRouter = new Hono<AppContext>();
 
@@ -180,6 +181,38 @@ paymentsRouter.post('/', async (c) => {
       }
     }
 
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'INVOICE_CREATED',
+        entityType: 'payments',
+        entityId: payment.id,
+        entityName: payment.title || payment.invoiceNumber || 'Invoice',
+        summary: `${user?.name || 'Superadmin'} created invoice #${payment.invoiceNumber || payment.id} for ₹${payment.amount} (Client: ${payment.clientName || 'N/A'})`,
+        details: {
+          invoiceId: payment.id,
+          invoiceNumber: payment.invoiceNumber,
+          amount: payment.amount,
+          clientName: payment.clientName,
+          title: payment.title,
+          projectId: payment.projectId,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ payment }, 201);
   } catch (err: unknown) {
     console.error('Error creating payment:', err instanceof Error ? err.message : err);
@@ -319,6 +352,37 @@ paymentsRouter.post('/:id/record-payment', async (c) => {
         )
       );
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'INVOICE_RECORDED',
+        entityType: 'payments',
+        entityId: paymentId,
+        entityName: updated.title || updated.invoiceNumber || paymentId,
+        summary: `${user?.name || 'Superadmin'} recorded payment received for invoice #${updated.invoiceNumber || paymentId} (₹${updated.amount}) via ${updated.paymentMethod || 'Manual Record'}`,
+        details: {
+          invoiceNumber: updated.invoiceNumber,
+          amount: updated.amount,
+          clientName: updated.clientName,
+          paymentMethod: updated.paymentMethod,
+          paidAt: timeIST,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
 
     return c.json({ payment: updated });
   } catch (err: unknown) {

@@ -12,6 +12,7 @@ import { webhooksRouter } from './routes/webhooks.js';
 import { clientsRouter } from './routes/clients.js';
 import { teamRouter } from './routes/team.js';
 import { portalRouter } from './routes/portal.js';
+import { logsRouter } from './routes/logs.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import { autoSyncPendingRazorpayPayments } from './services/billingService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
@@ -130,6 +131,9 @@ app.route('/api/automations', automationsRouter);
 
 // Protected: Team members and RBAC management router (Superadmin only)
 app.route('/api/team', teamRouter);
+
+// Protected: Enterprise Audit Logs router (Superadmin & authorized members)
+app.route('/api/logs', logsRouter);
 
 // Export Cloudflare Worker fetch & scheduled cron handler
 export default {

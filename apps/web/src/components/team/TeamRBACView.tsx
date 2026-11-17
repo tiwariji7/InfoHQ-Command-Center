@@ -32,6 +32,7 @@ const MODULES = [
   { key: 'tasks', label: 'Tasks & Sprints' },
   { key: 'billing', label: 'Invoices & Finance' },
   { key: 'team', label: 'Team & RBAC' },
+  { key: 'logs', label: 'Audit Logs' },
   { key: 'settings', label: 'System Settings' },
 ];
 
@@ -57,6 +58,7 @@ export const TeamRBACView: React.FC = () => {
     tasks: true,
     billing: false,
     team: false,
+    logs: false,
     settings: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);

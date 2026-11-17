@@ -12,6 +12,7 @@ import { ModulePlaceholderView } from './ModulePlaceholderView.js';
 import { CommandPalette } from './CommandPalette.js';
 import { TasksView } from '../tasks/TasksView.js';
 import { TeamRBACView } from '../team/TeamRBACView.js';
+import { AuditLogsView } from '../logs/AuditLogsView.js';
 import {
   Compass,
   Inbox,
@@ -23,6 +24,7 @@ import {
   FileSpreadsheet,
   TrendingUp,
   UserCheck,
+  ShieldAlert,
   SlidersHorizontal,
   LogOut,
   Menu,
@@ -201,6 +203,15 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
           label: 'Team & Roles',
           icon: UserCheck,
         },
+        ...(initialUser.role === 'superadmin' || initialUser.permissions?.logs
+          ? [
+              {
+                id: 'logs',
+                label: 'Audit Logs',
+                icon: ShieldAlert,
+              },
+            ]
+          : []),
         {
           id: 'settings',
           label: 'Settings & Security',
@@ -286,6 +297,10 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
         );
       case 'team':
         return <TeamRBACView />;
+      case 'logs':
+      case 'audit_logs':
+      case 'audit-logs':
+        return <AuditLogsView />;
       case 'communications':
         return (
           <ModulePlaceholderView

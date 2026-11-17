@@ -15,6 +15,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModulePermissions> = {
     billing: true,
     team: true,
     settings: true,
+    logs: true,
   },
   project_manager: {
     dashboard: true,
@@ -26,6 +27,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModulePermissions> = {
     billing: false,
     team: false,
     settings: false,
+    logs: false,
   },
   sales: {
     dashboard: true,
@@ -37,6 +39,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModulePermissions> = {
     billing: false,
     team: false,
     settings: false,
+    logs: false,
   },
   developer: {
     dashboard: true,
@@ -48,6 +51,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModulePermissions> = {
     billing: false,
     team: false,
     settings: false,
+    logs: false,
   },
   viewer: {
     dashboard: true,
@@ -59,6 +63,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModulePermissions> = {
     billing: false,
     team: false,
     settings: false,
+    logs: false,
   },
 };
 
