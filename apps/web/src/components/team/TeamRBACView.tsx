@@ -460,9 +460,8 @@ export const TeamRBACView: React.FC = () => {
             return (
               <div key={member.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#FAF9FF]/60 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${
-                    isSuper ? 'bg-[#7C5CE8] text-white' : 'bg-[#F3F0FF] text-[#7C5CE8]'
-                  }`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${isSuper ? 'bg-[#7C5CE8] text-white' : 'bg-[#F3F0FF] text-[#7C5CE8]'
+                    }`}>
                     {member.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -497,11 +496,10 @@ export const TeamRBACView: React.FC = () => {
                     <>
                       <button
                         onClick={() => handleToggleStatus(member)}
-                        className={`h-8 px-2.5 rounded-lg text-[11px] font-bold border ${
-                          isSuspended
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
+                        className={`h-8 px-2.5 rounded-lg text-[11px] font-bold border ${isSuspended
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
                       >
                         {isSuspended ? 'Activate' : 'Suspend'}
                       </button>

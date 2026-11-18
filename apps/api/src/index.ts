@@ -13,6 +13,7 @@ import { clientsRouter } from './routes/clients.js';
 import { teamRouter } from './routes/team.js';
 import { portalRouter } from './routes/portal.js';
 import { logsRouter } from './routes/logs.js';
+import { logAuditEvent } from './services/auditLogService.js';
 import { runMorningBriefingAndAudits } from './services/automationService.js';
 import { autoSyncPendingRazorpayPayments } from './services/billingService.js';
 import type { HealthResponse, MeResponse } from '@infohq/shared';
@@ -95,6 +96,83 @@ app.get('/api/me', requireAuth, (c) => {
     user,
   };
   return c.json(response);
+});
+
+// Protected: Log user login event with IP, device, and timestamp
+app.post('/api/auth/log-session', requireAuth, async (c) => {
+  const db = c.env.DB || c.env.COMMAND_DB;
+  if (!db) {
+    return c.json({ error: 'service_unavailable' }, 503);
+  }
+  const user = c.get('user');
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+  const ua = c.req.header('user-agent') || 'Browser Client';
+
+  await logAuditEvent(
+    db,
+    c.env,
+    {
+      actor: {
+        id: user?.id,
+        name: user?.name || user?.email || 'Authenticated User',
+        email: user?.email,
+        role: user?.role || 'viewer',
+      },
+      action: 'USER_LOGIN',
+      entityType: 'auth',
+      entityId: user?.id,
+      entityName: user?.email || user?.name,
+      summary: `${user?.name || user?.email} signed in to InfoHQ Command Center`,
+      details: {
+        role: user?.role,
+        clerkUserId: user?.clerkUserId,
+        email: user?.email,
+      },
+      ipAddress: ip,
+      userAgent: ua,
+    },
+    c.executionCtx
+  );
+
+  return c.json({ success: true });
+});
+
+// Protected: Log user logout event
+app.post('/api/auth/log-logout', requireAuth, async (c) => {
+  const db = c.env.DB || c.env.COMMAND_DB;
+  if (!db) {
+    return c.json({ error: 'service_unavailable' }, 503);
+  }
+  const user = c.get('user');
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+  const ua = c.req.header('user-agent') || 'Browser Client';
+
+  await logAuditEvent(
+    db,
+    c.env,
+    {
+      actor: {
+        id: user?.id,
+        name: user?.name || user?.email || 'Authenticated User',
+        email: user?.email,
+        role: user?.role || 'viewer',
+      },
+      action: 'USER_LOGOUT',
+      entityType: 'auth',
+      entityId: user?.id,
+      entityName: user?.email || user?.name,
+      summary: `${user?.name || user?.email} signed out of InfoHQ Command Center`,
+      details: {
+        role: user?.role,
+        clerkUserId: user?.clerkUserId,
+      },
+      ipAddress: ip,
+      userAgent: ua,
+    },
+    c.executionCtx
+  );
+
+  return c.json({ success: true });
 });
 
 // Public: Website and landing page inbound lead intake webhook

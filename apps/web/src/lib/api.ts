@@ -635,10 +635,38 @@ export async function fetchAuditLogsApi(
 
 export async function testAuditLogTelemetryApi(
   getToken: () => Promise<string | null>
-): Promise<{ success: boolean; message: string }> {
-  return fetchWithAuth<{ success: boolean; message: string }>('/api/logs/test', getToken, {
+): Promise<{ success: boolean; message: string; telegramDelivered?: boolean; telegramError?: string | null }> {
+  return fetchWithAuth<{ success: boolean; message: string; telegramDelivered?: boolean; telegramError?: string | null }>('/api/logs/test', getToken, {
     method: 'POST',
   });
+}
+
+export async function logUserLoginApi(
+  getToken: () => Promise<string | null>
+): Promise<{ success: boolean }> {
+  try {
+    return await fetchWithAuth<{ success: boolean }>('/api/auth/log-session', getToken, {
+      method: 'POST',
+    });
+  } catch (err) {
+    // Non-blocking telemetry
+    console.warn('Failed to record login audit log:', err);
+    return { success: false };
+  }
+}
+
+export async function logUserLogoutApi(
+  getToken: () => Promise<string | null>
+): Promise<{ success: boolean }> {
+  try {
+    return await fetchWithAuth<{ success: boolean }>('/api/auth/log-logout', getToken, {
+      method: 'POST',
+    });
+  } catch (err) {
+    // Non-blocking telemetry
+    console.warn('Failed to record logout audit log:', err);
+    return { success: false };
+  }
 }
 
 

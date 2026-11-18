@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import { checkHealth, fetchMe, ApiRequestError } from './lib/api.js';
+import { checkHealth, fetchMe, ApiRequestError, logUserLoginApi } from './lib/api.js';
 import type { HealthResponse, AuthUser } from '@infohq/shared';
 import { SignInCard } from './components/auth/SignInCard.js';
 import { AccessRestrictedScreen } from './components/auth/AccessRestrictedScreen.js';
@@ -104,6 +104,13 @@ export const App: React.FC = () => {
         if (isMounted) {
           setAuthenticatedUser(res.user);
           setAccessDeniedReason(null);
+
+          // Log user login once per browser session
+          const sessionKey = `ihq_auth_session_${res.user.id}`;
+          if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionKey)) {
+            sessionStorage.setItem(sessionKey, 'active');
+            logUserLoginApi(getToken);
+          }
         }
       })
       .catch((err: unknown) => {

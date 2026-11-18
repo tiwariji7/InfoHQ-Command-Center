@@ -422,6 +422,35 @@ paymentsRouter.patch('/:id', async (c) => {
     if (!updated) {
       return c.json({ error: 'not_found', message: 'Payment record not found.' }, 404);
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    const isStatus = parseResult.data.status !== undefined;
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: isStatus ? 'INVOICE_STATUS_CHANGED' : 'INVOICE_UPDATED',
+        entityType: 'payments',
+        entityId: paymentId,
+        entityName: updated.invoiceNumber || updated.title || paymentId,
+        summary: isStatus
+          ? `${user?.name || 'Superadmin'} updated invoice #${updated.invoiceNumber || paymentId} status to ${updated.status?.toUpperCase()}`
+          : `${user?.name || 'Superadmin'} updated invoice #${updated.invoiceNumber || paymentId} details`,
+        details: { paymentId, changes: parseResult.data, status: updated.status, amount: updated.amount },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ payment: updated });
   } catch (err: unknown) {
     console.error('Error updating payment:', err instanceof Error ? err.message : err);
@@ -437,7 +466,34 @@ paymentsRouter.delete('/:id', async (c) => {
 
   const paymentId = c.req.param('id');
   try {
+    const existing = await getPaymentById(c.env.DB, paymentId);
     const success = await deletePayment(c.env.DB, paymentId);
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'INVOICE_DELETED',
+        entityType: 'payments',
+        entityId: paymentId,
+        entityName: existing?.invoiceNumber || paymentId,
+        summary: `${user?.name || 'Superadmin'} deleted invoice #${existing?.invoiceNumber || paymentId} (₹${existing?.amount || 0})`,
+        details: { paymentId, invoiceNumber: existing?.invoiceNumber, amount: existing?.amount, clientName: existing?.clientName },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success });
   } catch (err: unknown) {
     console.error('Error deleting payment:', err instanceof Error ? err.message : err);
@@ -562,6 +618,37 @@ const handleGenerateOrResendLink = async (c: any) => {
   }
 
   const updatedPayment = await getPaymentById(c.env.DB, paymentId);
+
+  const user = c.get('user');
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+  const ua = c.req.header('user-agent') || 'Browser Client';
+  await logAuditEvent(
+    c.env.DB,
+    c.env,
+    {
+      actor: {
+        id: user?.id,
+        name: user?.name || 'Superadmin',
+        email: user?.email,
+        role: user?.role || 'superadmin',
+      },
+      action: 'PAYMENT_LINK_GENERATED',
+      entityType: 'payments',
+      entityId: paymentId,
+      entityName: invoiceNumber,
+      summary: `${user?.name || 'Superadmin'} generated live payment link for invoice #${invoiceNumber} (₹${payment.amount})`,
+      details: {
+        paymentId,
+        invoiceNumber,
+        amount: payment.amount,
+        clientName: payment.clientName,
+        paymentLinkUrl: rzpResult.shortUrl,
+      },
+      ipAddress: ip,
+      userAgent: ua,
+    },
+    c.executionCtx
+  );
   return c.json({
     success: true,
     paymentLinkUrl: rzpResult.shortUrl,

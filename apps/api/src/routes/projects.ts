@@ -274,6 +274,32 @@ projectsRouter.post('/:id/tasks', async (c) => {
 
   try {
     const task = await createTask(c.env.DB, projectId, parseResult.data);
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'TASK_CREATED',
+        entityType: 'projects',
+        entityId: task.id,
+        entityName: task.title,
+        summary: `${user?.name || 'Superadmin'} created task "${task.title}" under project ${projectId}`,
+        details: { projectId, taskId: task.id, title: task.title, priority: task.priority, dueDate: task.dueDate },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ task }, 201);
   } catch (err: unknown) {
     console.error('Error creating task:', err instanceof Error ? err.message : err);
@@ -313,6 +339,35 @@ projectsRouter.patch('/:id/tasks/:taskId', async (c) => {
     if (!updated) {
       return c.json({ error: 'not_found', message: 'Task not found.' }, 404);
     }
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    const isStatus = parseResult.data.status !== undefined;
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: isStatus ? 'TASK_STATUS_CHANGED' : 'TASK_UPDATED',
+        entityType: 'projects',
+        entityId: taskId,
+        entityName: updated.title,
+        summary: isStatus
+          ? `${user?.name || 'Superadmin'} updated task "${updated.title}" status to ${updated.status?.toUpperCase()}`
+          : `${user?.name || 'Superadmin'} updated task "${updated.title}"`,
+        details: { projectId, taskId, changes: parseResult.data, status: updated.status },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ task: updated });
   } catch (err: unknown) {
     console.error('Error updating task:', err instanceof Error ? err.message : err);
@@ -331,6 +386,32 @@ projectsRouter.delete('/:id/tasks/:taskId', async (c) => {
 
   try {
     const success = await deleteTask(c.env.DB, projectId, taskId);
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'TASK_DELETED',
+        entityType: 'projects',
+        entityId: taskId,
+        entityName: taskId,
+        summary: `${user?.name || 'Superadmin'} deleted task ${taskId} from project ${projectId}`,
+        details: { projectId, taskId },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success });
   } catch (err: unknown) {
     console.error('Error deleting task:', err instanceof Error ? err.message : err);

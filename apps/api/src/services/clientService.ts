@@ -81,7 +81,7 @@ export async function createOrGetClient(
     address?: string | null;
     sourceLeadId?: string | null;
   }
-): Promise<Client> {
+): Promise<Client & { isNew?: boolean }> {
   const cleanName = params.name.trim();
   const cleanEmail = params.email?.trim().toLowerCase() || null;
   const cleanPhone = params.phone?.trim() || null;
@@ -120,14 +120,17 @@ export async function createOrGetClient(
       .bind(updatedCompany, updatedEmail, updatedPhone, updatedLeadId, now, existing.id)
       .run();
 
-    return mapDbRowToClient({
-      ...existing,
-      company: updatedCompany,
-      email: updatedEmail,
-      phone: updatedPhone,
-      source_lead_id: updatedLeadId,
-      updated_at: now,
-    });
+    return Object.assign(
+      mapDbRowToClient({
+        ...existing,
+        company: updatedCompany,
+        email: updatedEmail,
+        phone: updatedPhone,
+        source_lead_id: updatedLeadId,
+        updated_at: now,
+      }),
+      { isNew: false }
+    );
   }
 
   // 2. Generate custom unique formatted Client ID: CLT-YYYY-XXXXX
@@ -165,6 +168,7 @@ export async function createOrGetClient(
     totalPaid: 0,
     createdAt: now,
     updatedAt: now,
+    isNew: true,
   };
 }
 
@@ -370,9 +374,9 @@ export async function updateClient(
 
     const leadMatch = !projectMatch && !existing
       ? await db
-          .prepare('SELECT id, client_id, name, email, phone, company FROM leads WHERE LOWER(name) = LOWER(?) LIMIT 1')
-          .bind(cleanTerm)
-          .first<Record<string, unknown>>()
+        .prepare('SELECT id, client_id, name, email, phone, company FROM leads WHERE LOWER(name) = LOWER(?) LIMIT 1')
+        .bind(cleanTerm)
+        .first<Record<string, unknown>>()
       : null;
 
     if (!existing && leadMatch?.client_id) {

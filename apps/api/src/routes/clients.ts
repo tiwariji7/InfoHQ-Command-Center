@@ -83,6 +83,8 @@ clientsRouter.post('/', async (c) => {
     const user = c.get('user');
     const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
     const ua = c.req.header('user-agent') || 'Browser Client';
+    const isNew = (client as { isNew?: boolean }).isNew === true;
+
     await logAuditEvent(
       c.env.DB,
       c.env,
@@ -93,12 +95,14 @@ clientsRouter.post('/', async (c) => {
           email: user?.email,
           role: user?.role || 'superadmin',
         },
-        action: 'CLIENT_CREATED',
+        action: isNew ? 'CLIENT_CREATED' : 'CLIENT_PROFILE_UPDATED',
         entityType: 'clients',
         entityId: client.id,
         entityName: client.name,
-        summary: `${user?.name || 'Superadmin'} created new client record: ${client.name} (${client.id})`,
-        details: { name: client.name, email: client.email, phone: client.phone, company: client.company },
+        summary: isNew
+          ? `${user?.name || 'Superadmin'} created new client record: ${client.name} (${client.id})`
+          : `${user?.name || 'Superadmin'} matched & updated existing client: ${client.name} (${client.id})`,
+        details: { name: client.name, email: client.email, phone: client.phone, company: client.company, isNew },
         ipAddress: ip,
         userAgent: ua,
       },

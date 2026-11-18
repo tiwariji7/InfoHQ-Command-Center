@@ -41,11 +41,21 @@ logsRouter.post('/test', requireSuperadmin, async (c) => {
     return c.json({ error: 'service_unavailable', message: 'Database binding not configured.' }, 503);
   }
 
+  const rawChatId =
+    c.env.TELEGRAM_LOGS_CHAT_ID ||
+    (c.env as unknown as Record<string, string>)['telegram_logs_chat_id'] ||
+    c.env.TELEGRAM_CHAT_ID;
+  const cleanChatId = String(rawChatId || '').replace(/["'\r\n\s]/g, '').trim();
+  const cleanToken = String(c.env.TELEGRAM_BOT_TOKEN || '').replace(/["'\r\n\s]/g, '').trim();
+
+  const isConfigured = Boolean(cleanToken && cleanChatId);
+
   const user = c.get('user');
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
   const ua = c.req.header('user-agent') || 'Browser Client';
 
-  await logAuditEvent(
+  // Do not pass executionCtx so the diagnostic directly awaits Telegram response and verifies it
+  const result = await logAuditEvent(
     db,
     c.env,
     {
@@ -59,19 +69,23 @@ logsRouter.post('/test', requireSuperadmin, async (c) => {
       entityType: 'system',
       summary: 'Verified live audit logging and Telegram channel telemetry connection.',
       details: {
-        channelConfigured: true,
-        channelId: c.env.TELEGRAM_LOGS_CHAT_ID || (c.env as any).telegram_logs_chat_id || 'active',
+        channelConfigured: isConfigured,
+        channelId: cleanChatId || 'missing',
         retentionPolicy: '30-Day Rolling Window',
-        testTriggeredBy: user?.name,
+        testTriggeredBy: user?.name || 'Superadmin',
       },
       ipAddress: ip,
       userAgent: ua,
-    },
-    c.executionCtx
+    }
   );
 
   return c.json({
     success: true,
-    message: 'Test audit log generated and dispatched to Telegram logs channel.',
+    logId: result.logId,
+    telegramDelivered: result.telegramDispatched,
+    telegramError: result.telegramError || null,
+    message: result.telegramDispatched
+      ? 'Test audit log recorded and verified delivered to Telegram logs channel.'
+      : `Audit log recorded in D1, but Telegram dispatch failed: ${result.telegramError || 'Settings missing or channel not accessible'}`,
   });
 });

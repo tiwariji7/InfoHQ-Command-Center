@@ -64,7 +64,7 @@ export async function logAuditEvent(
   env: Bindings,
   params: LogAuditParams,
   executionCtx?: { waitUntil: (promise: Promise<unknown>) => void }
-): Promise<void> {
+): Promise<{ logId: string; telegramDispatched: boolean; telegramError?: string }> {
   const now = Date.now();
   const logId = `log_${now}_${crypto.randomUUID().slice(0, 8)}`;
   const cleanIp = params.ipAddress ? params.ipAddress.split(',')[0].trim() : '127.0.0.1';
@@ -116,17 +116,29 @@ export async function logAuditEvent(
     (env as unknown as Record<string, string>)['telegram_logs_chat_id'] ||
     env.TELEGRAM_CHAT_ID;
 
-  if (env.TELEGRAM_BOT_TOKEN && rawChatId) {
+  const cleanChatId = String(rawChatId || '').replace(/["'\r\n\s]/g, '').trim();
+  const cleanToken = String(env.TELEGRAM_BOT_TOKEN || '').replace(/["'\r\n\s]/g, '').trim();
+
+  let telegramDispatched = false;
+  let telegramError: string | undefined;
+
+  if (cleanToken && cleanChatId) {
     const telegramPromise = dispatchTelegramAuditLog({
-      botToken: env.TELEGRAM_BOT_TOKEN,
-      chatId: String(rawChatId).trim(),
+      botToken: cleanToken,
+      chatId: cleanChatId,
       params,
       timestamp: now,
       ipAddress: cleanIp,
       userAgent: cleanUa,
       detailsJson,
-    }).catch((tgErr) => {
+    }).then((res) => {
+      telegramDispatched = res.ok;
+      if (!res.ok) telegramError = res.error;
+      return res;
+    }).catch((tgErr: unknown) => {
+      telegramError = tgErr instanceof Error ? tgErr.message : String(tgErr);
       console.warn('[Telegram Audit Log Dispatch Warning]:', tgErr);
+      return { ok: false, error: telegramError };
     });
 
     if (executionCtx && typeof executionCtx.waitUntil === 'function') {
@@ -135,14 +147,20 @@ export async function logAuditEvent(
       } catch {
         // Fallback
       }
+    } else {
+      await telegramPromise;
     }
+  } else {
+    telegramError = !cleanToken ? 'TELEGRAM_BOT_TOKEN missing' : 'TELEGRAM_LOGS_CHAT_ID missing';
   }
+
+  return { logId, telegramDispatched, telegramError };
 }
 
 /**
  * Formats and posts an audit log message to Telegram channel in clean, readable HTML.
  */
-async function dispatchTelegramAuditLog(opts: {
+export async function dispatchTelegramAuditLog(opts: {
   botToken: string;
   chatId: string;
   params: LogAuditParams;
@@ -150,7 +168,7 @@ async function dispatchTelegramAuditLog(opts: {
   ipAddress: string;
   userAgent: string;
   detailsJson: string | null;
-}): Promise<boolean> {
+}): Promise<{ ok: boolean; error?: string }> {
   const { botToken, chatId, params, timestamp, ipAddress, userAgent, detailsJson } = opts;
   const timeFormatted = formatIstTime(timestamp);
   const device = parseShortUserAgent(userAgent);
@@ -199,11 +217,13 @@ ${detailsBlock}━━━━━━━━━━━━━━━━━━━━━�
 `.trim();
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken.replace(/^['"]|['"]$/g, '').trim()}/sendMessage`, {
+    const cleanToken = botToken.replace(/["'\r\n\s]/g, '').trim();
+    const cleanChatId = chatId.replace(/["'\r\n\s]/g, '').trim();
+    const res = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: cleanChatId,
         text: message,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
@@ -213,12 +233,13 @@ ${detailsBlock}━━━━━━━━━━━━━━━━━━━━━�
     if (!res.ok) {
       const errBody = await res.text();
       console.warn('[Telegram Audit Log Error Response]:', errBody);
-      return false;
+      return { ok: false, error: errBody };
     }
-    return true;
-  } catch (err) {
+    return { ok: true };
+  } catch (err: unknown) {
+    const errStr = err instanceof Error ? err.message : String(err);
     console.warn('[Telegram Audit Log Fetch Exception]:', err);
-    return false;
+    return { ok: false, error: errStr };
   }
 }
 
@@ -241,6 +262,11 @@ export async function queryAuditLogs(
   const conditions: string[] = [];
   const binds: unknown[] = [];
 
+  // Enforce 30-day retention cutoff on reads as well
+  const retentionCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  conditions.push('created_at >= ?');
+  binds.push(retentionCutoff);
+
   if (query.action && query.action.trim()) {
     conditions.push('action = ?');
     binds.push(query.action.trim());
@@ -253,8 +279,8 @@ export async function queryAuditLogs(
 
   if (query.search && query.search.trim()) {
     const term = `%${query.search.trim()}%`;
-    conditions.push('(actor_name LIKE ? OR actor_email LIKE ? OR summary LIKE ? OR entity_name LIKE ?)');
-    binds.push(term, term, term, term);
+    conditions.push('(action LIKE ? OR actor_name LIKE ? OR actor_email LIKE ? OR summary LIKE ? OR entity_name LIKE ?)');
+    binds.push(term, term, term, term, term);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

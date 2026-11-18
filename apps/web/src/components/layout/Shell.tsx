@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useClerk, useUser } from '@clerk/clerk-react';
+import { useClerk, useUser, useAuth } from '@clerk/clerk-react';
 import { AnimatePresence } from 'framer-motion';
 import type { AuthUser, HealthResponse } from '@infohq/shared';
 import { PageTransition } from '../motion/index.js';
+import { logUserLogoutApi } from '../../lib/api.js';
 import { LeadsInbox } from '../leads/LeadsInbox.js';
 import { PipelineView } from '../pipeline/PipelineView.js';
 import { ProjectsList } from '../projects/ProjectsList.js';
@@ -62,7 +63,20 @@ interface NavSection {
 export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health, apiError: _apiError }) => {
   const clerk = useClerk();
   const { signOut } = clerk;
+  const { getToken } = useAuth();
   const { user: clerkUser } = useUser();
+
+  const handleSignOut = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear();
+      }
+      await logUserLogoutApi(getToken);
+    } catch {
+      // Non-blocking logout telemetry
+    }
+    signOut();
+  };
 
   const getInitialTab = (): string => {
     if (typeof window !== 'undefined') {
@@ -522,7 +536,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
             {/* Drawer Logout Footer */}
             <div className="p-3 border-t border-[#EAE6F7] bg-[#F8F8FF] shrink-0">
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-control text-xs font-semibold text-rose-600 bg-white border border-rose-100 hover:bg-rose-50 transition-colors cursor-pointer shadow-xs"
               >
                 <LogOut size={15} />
@@ -751,7 +765,7 @@ export const Shell: React.FC<ShellProps> = ({ user: initialUser, health: _health
                     <button
                       onClick={() => {
                         setProfileDropdownOpen(false);
-                        signOut();
+                        handleSignOut();
                       }}
                       className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-control text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
                     >

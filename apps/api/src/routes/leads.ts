@@ -21,6 +21,7 @@ import {
   setLeadFollowUp,
   DuplicateLeadError,
 } from '../services/leadService.js';
+import { logAuditEvent } from '../services/auditLogService.js';
 
 export const leadsRouter = new Hono<AppContext>();
 
@@ -104,6 +105,38 @@ leadsRouter.post('/', async (c) => {
 
   try {
     const created = await createLead(c.env.DB, parseResult.data, user.clerkUserId);
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'LEAD_CREATED',
+        entityType: 'leads',
+        entityId: created.id,
+        entityName: created.name,
+        summary: `${user?.name || 'Superadmin'} manually created lead for ${created.name}${created.company ? ` (${created.company})` : ''}`,
+        details: {
+          name: created.name,
+          company: created.company,
+          email: created.email,
+          phone: created.phone,
+          budget: created.budget,
+          serviceNeeded: created.serviceNeeded,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: created }, 201);
   } catch (err: unknown) {
     if (err instanceof DuplicateLeadError) {
@@ -191,6 +224,35 @@ leadsRouter.patch('/:id/stage', async (c) => {
     if (!updatedLead) {
       return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
     }
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'LEAD_STAGE_CHANGED',
+        entityType: 'leads',
+        entityId: leadId,
+        entityName: updatedLead.name,
+        summary: `${user?.name || 'Superadmin'} updated lead stage for "${updatedLead.name}" to ${parseResult.data.stage.toUpperCase()}`,
+        details: {
+          leadId,
+          newStage: parseResult.data.stage,
+          lostReason: parseResult.data.lostReason,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: updatedLead });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : 'Failed to update lead stage.';
@@ -232,6 +294,34 @@ leadsRouter.post('/:id/notes', async (c) => {
     if (!note) {
       return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
     }
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'LEAD_NOTE_ADDED',
+        entityType: 'leads',
+        entityId: leadId,
+        entityName: leadId,
+        summary: `${user?.name || 'Superadmin'} added note to lead ${leadId}`,
+        details: {
+          leadId,
+          noteExcerpt: parseResult.data.body.slice(0, 200),
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: note }, 201);
   } catch (err: unknown) {
     console.error('Error adding lead note:', err instanceof Error ? err.message : err);
@@ -272,6 +362,34 @@ leadsRouter.patch('/:id/follow-up', async (c) => {
     if (!updatedLead) {
       return c.json({ error: 'not_found', message: 'Lead not found.' }, 404);
     }
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'LEAD_FOLLOWUP_SCHEDULED',
+        entityType: 'leads',
+        entityId: leadId,
+        entityName: updatedLead.name,
+        summary: `${user?.name || 'Superadmin'} scheduled follow-up for lead "${updatedLead.name}"`,
+        details: {
+          leadId,
+          nextFollowUpAt: parseResult.data.nextFollowUpAt,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, data: updatedLead });
   } catch (err: unknown) {
     console.error('Error scheduling follow-up:', err instanceof Error ? err.message : err);
@@ -313,6 +431,39 @@ leadsRouter.post('/:id/auto-convert', requireSuperadmin, async (c) => {
       c.env,
       c.executionCtx
     );
+
+    const user = c.get('user');
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1';
+    const ua = c.req.header('user-agent') || 'Browser Client';
+    await logAuditEvent(
+      c.env.DB,
+      c.env,
+      {
+        actor: {
+          id: user?.id,
+          name: user?.name || 'Superadmin',
+          email: user?.email,
+          role: user?.role || 'superadmin',
+        },
+        action: 'LEAD_CONVERTED_TO_PROJECT',
+        entityType: 'leads',
+        entityId: leadId,
+        entityName: result.project?.title || leadId,
+        summary: `${user?.name || 'Superadmin'} converted won lead into Project "${result.project?.title}" & Advance Invoice`,
+        details: {
+          leadId,
+          projectId: result.project?.id,
+          projectTitle: result.project?.title,
+          clientName: result.project?.clientName,
+          invoiceId: result.payment?.id,
+          invoiceAmount: result.payment?.amount,
+        },
+        ipAddress: ip,
+        userAgent: ua,
+      },
+      c.executionCtx
+    );
+
     return c.json({ success: true, ...result });
   } catch (err: unknown) {
     console.error('Error auto-converting lead:', err instanceof Error ? err.message : err);
